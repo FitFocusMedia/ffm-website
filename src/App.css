@@ -1,0 +1,115 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+@theme {
+  --font-sans: "Inter", system-ui, sans-serif;
+  --color-primary-200: #ffc7c7;
+  --color-primary-400: #ff6b6b;
+  --color-primary-500: #f83b3b;
+  --color-primary-600: #e51d1d;
+  --color-primary-700: #c11414;
+  --color-primary-900: #841818;
+  --color-dark-600: #5d5d5d;
+  --color-dark-700: #4f4f4f;
+  --color-dark-800: #454545;
+  --color-dark-900: #3d3d3d;
+  --color-dark-950: #0a0a0a;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-dark-950);
+    color: #f3f4f6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+  input, select, textarea {
+    font-size: 16px;
+  }
+}
+
+.section {
+  scroll-margin-top: 80px;
+}
+
+.text-gradient {
+  background: linear-gradient(to right, var(--color-primary-400), #f97316);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.animated-gradient {
+  background: linear-gradient(-45deg, #0a0a0a, #1a0a0a, #0a0a0a, #0a0514);
+  background-size: 400% 400%;
+  animation: gradient 15s ease infinite;
+}
+
+@keyframes gradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.card-glow {
+  box-shadow: 0 0 30px rgba(248, 59, 59, 0.15);
+}
+
+.hover-lift {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.hover-lift:hover {
+  transform: translateY(-8px);
+}
+
+/* Gallery image hover effect */
+.gallery-item {
+  overflow: hidden;
+  position: relative;
+}
+.gallery-item img {
+  transition: transform 0.5s ease;
+}
+.gallery-item:hover img {
+  transform: scale(1.05);
+}
+.gallery-item .overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 50%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.gallery-item:hover .overlay {
+  opacity: 1;
+}
+
+/* Lightbox */
+.lightbox-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.95);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Hero parallax */
+.hero-bg {
+  background-attachment: fixed;
+  background-position: center;
+  background-size: cover;
+}
+
+@media (max-width: 768px) {
+  .hero-bg {
+    background-attachment: scroll;
+  }
+}
