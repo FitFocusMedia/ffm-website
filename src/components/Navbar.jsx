@@ -56,8 +56,14 @@ const Navbar = () => {
               </Link>
             ))}
             <Link
+              to="/portal"
+              className="ml-2 px-4 py-2 text-sm font-semibold text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+            >
+              Portal
+            </Link>
+            <Link
               to="/proposal"
-              className="ml-3 px-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-lg text-sm transition-all hover:scale-105"
+              className="ml-1 px-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-lg text-sm transition-all hover:scale-105"
             >
               Get Started
             </Link>
@@ -96,6 +102,12 @@ const Navbar = () => {
                   {link.label}
                 </Link>
               ))}
+              <Link
+                to="/portal"
+                className="block px-4 py-3 rounded-lg text-base font-semibold text-gray-400 hover:text-white hover:bg-white/5 transition-all"
+              >
+                Portal
+              </Link>
               <Link
                 to="/proposal"
                 className="block mt-3 px-4 py-3 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-lg text-center transition-all"

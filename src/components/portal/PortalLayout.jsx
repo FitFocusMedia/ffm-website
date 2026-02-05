@@ -15,23 +15,29 @@ export default function PortalLayout({ children }) {
   }
 
   return (
-    <div className="min-h-screen bg-dark-950 flex flex-col">
+    <div className="min-h-screen bg-[#0d0d1a] flex flex-col">
       {/* Portal Header */}
-      <header className="bg-dark-900 border-b border-gray-800">
+      <header className="bg-gradient-to-r from-[#1a1a2e] to-[#16162a] border-b border-gray-800/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-4">
-              <h1 className="text-xl font-bold text-white">Fit Focus Media</h1>
-              <span className="text-gray-500">|</span>
-              <span className="text-gray-400">Contract Portal</span>
+            <div 
+              className="flex items-center gap-3 cursor-pointer"
+              onClick={() => navigate('/portal/contracts')}
+            >
+              <span className="text-lg font-black tracking-wider">
+                <span className="text-red-500">FIT FOCUS</span>{' '}
+                <span className="text-white">MEDIA</span>
+              </span>
+              <span className="text-gray-700">|</span>
+              <span className="text-gray-400 font-medium">Contract Portal</span>
             </div>
 
             {user && (
               <div className="flex items-center gap-4">
-                <span className="text-gray-400 text-sm">{user.email}</span>
+                <span className="text-gray-500 text-sm hidden sm:block">{user.email}</span>
                 <button
                   onClick={handleSignOut}
-                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors text-sm"
+                  className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-lg transition-all text-sm font-medium border border-gray-700/50"
                 >
                   Sign Out
                 </button>
