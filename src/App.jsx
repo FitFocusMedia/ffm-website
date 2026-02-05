@@ -8,6 +8,16 @@ import WorkPage from './pages/WorkPage'
 import ProposalPage from './pages/ProposalPage'
 import ContactPage from './pages/ContactPage'
 
+// Portal imports
+import { AuthProvider } from './context/AuthContext'
+import ProtectedRoute from './components/portal/ProtectedRoute'
+import PortalLayout from './components/portal/PortalLayout'
+import LoginPage from './components/portal/LoginPage'
+import ContractDashboard from './components/portal/ContractDashboard'
+import ContractBuilder from './components/portal/ContractBuilder'
+import ContractView from './components/portal/ContractView'
+import ContractPublicView from './components/portal/ContractPublicView'
+
 function ScrollToTop() {
   const { pathname } = useLocation()
   useEffect(() => {
@@ -16,22 +26,68 @@ function ScrollToTop() {
   return null
 }
 
-function App() {
+// Public layout wrapper
+function PublicLayout({ children }) {
   return (
     <div className="min-h-screen bg-dark-950 flex flex-col">
-      <ScrollToTop />
       <Navbar />
-      <main className="flex-1">
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/services" element={<ServicesPage />} />
-          <Route path="/work" element={<WorkPage />} />
-          <Route path="/proposal" element={<ProposalPage />} />
-          <Route path="/contact" element={<ContactPage />} />
-        </Routes>
-      </main>
+      <main className="flex-1">{children}</main>
       <Footer />
     </div>
+  )
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <ScrollToTop />
+      <Routes>
+        {/* Public Routes with Navbar/Footer */}
+        <Route path="/" element={<PublicLayout><HomePage /></PublicLayout>} />
+        <Route path="/services" element={<PublicLayout><ServicesPage /></PublicLayout>} />
+        <Route path="/work" element={<PublicLayout><WorkPage /></PublicLayout>} />
+        <Route path="/proposal" element={<PublicLayout><ProposalPage /></PublicLayout>} />
+        <Route path="/contact" element={<PublicLayout><ContactPage /></PublicLayout>} />
+
+        {/* Public Contract View - NO AUTH REQUIRED, NO Navbar/Footer */}
+        <Route path="/contract/:shareToken" element={<ContractPublicView />} />
+
+        {/* Portal Login - NO AUTH REQUIRED, NO Navbar/Footer */}
+        <Route path="/portal" element={<PortalLayout><LoginPage /></PortalLayout>} />
+
+        {/* Protected Portal Routes - NO Navbar/Footer */}
+        <Route
+          path="/portal/contracts"
+          element={
+            <ProtectedRoute>
+              <PortalLayout>
+                <ContractDashboard />
+              </PortalLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/portal/contracts/new"
+          element={
+            <ProtectedRoute>
+              <PortalLayout>
+                <ContractBuilder />
+              </PortalLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/portal/contracts/:id"
+          element={
+            <ProtectedRoute>
+              <PortalLayout>
+                <ContractView />
+              </PortalLayout>
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
+    </AuthProvider>
   )
 }
 

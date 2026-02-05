@@ -66,3 +66,61 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+/* Print Styles for Contract PDF */
+@media print {
+  /* Hide all UI elements */
+  .print\:hidden,
+  header,
+  nav,
+  footer,
+  button,
+  .status-badge {
+    display: none !important;
+  }
+
+  /* Reset all backgrounds to white */
+  * {
+    background: white !important;
+    background-color: white !important;
+  }
+
+  /* Reset all text to black */
+  body,
+  h1, h2, h3, h4, h5, h6,
+  p, span, div, td, th, li {
+    color: black !important;
+  }
+
+  /* Ensure signature images display properly */
+  img {
+    display: block !important;
+    max-width: 300px !important;
+    page-break-inside: avoid;
+  }
+
+  /* Table borders */
+  table {
+    border-collapse: collapse !important;
+  }
+
+  table, th, td {
+    border: 1px solid #333 !important;
+  }
+
+  /* Page breaks */
+  h1, h2, h3 {
+    page-break-after: avoid;
+  }
+
+  /* Remove rounded corners and shadows */
+  * {
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* Optimize print layout */
+  @page {
+    margin: 2cm;
+  }
+}
