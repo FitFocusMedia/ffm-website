@@ -32,13 +32,32 @@ export default function ContractView() {
     }
   }
 
-  const handleCopyLink = () => {
+  const [copySuccess, setCopySuccess] = useState(false)
+
+  const handleCopyLink = async () => {
     const link = getContractShareLink(contract.share_token)
-    navigator.clipboard.writeText(link).then(() => {
-      alert('Contract link copied to clipboard!\n\n' + link)
-    }).catch(() => {
-      prompt('Copy this link:', link)
-    })
+    try {
+      // Try modern clipboard API first
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(link)
+      } else {
+        // Fallback for mobile: create temp textarea
+        const textarea = document.createElement('textarea')
+        textarea.value = link
+        textarea.style.position = 'fixed'
+        textarea.style.left = '-9999px'
+        document.body.appendChild(textarea)
+        textarea.focus()
+        textarea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textarea)
+      }
+      setCopySuccess(true)
+      setTimeout(() => setCopySuccess(false), 3000)
+    } catch {
+      // Last resort: show link for manual copy
+      alert('Copy this link:\n\n' + link)
+    }
   }
 
   const handleSendToClient = () => {
@@ -114,9 +133,9 @@ export default function ContractView() {
       <div className="flex flex-wrap gap-3 mb-6 print:hidden">
         <button
           onClick={handleCopyLink}
-          className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+          className={`px-4 py-2 ${copySuccess ? 'bg-green-600' : 'bg-gray-700 hover:bg-gray-600'} text-white rounded-lg transition-colors`}
         >
-          📋 Copy Link
+          {copySuccess ? '✅ Copied!' : '📋 Copy Link'}
         </button>
 
         {contract.status !== 'signed' && (
