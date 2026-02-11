@@ -179,7 +179,7 @@ const OrderPage = () => {
         order_status: 'pending'
       })
 
-      const API_URL = import.meta.env.VITE_API_URL || 'https://clawdbots-mini.tailcfdc1.ts.net:5206'
+      const API_URL = import.meta.env.VITE_API_URL || 'https://scarlet-sales-api-production.up.railway.app'
       const response = await fetch(`${API_URL}/api/create-checkout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
