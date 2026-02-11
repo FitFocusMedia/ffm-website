@@ -7,6 +7,9 @@ import ServicesPage from './pages/ServicesPage'
 import WorkPage from './pages/WorkPage'
 import ProposalPage from './pages/ProposalPage'
 import ContactPage from './pages/ContactPage'
+import BookingPage from './pages/BookingPage'
+import CalculatorPage from './pages/CalculatorPage'
+import OrderPage from './pages/OrderPage'
 
 // Portal imports
 import { AuthProvider } from './context/AuthContext'
@@ -17,6 +20,23 @@ import ContractDashboard from './components/portal/ContractDashboard'
 import ContractBuilder from './components/portal/ContractBuilder'
 import ContractView from './components/portal/ContractView'
 import ContractPublicView from './components/portal/ContractPublicView'
+
+// CRM imports
+import CRMDashboard from './components/portal/crm/CRMDashboard'
+import PipelineBoard from './components/portal/crm/PipelineBoard'
+import LeadDetail from './components/portal/crm/LeadDetail'
+import OutreachTemplates from './components/portal/crm/OutreachTemplates'
+import OnboardingDashboard from './components/portal/onboarding/OnboardingDashboard'
+import OnboardingCreate from './components/portal/onboarding/OnboardingCreate'
+import OnboardingDetail from './components/portal/onboarding/OnboardingDetail'
+
+// Athlete Portal imports
+import AthleteLogin from './components/athlete/AthleteLogin'
+import AthleteRegister from './components/athlete/AthleteRegister'
+import AthletePackages from './components/athlete/AthletePackages'
+import AthleteDashboard from './components/athlete/AthleteDashboard'
+import AthleteEventView from './components/athlete/AthleteEventView'
+import ContentManager from './pages/admin/ContentManager'
 
 function ScrollToTop() {
   const { pathname } = useLocation()
@@ -48,6 +68,9 @@ function App() {
         <Route path="/work" element={<PublicLayout><WorkPage /></PublicLayout>} />
         <Route path="/proposal" element={<PublicLayout><ProposalPage /></PublicLayout>} />
         <Route path="/contact" element={<PublicLayout><ContactPage /></PublicLayout>} />
+        <Route path="/book" element={<PublicLayout><BookingPage /></PublicLayout>} />
+        <Route path="/calculator" element={<PublicLayout><CalculatorPage /></PublicLayout>} />
+        <Route path="/order" element={<PublicLayout><OrderPage /></PublicLayout>} />
 
         {/* Public Contract View - NO AUTH REQUIRED, NO Navbar/Footer */}
         <Route path="/contract/:shareToken" element={<ContractPublicView />} />
@@ -86,6 +109,97 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        {/* Onboarding Routes */}
+        <Route
+          path="/portal/onboarding"
+          element={
+            <ProtectedRoute>
+              <PortalLayout>
+                <OnboardingDashboard />
+              </PortalLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/portal/onboarding/new"
+          element={
+            <ProtectedRoute>
+              <PortalLayout>
+                <OnboardingCreate />
+              </PortalLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/portal/onboarding/:id"
+          element={
+            <ProtectedRoute>
+              <PortalLayout>
+                <OnboardingDetail />
+              </PortalLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* CRM Routes */}
+        <Route
+          path="/portal/pipeline"
+          element={
+            <ProtectedRoute>
+              <PortalLayout>
+                <CRMDashboard />
+              </PortalLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/portal/pipeline/board"
+          element={
+            <ProtectedRoute>
+              <PipelineBoard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/portal/pipeline/leads/:id"
+          element={
+            <ProtectedRoute>
+              <LeadDetail />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/portal/outreach"
+          element={
+            <ProtectedRoute>
+              <PortalLayout>
+                <OutreachTemplates />
+              </PortalLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Athlete Portal - Content Manager (Admin) */}
+        <Route
+          path="/portal/content"
+          element={
+            <ProtectedRoute>
+              <PortalLayout>
+                <ContentManager />
+              </PortalLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Athlete Portal - Public Routes (NO Navbar/Footer) */}
+        <Route path="/athlete" element={<AthleteLogin />} />
+        <Route path="/athlete/register" element={<AthleteRegister />} />
+        <Route path="/athlete/packages" element={<AthletePackages />} />
+
+        {/* Athlete Portal - Protected Routes (with AthleteLayout) */}
+        <Route path="/athlete/dashboard" element={<AthleteDashboard />} />
+        <Route path="/athlete/events/:eventId" element={<AthleteEventView />} />
       </Routes>
     </AuthProvider>
   )

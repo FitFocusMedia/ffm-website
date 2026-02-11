@@ -132,6 +132,20 @@ export async function markContractViewed(id) {
   return data
 }
 
+/**
+ * Athlete Content Orders
+ */
+export async function createContentOrder(orderData) {
+  const { data, error } = await supabase
+    .from('orders')
+    .insert([orderData])
+    .select()
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
 export async function signContract(id, signature, isClient = false) {
   const updates = isClient
     ? {
