@@ -499,7 +499,7 @@ ${e.message}`);window.location.href=`mailto:brandon@fitfocusmedia.com.au?subject
         <div class="border border-gray-700 rounded-lg p-6">
           <h3 class="text-lg font-bold mb-4">Fit Focus Media</h3>
           ${e.ffm_signature?`
-            <img src="${e.ffm_signature}" alt="FFM Signature" class="max-w-full h-auto border border-gray-600 p-2 rounded bg-white mb-4" style="max-width: 300px;">
+            <img src="${e.ffm_signature}" alt="FFM Signature" class="max-w-full h-auto border border-gray-600 p-2 rounded bg-gray-900 mb-4" style="max-width: 300px;">
             <p><strong>Name:</strong> Brandon Hibbs</p>
             <p><strong>Signed:</strong> ${new Date(e.ffm_signed_at).toLocaleString("en-AU",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:!0,timeZoneName:"short"})}</p>
           `:'<p class="text-gray-500">[PENDING FFM SIGNATURE]</p>'}
@@ -508,7 +508,7 @@ ${e.message}`);window.location.href=`mailto:brandon@fitfocusmedia.com.au?subject
         <div class="border border-gray-700 rounded-lg p-6">
           <h3 class="text-lg font-bold mb-4">${r(t.org_name,"[ORGANIZATION]")}</h3>
           ${e.client_signature?`
-            <img src="${e.client_signature}" alt="Client Signature" class="max-w-full h-auto border border-gray-600 p-2 rounded bg-white mb-4" style="max-width: 300px;">
+            <img src="${e.client_signature}" alt="Client Signature" class="max-w-full h-auto border border-gray-600 p-2 rounded bg-gray-900 mb-4" style="max-width: 300px;">
             <p><strong>Name:</strong> ${r(t.promoter_name)}</p>
             <p><strong>Position:</strong> ${r(t.promoter_position)}</p>
             <p><strong>Signed:</strong> ${new Date(e.client_signed_at).toLocaleString("en-AU",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:!0,timeZoneName:"short"})}</p>
