@@ -14,41 +14,26 @@ export default function OrgOrderPage() {
   const [packages, setPackages] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [paymentSuccess, setPaymentSuccess] = useState(false)
-  const [paymentCanceled, setPaymentCanceled] = useState(false)
+  
+  // Initialize payment status from URL immediately (before first render completes)
+  const [paymentSuccess, setPaymentSuccess] = useState(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const hash = window.location.hash
+    return urlParams.get('success') === 'true' || hash.includes('success=true')
+  })
+  const [paymentCanceled, setPaymentCanceled] = useState(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const hash = window.location.hash
+    return urlParams.get('canceled') === 'true' || hash.includes('canceled=true')
+  })
 
-  // Check for payment success/cancel on mount
+  // Clean URL after detecting success/cancel (but don't change state)
   useEffect(() => {
-    // Try useSearchParams first
-    let isSuccess = searchParams.get('success') === 'true'
-    let isCanceled = searchParams.get('canceled') === 'true'
-    
-    // Fallback: check the hash portion of URL directly (for HashRouter)
-    if (!isSuccess && !isCanceled) {
-      const hash = window.location.hash
-      if (hash.includes('success=true')) isSuccess = true
-      if (hash.includes('canceled=true')) isCanceled = true
-    }
-    
-    // Also check main URL query string
-    if (!isSuccess && !isCanceled) {
-      const urlParams = new URLSearchParams(window.location.search)
-      if (urlParams.get('success') === 'true') isSuccess = true
-      if (urlParams.get('canceled') === 'true') isCanceled = true
-    }
-    
-    if (isSuccess) {
-      setPaymentSuccess(true)
-      // Clean URL without losing the hash route
+    if (paymentSuccess || paymentCanceled) {
       const cleanUrl = window.location.origin + window.location.pathname + '#/order/' + orgSlug
       window.history.replaceState({}, '', cleanUrl)
     }
-    if (isCanceled) {
-      setPaymentCanceled(true)
-      const cleanUrl = window.location.origin + window.location.pathname + '#/order/' + orgSlug
-      window.history.replaceState({}, '', cleanUrl)
-    }
-  }, [searchParams, orgSlug])
+  }, [paymentSuccess, paymentCanceled, orgSlug])
   
   // Form state
   const [step, setStep] = useState(1)
@@ -293,24 +278,7 @@ export default function OrgOrderPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        <div className="text-gray-400">Loading...</div>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center gap-4">
-        <div className="text-red-500">{error}</div>
-        <Link to="/content" className="text-gray-400 hover:text-white">← Back to all organizations</Link>
-      </div>
-    )
-  }
-
-  // Payment Success Screen
+  // Payment Success Screen - check FIRST before loading
   if (paymentSuccess) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center p-4">
@@ -320,11 +288,11 @@ export default function OrgOrderPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h2 className="text-3xl font-bold mb-3">Payment Successful!</h2>
+          <h2 className="text-3xl font-bold mb-3">You're Locked In! 🎬</h2>
           <p className="text-gray-400 mb-6">
-            Thanks for your order! We'll find your footage and start editing. You'll receive a confirmation email shortly.
+            Thanks for your order! We'll capture your performance at the event and deliver your professionally edited content afterwards.
           </p>
-          <p className="text-gray-500 text-sm mb-6">Delivery: 5-7 business days</p>
+          <p className="text-gray-500 text-sm mb-6">Check your email for confirmation details.</p>
           <Link to="/content" className="inline-block px-8 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700">
             Back to Events
           </Link>
@@ -352,6 +320,23 @@ export default function OrgOrderPage() {
             Try Again
           </button>
         </div>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        <div className="text-gray-400">Loading...</div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center gap-4">
+        <div className="text-red-500">{error}</div>
+        <Link to="/content" className="text-gray-400 hover:text-white">← Back to all organizations</Link>
       </div>
     )
   }

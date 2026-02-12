@@ -40,6 +40,7 @@ import AthleteDashboard from './components/athlete/AthleteDashboard'
 import AthleteEventView from './components/athlete/AthleteEventView'
 import ContentManager from './pages/admin/ContentManager'
 import ContentAdmin from './pages/portal/ContentAdmin'
+import OrderManagement from './pages/portal/OrderManagement'
 
 function ScrollToTop() {
   const { pathname } = useLocation()
@@ -214,6 +215,18 @@ function App() {
             <ProtectedRoute>
               <PortalLayout>
                 <ContentAdmin />
+              </PortalLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Order Management */}
+        <Route
+          path="/portal/orders"
+          element={
+            <ProtectedRoute>
+              <PortalLayout>
+                <OrderManagement />
               </PortalLayout>
             </ProtectedRoute>
           }
