@@ -99,6 +99,12 @@ button:focus-visible {
     page-break-inside: avoid;
   }
 
+  /* Invert signature images for print (white strokes -> black strokes) */
+  img[alt*="Signature"] {
+    filter: invert(1) !important;
+    background: white !important;
+  }
+
   /* Table borders */
   table {
     border-collapse: collapse !important;
@@ -119,8 +125,17 @@ button:focus-visible {
     box-shadow: none !important;
   }
 
-  /* Optimize print layout */
+  /* Optimize print layout - remove browser header/footer space */
   @page {
-    margin: 2cm;
+    margin: 1.5cm 2cm;
+    @top-left { content: none; }
+    @top-right { content: none; }
+    @bottom-left { content: none; }
+    @bottom-right { content: none; }
+  }
+  
+  /* Add our own footer */
+  .contract-content::after {
+    content: none;
   }
 }

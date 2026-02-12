@@ -1,9 +1,10 @@
 import { useAuth } from '../../context/AuthContext'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 
 export default function PortalLayout({ children }) {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
 
   const handleSignOut = async () => {
     try {
@@ -14,10 +15,22 @@ export default function PortalLayout({ children }) {
     }
   }
 
+  const isActive = (path) => {
+    return location.pathname.startsWith(path)
+  }
+
+  const tabs = [
+    { name: 'Contracts', path: '/portal/contracts' },
+    { name: 'Pipeline', path: '/portal/pipeline' },
+    { name: 'Outreach', path: '/portal/outreach' },
+    { name: 'Onboarding', path: '/portal/onboarding' },
+    { name: 'Content', path: '/portal/content-admin' }
+  ]
+
   return (
     <div className="min-h-screen bg-[#0d0d1a] flex flex-col">
-      {/* Portal Header */}
-      <header className="bg-gradient-to-r from-[#1a1a2e] to-[#16162a] border-b border-gray-800/50">
+      {/* Portal Header - hidden when printing */}
+      <header className="print:hidden bg-gradient-to-r from-[#1a1a2e] to-[#16162a] border-b border-gray-800/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div 
@@ -29,7 +42,7 @@ export default function PortalLayout({ children }) {
                 <span className="text-white">MEDIA</span>
               </span>
               <span className="text-gray-700">|</span>
-              <span className="text-gray-400 font-medium">Contract Portal</span>
+              <span className="text-gray-400 font-medium">Portal</span>
             </div>
 
             {user && (
@@ -44,6 +57,28 @@ export default function PortalLayout({ children }) {
               </div>
             )}
           </div>
+
+          {/* Navigation Tabs */}
+          {user && (
+            <div className="flex gap-6 -mb-px">
+              {tabs.map(tab => (
+                <button
+                  key={tab.path}
+                  onClick={() => navigate(tab.path)}
+                  className={`relative px-4 py-3 font-bold text-sm transition-colors ${
+                    isActive(tab.path)
+                      ? 'text-red-500'
+                      : 'text-gray-400 hover:text-gray-300'
+                  }`}
+                >
+                  {tab.name}
+                  {isActive(tab.path) && (
+                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500" />
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </header>
 

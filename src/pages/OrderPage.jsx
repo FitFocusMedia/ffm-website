@@ -179,7 +179,7 @@ const OrderPage = () => {
         order_status: 'pending'
       })
 
-      const API_URL = import.meta.env.VITE_API_URL || 'https://scarlet-sales-api-production.up.railway.app'
+      const API_URL = import.meta.env.VITE_API_URL || 'https://scarlet-sales-api-vercel.vercel.app'
       const response = await fetch(`${API_URL}/api/create-checkout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { createContract } from '../../lib/supabase'
+import { useNavigate, useParams } from 'react-router-dom'
+import { createContract, getContractById, updateContract } from '../../lib/supabase'
 import { generateContractHTML, getSignatureData, hasSignature } from '../../lib/contractHelpers'
 import SignatureCanvas from './SignatureCanvas'
 
 const TOTAL_STEPS = 6
 
-export default function ContractBuilder() {
+export default function ContractBuilder({ editMode = false }) {
+  const { id: contractId } = useParams()
   const [currentStep, setCurrentStep] = useState(1)
   const [formData, setFormData] = useState({
     agreement_date: new Date().toISOString().split('T')[0],
@@ -57,36 +58,83 @@ export default function ContractBuilder() {
     pli_amount: '20000000',
   })
   const [multiEvents, setMultiEvents] = useState([])
+  const [athletePackages, setAthletePackages] = useState([
+    { name: 'VIP Coverage', price: '350', description: 'Full event coverage with priority editing, professional highlight reel, all match recordings, and premium photo package.' },
+    { name: 'Match Package', price: '175', description: 'Individual match recording with edited highlights and action photos from your matches.' },
+    { name: 'Season Pass', price: '899', description: 'Full season coverage across all events, priority processing, and exclusive content access.' }
+  ])
+  const [addOns, setAddOns] = useState([])
   const [submitting, setSubmitting] = useState(false)
+  const [existingContract, setExistingContract] = useState(null)
+  const [loadingContract, setLoadingContract] = useState(editMode)
   const [showPreview, setShowPreview] = useState(true)
   const signatureCanvasRef = useRef(null)
   const [signatureCanvas, setSignatureCanvas] = useState(null)
   const [confirmSignature, setConfirmSignature] = useState(false)
   const navigate = useNavigate()
 
+  // Load existing contract in edit mode
   useEffect(() => {
-    // Load saved form data from localStorage
-    const saved = localStorage.getItem('contractBuilderData')
-    if (saved) {
-      try {
-        const data = JSON.parse(saved)
-        setFormData(data.formData || formData)
-        setMultiEvents(data.multiEvents || [])
-        setCurrentStep(data.currentStep || 1)
-      } catch (error) {
-        console.error('Error loading saved data:', error)
+    if (editMode && contractId) {
+      loadExistingContract()
+    }
+  }, [editMode, contractId])
+
+  const loadExistingContract = async () => {
+    try {
+      setLoadingContract(true)
+      const contract = await getContractById(contractId)
+      setExistingContract(contract)
+      
+      // Populate form with existing data
+      const d = contract.contract_data || {}
+      setFormData(prev => ({
+        ...prev,
+        ...d
+      }))
+      
+      if (d.multi_events) setMultiEvents(d.multi_events)
+      if (d.athlete_packages) setAthletePackages(d.athlete_packages)
+      if (d.add_ons) setAddOns(d.add_ons)
+      
+    } catch (error) {
+      console.error('Error loading contract:', error)
+      alert('Failed to load contract for editing')
+      navigate('/portal/contracts')
+    } finally {
+      setLoadingContract(false)
+    }
+  }
+
+  useEffect(() => {
+    // Load saved form data from localStorage (only for new contracts)
+    if (!editMode) {
+      const saved = localStorage.getItem('contractBuilderData')
+      if (saved) {
+        try {
+          const data = JSON.parse(saved)
+          setFormData(data.formData || formData)
+          setMultiEvents(data.multiEvents || [])
+          if (data.athletePackages) setAthletePackages(data.athletePackages)
+          if (data.addOns) setAddOns(data.addOns)
+          setCurrentStep(data.currentStep || 1)
+        } catch (error) {
+          console.error('Error loading saved data:', error)
+        }
       }
     }
-  }, [])
+  }, [editMode])
 
   useEffect(() => {
     // Auto-save to localStorage
     localStorage.setItem('contractBuilderData', JSON.stringify({
       formData,
       multiEvents,
+      athletePackages,
+      addOns,
       currentStep
     }))
-  }, [formData, multiEvents, currentStep])
+  }, [formData, multiEvents, athletePackages, addOns, currentStep])
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target
@@ -108,6 +156,34 @@ export default function ContractBuilder() {
     const updated = [...multiEvents]
     updated[index][field] = value
     setMultiEvents(updated)
+  }
+
+  const addAthletePackage = () => {
+    setAthletePackages([...athletePackages, { name: '', price: '', description: '' }])
+  }
+
+  const removeAthletePackage = (index) => {
+    setAthletePackages(athletePackages.filter((_, i) => i !== index))
+  }
+
+  const updateAthletePackage = (index, field, value) => {
+    const updated = [...athletePackages]
+    updated[index][field] = value
+    setAthletePackages(updated)
+  }
+
+  const addAddOn = () => {
+    setAddOns([...addOns, { name: '', price: '', description: '', included: true }])
+  }
+
+  const removeAddOn = (index) => {
+    setAddOns(addOns.filter((_, i) => i !== index))
+  }
+
+  const updateAddOn = (index, field, value) => {
+    const updated = [...addOns]
+    updated[index][field] = value
+    setAddOns(updated)
   }
 
   const validateStep = (step) => {
@@ -155,46 +231,76 @@ export default function ContractBuilder() {
   const handleSubmit = async (e) => {
     e.preventDefault()
 
-    // Validate signature
-    if (!signatureCanvas || !hasSignature(signatureCanvas)) {
-      alert('Please sign the contract before submitting.')
-      return
-    }
-
-    if (!confirmSignature) {
-      alert('Please confirm your signature.')
-      return
+    // For new contracts, require signature
+    // For edits, signature is optional (keep existing if not changed)
+    const hasNewSignature = signatureCanvas && hasSignature(signatureCanvas)
+    
+    if (!editMode) {
+      if (!hasNewSignature) {
+        alert('Please sign the contract before submitting.')
+        return
+      }
+      if (!confirmSignature) {
+        alert('Please confirm your signature.')
+        return
+      }
     }
 
     setSubmitting(true)
 
     try {
-      const ffmSignature = getSignatureData(signatureCanvas)
-
       const contractData = {
         ...formData,
         multi_events: multiEvents,
+        athlete_packages: athletePackages,
+        add_ons: addOns,
       }
 
-      const newContract = await createContract({
-        status: 'sent',
-        org_name: formData.org_name,
-        promoter_name: formData.promoter_name,
-        promoter_email: formData.promoter_email,
-        promoter_phone: formData.promoter_phone,
-        contract_data: contractData,
-        ffm_signature: ffmSignature,
-        ffm_signed_at: new Date().toISOString(),
-      })
+      if (editMode && existingContract) {
+        // UPDATE existing contract
+        const updates = {
+          org_name: formData.org_name,
+          promoter_name: formData.promoter_name,
+          promoter_email: formData.promoter_email,
+          promoter_phone: formData.promoter_phone,
+          contract_data: contractData,
+          updated_at: new Date().toISOString(),
+        }
 
-      // Clear saved data
-      localStorage.removeItem('contractBuilderData')
+        // Only update signature if a new one was provided
+        if (hasNewSignature && confirmSignature) {
+          updates.ffm_signature = getSignatureData(signatureCanvas)
+          updates.ffm_signed_at = new Date().toISOString()
+        }
 
-      alert('Contract created successfully! You can now share it with the client.')
-      navigate(`/portal/contracts/${newContract.id}`)
+        await updateContract(contractId, updates)
+        
+        alert('Contract updated successfully!')
+        navigate(`/portal/contracts/${contractId}`)
+      } else {
+        // CREATE new contract
+        const ffmSignature = getSignatureData(signatureCanvas)
+
+        const newContract = await createContract({
+          status: 'sent',
+          org_name: formData.org_name,
+          promoter_name: formData.promoter_name,
+          promoter_email: formData.promoter_email,
+          promoter_phone: formData.promoter_phone,
+          contract_data: contractData,
+          ffm_signature: ffmSignature,
+          ffm_signed_at: new Date().toISOString(),
+        })
+
+        // Clear saved data
+        localStorage.removeItem('contractBuilderData')
+
+        alert('Contract created successfully! You can now share it with the client.')
+        navigate(`/portal/contracts/${newContract.id}`)
+      }
     } catch (error) {
-      console.error('Error creating contract:', error)
-      alert('Failed to create contract: ' + error.message)
+      console.error('Error saving contract:', error)
+      alert('Failed to save contract: ' + error.message)
     } finally {
       setSubmitting(false)
     }
@@ -202,9 +308,17 @@ export default function ContractBuilder() {
 
   const mockContract = {
     status: 'draft',
-    contract_data: { ...formData, multi_events: multiEvents },
+    contract_data: { ...formData, multi_events: multiEvents, athlete_packages: athletePackages, add_ons: addOns },
     ffm_signature: null,
     client_signature: null,
+  }
+
+  if (loadingContract) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-white text-xl">Loading contract...</div>
+      </div>
+    )
   }
 
   return (
@@ -212,12 +326,14 @@ export default function ContractBuilder() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <button
-            onClick={() => navigate('/portal/contracts')}
+            onClick={() => navigate(editMode ? `/portal/contracts/${contractId}` : '/portal/contracts')}
             className="text-gray-400 hover:text-white mb-2 inline-flex items-center gap-2"
           >
-            ← Back to Dashboard
+            ← {editMode ? 'Back to Contract' : 'Back to Dashboard'}
           </button>
-          <h1 className="text-3xl font-bold text-white">Create New Contract</h1>
+          <h1 className="text-3xl font-bold text-white">
+            {editMode ? `Edit Contract: ${formData.org_name || 'Untitled'}` : 'Create New Contract'}
+          </h1>
         </div>
         <button
           onClick={() => setShowPreview(!showPreview)}
@@ -757,48 +873,139 @@ export default function ContractBuilder() {
                   </>
                 )}
 
-                <h3 className="text-lg font-bold text-white mt-6">Athlete Media Package Pricing</h3>
-
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    VIP Coverage Price
-                  </label>
-                  <input
-                    type="number"
-                    name="vip_price"
-                    value={formData.vip_price}
-                    onChange={handleInputChange}
-                    placeholder="e.g., 350"
-                    className="w-full px-4 py-2 bg-dark-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-bold text-white">Athlete Media Packages</h3>
+                    <button
+                      type="button"
+                      onClick={addAthletePackage}
+                      className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm transition-colors"
+                    >
+                      + Add Package
+                    </button>
+                  </div>
+                  
+                  {athletePackages.length === 0 && (
+                    <p className="text-gray-400 text-sm mb-4">No packages added. Click "+ Add Package" to create athlete media packages.</p>
+                  )}
+                  
+                  {athletePackages.map((pkg, index) => (
+                    <div key={index} className="bg-dark-800 p-4 rounded-lg mb-4 border border-gray-700">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-gray-400">Package {index + 1}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeAthletePackage(index)}
+                          className="text-red-500 hover:text-red-400 text-sm"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-400 mb-1">Package Name</label>
+                          <input
+                            type="text"
+                            value={pkg.name}
+                            onChange={(e) => updateAthletePackage(index, 'name', e.target.value)}
+                            placeholder="e.g., VIP Coverage"
+                            className="w-full px-3 py-2 bg-dark-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-400 mb-1">Price ($)</label>
+                          <input
+                            type="number"
+                            value={pkg.price}
+                            onChange={(e) => updateAthletePackage(index, 'price', e.target.value)}
+                            placeholder="e.g., 350"
+                            className="w-full px-3 py-2 bg-dark-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-xs font-medium text-gray-400 mb-1">Description (what's included)</label>
+                        <textarea
+                          value={pkg.description}
+                          onChange={(e) => updateAthletePackage(index, 'description', e.target.value)}
+                          placeholder="Describe what this package includes..."
+                          rows={2}
+                          className="w-full px-3 py-2 bg-dark-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                        />
+                      </div>
+                    </div>
+                  ))}
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Match Package Price
-                  </label>
-                  <input
-                    type="number"
-                    name="match_price"
-                    value={formData.match_price}
-                    onChange={handleInputChange}
-                    placeholder="e.g., 175"
-                    className="w-full px-4 py-2 bg-dark-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Season Pass Price
-                  </label>
-                  <input
-                    type="number"
-                    name="season_price"
-                    value={formData.season_price}
-                    onChange={handleInputChange}
-                    placeholder="e.g., 899"
-                    className="w-full px-4 py-2 bg-dark-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                {/* Add-Ons Section */}
+                <div className="mt-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-bold text-white">Client Add-Ons</h3>
+                    <button
+                      type="button"
+                      onClick={addAddOn}
+                      className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm transition-colors"
+                    >
+                      + Add Add-On
+                    </button>
+                  </div>
+                  
+                  <p className="text-gray-400 text-sm mb-4">Optional services or packages the client has opted into for this event.</p>
+                  
+                  {addOns.length === 0 && (
+                    <p className="text-gray-500 text-sm italic mb-4">No add-ons added. Click "+ Add Add-On" to include optional services.</p>
+                  )}
+                  
+                  {addOns.map((addon, index) => (
+                    <div key={index} className="bg-dark-800 p-4 rounded-lg mb-4 border border-green-900">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-green-400">Add-On {index + 1}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeAddOn(index)}
+                          className="text-red-500 hover:text-red-400 text-sm"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-400 mb-1">Add-On Name</label>
+                          <input
+                            type="text"
+                            value={addon.name}
+                            onChange={(e) => updateAddOn(index, 'name', e.target.value)}
+                            placeholder="e.g., Additional Camera Operator"
+                            className="w-full px-3 py-2 bg-dark-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-400 mb-1">Price ($)</label>
+                          <input
+                            type="number"
+                            value={addon.price}
+                            onChange={(e) => updateAddOn(index, 'price', e.target.value)}
+                            placeholder="e.g., 500"
+                            className="w-full px-3 py-2 bg-dark-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-xs font-medium text-gray-400 mb-1">Description</label>
+                        <textarea
+                          value={addon.description}
+                          onChange={(e) => updateAddOn(index, 'description', e.target.value)}
+                          placeholder="Describe what this add-on includes..."
+                          rows={2}
+                          className="w-full px-3 py-2 bg-dark-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+                        />
+                      </div>
+                    </div>
+                  ))}
                 </div>
 
                 <h3 className="text-lg font-bold text-white mt-6">Athlete Revenue Split</h3>
@@ -1019,18 +1226,41 @@ export default function ContractBuilder() {
             {/* Step 6: Sign */}
             {currentStep === 6 && (
               <div className="space-y-6">
-                <h2 className="text-2xl font-bold text-white mb-4">Step 6: Sign Contract</h2>
+                <h2 className="text-2xl font-bold text-white mb-4">
+                  Step 6: {editMode ? 'Review & Save' : 'Sign Contract'}
+                </h2>
+
+                {editMode && existingContract?.ffm_signature && (
+                  <div className="bg-green-900/20 border border-green-600 rounded-lg p-4 mb-4">
+                    <p className="text-green-200 text-sm mb-3">
+                      ✅ This contract already has an FFM signature. You can update the contract details without re-signing, 
+                      or provide a new signature below if needed.
+                    </p>
+                    <div className="bg-white p-2 rounded inline-block">
+                      <img 
+                        src={existingContract.ffm_signature} 
+                        alt="Existing FFM Signature" 
+                        className="max-h-24"
+                      />
+                    </div>
+                    <p className="text-green-300 text-xs mt-2">
+                      Signed: {new Date(existingContract.ffm_signed_at).toLocaleString()}
+                    </p>
+                  </div>
+                )}
 
                 <div className="bg-yellow-900/20 border border-yellow-600 rounded-lg p-4">
                   <p className="text-yellow-200 text-sm">
-                    ⚠️ By signing this contract, you confirm that all information provided is accurate and you are 
-                    authorized to create this agreement on behalf of Fit Focus Media.
+                    {editMode 
+                      ? '⚠️ Review your changes. If you want to update the signature, draw a new one below and check the confirmation box.'
+                      : '⚠️ By signing this contract, you confirm that all information provided is accurate and you are authorized to create this agreement on behalf of Fit Focus Media.'
+                    }
                   </p>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    FFM Signature
+                    {editMode ? 'New FFM Signature (optional)' : 'FFM Signature'}
                   </label>
                   <SignatureCanvas
                     onSignatureChange={(canvas) => setSignatureCanvas(canvas)}
@@ -1046,7 +1276,10 @@ export default function ContractBuilder() {
                     className="w-4 h-4 text-blue-600 bg-dark-800 border-gray-700 rounded focus:ring-2 focus:ring-blue-500"
                   />
                   <label htmlFor="confirmSignature" className="ml-2 text-sm font-medium text-gray-300">
-                    I confirm this is my signature and I am authorized to sign this contract
+                    {editMode 
+                      ? 'I want to update the signature with the new one above'
+                      : 'I confirm this is my signature and I am authorized to sign this contract'
+                    }
                   </label>
                 </div>
               </div>
@@ -1080,7 +1313,10 @@ export default function ContractBuilder() {
                   disabled={submitting}
                   className="ml-auto px-6 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-800 text-white rounded-lg transition-colors"
                 >
-                  {submitting ? 'Creating Contract...' : 'Create Contract'}
+                  {submitting 
+                    ? (editMode ? 'Updating Contract...' : 'Creating Contract...') 
+                    : (editMode ? 'Update Contract' : 'Create Contract')
+                  }
                 </button>
               )}
             </div>

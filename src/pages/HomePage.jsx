@@ -87,6 +87,12 @@ const HomePage = () => {
               >
                 View Our Work
               </Link>
+              <Link
+                to="/book"
+                className="px-8 py-4 bg-accent-600 hover:bg-accent-700 text-white font-bold rounded-lg text-lg transition-all inline-flex items-center justify-center gap-3 hover:scale-105"
+              >
+                📅 Book a Call
+              </Link>
             </motion.div>
           </motion.div>
 

@@ -1,7 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = 'https://qdrszmtugndlwoxyvrsq.supabase.co'
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcnN6bXR1Z25kbHdveHl2cnNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk5NzE0OTMsImV4cCI6MjA4NTU0NzQ5M30.r6_ZjXwM8RLbcBMCrZ09R6m0tcpzif6a2vuis8x8Zkk'
+// Fit Focus Media Web Services project
+const supabaseUrl = 'https://gonalgubgldgpkcekaxe.supabase.co'
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdvbmFsZ3ViZ2xkZ3BrY2VrYXhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA4NTk3NDIsImV4cCI6MjA4NjQzNTc0Mn0.GuvFAgWtB0bJ_yf_6NKfPK3Gv-vJH7WhHcJFzvqm9Ew'
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 

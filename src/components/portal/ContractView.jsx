@@ -108,8 +108,8 @@ export default function ContractView() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
-      <div className="mb-6">
+      {/* Header - hidden when printing */}
+      <div className="mb-6 print:hidden">
         <button
           onClick={() => navigate('/portal/contracts')}
           className="text-gray-400 hover:text-white mb-2 inline-flex items-center gap-2"
@@ -153,6 +153,15 @@ export default function ContractView() {
         >
           📄 Download PDF
         </button>
+
+        {contract.status !== 'signed' && (
+          <button
+            onClick={() => navigate(`/portal/contracts/${contract.id}/edit`)}
+            className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors"
+          >
+            ✏️ Edit Contract
+          </button>
+        )}
 
         <button
           onClick={handleDelete}

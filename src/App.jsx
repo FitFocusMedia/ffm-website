@@ -10,6 +10,8 @@ import ContactPage from './pages/ContactPage'
 import BookingPage from './pages/BookingPage'
 import CalculatorPage from './pages/CalculatorPage'
 import OrderPage from './pages/OrderPage'
+import ContentLandingPage from './pages/ContentLandingPage'
+import OrgOrderPage from './pages/OrgOrderPage'
 
 // Portal imports
 import { AuthProvider } from './context/AuthContext'
@@ -37,6 +39,7 @@ import AthletePackages from './components/athlete/AthletePackages'
 import AthleteDashboard from './components/athlete/AthleteDashboard'
 import AthleteEventView from './components/athlete/AthleteEventView'
 import ContentManager from './pages/admin/ContentManager'
+import ContentAdmin from './pages/portal/ContentAdmin'
 
 function ScrollToTop() {
   const { pathname } = useLocation()
@@ -71,6 +74,8 @@ function App() {
         <Route path="/book" element={<PublicLayout><BookingPage /></PublicLayout>} />
         <Route path="/calculator" element={<PublicLayout><CalculatorPage /></PublicLayout>} />
         <Route path="/order" element={<PublicLayout><OrderPage /></PublicLayout>} />
+        <Route path="/content" element={<PublicLayout><ContentLandingPage /></PublicLayout>} />
+        <Route path="/order/:orgSlug" element={<PublicLayout><OrgOrderPage /></PublicLayout>} />
 
         {/* Public Contract View - NO AUTH REQUIRED, NO Navbar/Footer */}
         <Route path="/contract/:shareToken" element={<ContractPublicView />} />
@@ -105,6 +110,16 @@ function App() {
             <ProtectedRoute>
               <PortalLayout>
                 <ContractView />
+              </PortalLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/portal/contracts/:id/edit"
+          element={
+            <ProtectedRoute>
+              <PortalLayout>
+                <ContractBuilder editMode={true} />
               </PortalLayout>
             </ProtectedRoute>
           }
@@ -187,6 +202,18 @@ function App() {
             <ProtectedRoute>
               <PortalLayout>
                 <ContentManager />
+              </PortalLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Content Orders Admin */}
+        <Route
+          path="/portal/content-admin"
+          element={
+            <ProtectedRoute>
+              <PortalLayout>
+                <ContentAdmin />
               </PortalLayout>
             </ProtectedRoute>
           }
