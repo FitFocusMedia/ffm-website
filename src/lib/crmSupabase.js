@@ -1,12 +1,5 @@
 // CRM Functions — Supabase Only (Single Source of Truth)
-// Uses service role key for admin operations (internal portal only)
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseUrl = 'https://gonalgubgldgpkcekaxe.supabase.co'
-const supabaseServiceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdvbmFsZ3ViZ2xkZ3BrY2VrYXhlIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MDg1OTc0MiwiZXhwIjoyMDg2NDM1NzQyfQ.agovELOmy9ay7MqDAWXWnXbyCAVve_x4ofX8Q0sCj1E'
-
-// Service role client bypasses RLS - safe for internal portal
-const supabase = createClient(supabaseUrl, supabaseServiceKey)
+import { supabase } from './supabase'
 
 // --- Lead Management ---
 
