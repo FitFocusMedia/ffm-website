@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { getLead, updateLead, getActivities, addActivity, updateActivity, deleteActivity } from '../../../lib/crmSupabase'
 import { 
   ArrowLeft, Phone, Mail, Globe, Instagram, Facebook, MapPin, Trophy, 
-  Calendar, DollarSign, Tag, Shield, Edit2, Save, X, Plus, RefreshCw 
+  Calendar, DollarSign, Tag, Shield, Edit2, Save, X, Plus, RefreshCw, Linkedin, User 
 } from 'lucide-react'
 
 const STAGE_OPTIONS = [
@@ -427,6 +427,51 @@ export default function LeadDetail() {
                         <div className="flex-1 min-w-0">
                           <div className="text-[10px] font-bold text-gray-600 uppercase mb-0.5">Instagram</div>
                           <div className="text-sm text-gray-300 group-hover:text-red-400">{lead.contact?.instagram || '—'}</div>
+                        </div>
+                      </a>
+                    )}
+
+                    {lead.contact?.facebook && (
+                      <a
+                        href={`https://facebook.com/${lead.contact?.facebook}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 p-3 bg-[#12122a] rounded-lg border border-gray-800/50 hover:border-red-500/30 transition-all group"
+                      >
+                        <Facebook size={20} className="text-gray-500 group-hover:text-red-400" />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[10px] font-bold text-gray-600 uppercase mb-0.5">Facebook</div>
+                          <div className="text-sm text-gray-300 group-hover:text-red-400">{lead.contact?.facebook || '—'}</div>
+                        </div>
+                      </a>
+                    )}
+
+                    {lead.contact?.linkedin && (
+                      <a
+                        href={`https://linkedin.com/in/${lead.contact?.linkedin}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 p-3 bg-[#12122a] rounded-lg border border-gray-800/50 hover:border-red-500/30 transition-all group"
+                      >
+                        <Linkedin size={20} className="text-gray-500 group-hover:text-red-400" />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[10px] font-bold text-gray-600 uppercase mb-0.5">LinkedIn</div>
+                          <div className="text-sm text-gray-300 group-hover:text-red-400 truncate">{lead.contact?.linkedin || '—'}</div>
+                        </div>
+                      </a>
+                    )}
+
+                    {lead.contact?.decision_maker_instagram && (
+                      <a
+                        href={`https://instagram.com/${lead.contact?.decision_maker_instagram?.replace('@', '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 p-3 bg-[#12122a] rounded-lg border border-gray-800/50 hover:border-red-500/30 transition-all group"
+                      >
+                        <User size={20} className="text-gray-500 group-hover:text-red-400" />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[10px] font-bold text-gray-600 uppercase mb-0.5">Decision Maker IG</div>
+                          <div className="text-sm text-gray-300 group-hover:text-red-400">{lead.contact?.decision_maker_instagram || '—'}</div>
                         </div>
                       </a>
                     )}
