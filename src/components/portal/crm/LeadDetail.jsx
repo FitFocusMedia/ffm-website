@@ -219,78 +219,196 @@ export default function LeadDetail() {
             {/* Contact Info */}
             <div className="bg-[#1a1a2e] rounded-xl p-6 border border-gray-800/50">
               <h3 className="text-lg font-bold text-white mb-4">Contact Information</h3>
-              <div className="grid sm:grid-cols-2 gap-4">
-                {lead.contact?.email && (
-                  <a
-                    href={`mailto:${lead.contact.email}`}
-                    className="flex items-center gap-3 p-3 bg-[#12122a] rounded-lg border border-gray-800/50 hover:border-red-500/30 transition-all group"
-                  >
-                    <Mail size={20} className="text-gray-500 group-hover:text-red-400" />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[10px] font-bold text-gray-600 uppercase mb-0.5">Email</div>
-                      <div className="text-sm text-gray-300 group-hover:text-red-400 truncate">{lead.contact.email}</div>
-                    </div>
-                  </a>
-                )}
-
-                {lead.contact?.phone && (
-                  <a
-                    href={`tel:${lead.contact.phone}`}
-                    className="flex items-center gap-3 p-3 bg-[#12122a] rounded-lg border border-gray-800/50 hover:border-red-500/30 transition-all group"
-                  >
-                    <Phone size={20} className="text-gray-500 group-hover:text-red-400" />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[10px] font-bold text-gray-600 uppercase mb-0.5">Phone</div>
-                      <div className="text-sm text-gray-300 group-hover:text-red-400">{lead.contact.phone}</div>
-                    </div>
-                  </a>
-                )}
-
-                {lead.contact?.website && (
-                  <a
-                    href={lead.contact.website}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-3 p-3 bg-[#12122a] rounded-lg border border-gray-800/50 hover:border-red-500/30 transition-all group"
-                  >
-                    <Globe size={20} className="text-gray-500 group-hover:text-red-400" />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[10px] font-bold text-gray-600 uppercase mb-0.5">Website</div>
-                      <div className="text-sm text-gray-300 group-hover:text-red-400 truncate">{lead.contact.website}</div>
-                    </div>
-                  </a>
-                )}
-
-                {lead.contact?.instagram && (
-                  <a
-                    href={`https://instagram.com/${lead.contact.instagram.replace('@', '')}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-3 p-3 bg-[#12122a] rounded-lg border border-gray-800/50 hover:border-red-500/30 transition-all group"
-                  >
-                    <Instagram size={20} className="text-gray-500 group-hover:text-red-400" />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[10px] font-bold text-gray-600 uppercase mb-0.5">Instagram</div>
-                      <div className="text-sm text-gray-300 group-hover:text-red-400">{lead.contact.instagram}</div>
-                    </div>
-                  </a>
-                )}
-              </div>
-
-              {lead.contact?.decision_maker && (
-                <div className="mt-4 p-3 bg-[#12122a] rounded-lg border border-gray-800/50">
-                  <div className="text-[10px] font-bold text-gray-600 uppercase mb-1">Decision Maker</div>
-                  <div className="flex items-center gap-3">
-                    {lead.contact.avatar && (
-                      <img 
-                        src={lead.contact.avatar} 
-                        alt={lead.contact.decision_maker}
-                        className="w-12 h-12 rounded-full object-cover border-2 border-gray-700"
+              
+              {editing ? (
+                /* Editable Contact Fields */
+                <div className="space-y-4">
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-600 uppercase mb-1 block">Email</label>
+                      <input
+                        type="email"
+                        value={editedLead.contact?.email || ''}
+                        onChange={(e) => setEditedLead({
+                          ...editedLead,
+                          contact: { ...editedLead.contact, email: e.target.value }
+                        })}
+                        className="w-full bg-[#12122a] border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-red-500 focus:outline-none"
+                        placeholder="email@example.com"
                       />
-                    )}
-                    <div className="text-white font-bold">{lead.contact.decision_maker}</div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-600 uppercase mb-1 block">Phone</label>
+                      <input
+                        type="tel"
+                        value={editedLead.contact?.phone || ''}
+                        onChange={(e) => setEditedLead({
+                          ...editedLead,
+                          contact: { ...editedLead.contact, phone: e.target.value }
+                        })}
+                        className="w-full bg-[#12122a] border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-red-500 focus:outline-none"
+                        placeholder="0400 000 000"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-600 uppercase mb-1 block">Website</label>
+                      <input
+                        type="url"
+                        value={editedLead.contact?.website || ''}
+                        onChange={(e) => setEditedLead({
+                          ...editedLead,
+                          contact: { ...editedLead.contact, website: e.target.value }
+                        })}
+                        className="w-full bg-[#12122a] border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-red-500 focus:outline-none"
+                        placeholder="https://example.com"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-600 uppercase mb-1 block">Instagram</label>
+                      <input
+                        type="text"
+                        value={editedLead.contact?.instagram || ''}
+                        onChange={(e) => setEditedLead({
+                          ...editedLead,
+                          contact: { ...editedLead.contact, instagram: e.target.value }
+                        })}
+                        className="w-full bg-[#12122a] border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-red-500 focus:outline-none"
+                        placeholder="@username"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-600 uppercase mb-1 block">Facebook</label>
+                      <input
+                        type="text"
+                        value={editedLead.contact?.facebook || ''}
+                        onChange={(e) => setEditedLead({
+                          ...editedLead,
+                          contact: { ...editedLead.contact, facebook: e.target.value }
+                        })}
+                        className="w-full bg-[#12122a] border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-red-500 focus:outline-none"
+                        placeholder="PageName"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-600 uppercase mb-1 block">Contact Form URL</label>
+                      <input
+                        type="url"
+                        value={editedLead.contact?.contact_form || ''}
+                        onChange={(e) => setEditedLead({
+                          ...editedLead,
+                          contact: { ...editedLead.contact, contact_form: e.target.value }
+                        })}
+                        className="w-full bg-[#12122a] border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-red-500 focus:outline-none"
+                        placeholder="https://example.com/contact"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-600 uppercase mb-1 block">Decision Maker</label>
+                      <input
+                        type="text"
+                        value={editedLead.contact?.decision_maker || ''}
+                        onChange={(e) => setEditedLead({
+                          ...editedLead,
+                          contact: { ...editedLead.contact, decision_maker: e.target.value }
+                        })}
+                        className="w-full bg-[#12122a] border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-red-500 focus:outline-none"
+                        placeholder="Name"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-600 uppercase mb-1 block">Avatar URL</label>
+                      <input
+                        type="url"
+                        value={editedLead.contact?.avatar || ''}
+                        onChange={(e) => setEditedLead({
+                          ...editedLead,
+                          contact: { ...editedLead.contact, avatar: e.target.value }
+                        })}
+                        className="w-full bg-[#12122a] border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-red-500 focus:outline-none"
+                        placeholder="https://example.com/photo.jpg"
+                      />
+                    </div>
                   </div>
                 </div>
+              ) : (
+                /* Display Contact Fields */
+                <>
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    {(lead.contact?.email || editing) && (
+                      <a
+                        href={`mailto:${lead.contact?.email}`}
+                        className="flex items-center gap-3 p-3 bg-[#12122a] rounded-lg border border-gray-800/50 hover:border-red-500/30 transition-all group"
+                      >
+                        <Mail size={20} className="text-gray-500 group-hover:text-red-400" />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[10px] font-bold text-gray-600 uppercase mb-0.5">Email</div>
+                          <div className="text-sm text-gray-300 group-hover:text-red-400 truncate">{lead.contact?.email || '—'}</div>
+                        </div>
+                      </a>
+                    )}
+
+                    {(lead.contact?.phone || editing) && (
+                      <a
+                        href={`tel:${lead.contact?.phone}`}
+                        className="flex items-center gap-3 p-3 bg-[#12122a] rounded-lg border border-gray-800/50 hover:border-red-500/30 transition-all group"
+                      >
+                        <Phone size={20} className="text-gray-500 group-hover:text-red-400" />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[10px] font-bold text-gray-600 uppercase mb-0.5">Phone</div>
+                          <div className="text-sm text-gray-300 group-hover:text-red-400">{lead.contact?.phone || '—'}</div>
+                        </div>
+                      </a>
+                    )}
+
+                    {(lead.contact?.website || editing) && (
+                      <a
+                        href={lead.contact?.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 p-3 bg-[#12122a] rounded-lg border border-gray-800/50 hover:border-red-500/30 transition-all group"
+                      >
+                        <Globe size={20} className="text-gray-500 group-hover:text-red-400" />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[10px] font-bold text-gray-600 uppercase mb-0.5">Website</div>
+                          <div className="text-sm text-gray-300 group-hover:text-red-400 truncate">{lead.contact?.website || '—'}</div>
+                        </div>
+                      </a>
+                    )}
+
+                    {(lead.contact?.instagram || editing) && (
+                      <a
+                        href={`https://instagram.com/${lead.contact?.instagram?.replace('@', '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 p-3 bg-[#12122a] rounded-lg border border-gray-800/50 hover:border-red-500/30 transition-all group"
+                      >
+                        <Instagram size={20} className="text-gray-500 group-hover:text-red-400" />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[10px] font-bold text-gray-600 uppercase mb-0.5">Instagram</div>
+                          <div className="text-sm text-gray-300 group-hover:text-red-400">{lead.contact?.instagram || '—'}</div>
+                        </div>
+                      </a>
+                    )}
+                  </div>
+
+                  {(lead.contact?.decision_maker || editing) && (
+                    <div className="mt-4 p-3 bg-[#12122a] rounded-lg border border-gray-800/50">
+                      <div className="text-[10px] font-bold text-gray-600 uppercase mb-1">Decision Maker</div>
+                      <div className="flex items-center gap-3">
+                        {lead.contact?.avatar && (
+                          <img 
+                            src={lead.contact.avatar} 
+                            alt={lead.contact.decision_maker}
+                            className="w-12 h-12 rounded-full object-cover border-2 border-gray-700"
+                          />
+                        )}
+                        <div className="text-white font-bold">{lead.contact?.decision_maker || '—'}</div>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
