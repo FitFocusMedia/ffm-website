@@ -280,7 +280,16 @@ export default function LeadDetail() {
               {lead.contact?.decision_maker && (
                 <div className="mt-4 p-3 bg-[#12122a] rounded-lg border border-gray-800/50">
                   <div className="text-[10px] font-bold text-gray-600 uppercase mb-1">Decision Maker</div>
-                  <div className="text-white font-bold">{lead.contact.decision_maker}</div>
+                  <div className="flex items-center gap-3">
+                    {lead.contact.avatar && (
+                      <img 
+                        src={lead.contact.avatar} 
+                        alt={lead.contact.decision_maker}
+                        className="w-12 h-12 rounded-full object-cover border-2 border-gray-700"
+                      />
+                    )}
+                    <div className="text-white font-bold">{lead.contact.decision_maker}</div>
+                  </div>
                 </div>
               )}
             </div>
