@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { getPipelineStats, getLeads } from '../../../lib/crmSupabase'
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { Clock, TrendingUp, DollarSign, Users, Filter, RefreshCw } from 'lucide-react'
+import FollowUpScheduler from './FollowUpScheduler'
 
 const TIER_COLORS = ['#ef4444', '#f59e0b', '#3b82f6']
 const STAGE_COLORS = {
@@ -144,6 +145,11 @@ export default function CRMDashboard() {
           </div>
           <div className="text-3xl font-black text-red-400">${(stats.pipelineValue / 1000).toFixed(0)}K</div>
         </div>
+      </div>
+
+      {/* Follow-Up Scheduler Section */}
+      <div className="mb-8">
+        <FollowUpScheduler />
       </div>
 
       {/* Charts Row */}
