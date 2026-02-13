@@ -121,6 +121,37 @@ export async function addActivity(leadId, activity) {
   return data
 }
 
+export async function updateActivity(activityId, updates) {
+  const { data, error } = await supabase
+    .from('crm_activities')
+    .update({
+      type: updates.type,
+      notes: updates.notes
+    })
+    .eq('id', activityId)
+    .select()
+    .single()
+  
+  if (error) {
+    console.error('Error updating activity:', error)
+    throw error
+  }
+  return data
+}
+
+export async function deleteActivity(activityId) {
+  const { error } = await supabase
+    .from('crm_activities')
+    .delete()
+    .eq('id', activityId)
+  
+  if (error) {
+    console.error('Error deleting activity:', error)
+    throw error
+  }
+  return true
+}
+
 // --- Template Management ---
 
 const EMAIL_TEMPLATES = [

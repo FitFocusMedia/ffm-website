@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getLead, updateLead, getActivities, addActivity } from '../../../lib/crmSupabase'
+import { getLead, updateLead, getActivities, addActivity, updateActivity, deleteActivity } from '../../../lib/crmSupabase'
 import { 
   ArrowLeft, Phone, Mail, Globe, Instagram, Facebook, MapPin, Trophy, 
   Calendar, DollarSign, Tag, Shield, Edit2, Save, X, Plus, RefreshCw 
@@ -38,6 +38,11 @@ export default function LeadDetail() {
   const [showActivityForm, setShowActivityForm] = useState(false)
   const [activityType, setActivityType] = useState('Phone Call')
   const [activityNotes, setActivityNotes] = useState('')
+  
+  // Activity edit state
+  const [editingActivityId, setEditingActivityId] = useState(null)
+  const [editActivityType, setEditActivityType] = useState('')
+  const [editActivityNotes, setEditActivityNotes] = useState('')
 
   useEffect(() => {
     if (id) {
@@ -116,6 +121,40 @@ export default function LeadDetail() {
     } catch (error) {
       console.error('Error adding activity:', error)
       alert('Error adding activity')
+    }
+  }
+
+  const handleEditActivity = (activity) => {
+    setEditingActivityId(activity.id)
+    setEditActivityType(activity.type)
+    setEditActivityNotes(activity.notes)
+  }
+
+  const handleSaveActivity = async () => {
+    try {
+      await updateActivity(editingActivityId, {
+        type: editActivityType,
+        notes: editActivityNotes
+      })
+      const newActivities = await getActivities(id)
+      setActivities(newActivities)
+      setEditingActivityId(null)
+    } catch (error) {
+      console.error('Error updating activity:', error)
+      alert('Error updating activity')
+    }
+  }
+
+  const handleDeleteActivity = async (activityId) => {
+    if (!confirm('Are you sure you want to delete this activity?')) return
+    
+    try {
+      await deleteActivity(activityId)
+      const newActivities = await getActivities(id)
+      setActivities(newActivities)
+    } catch (error) {
+      console.error('Error deleting activity:', error)
+      alert('Error deleting activity')
     }
   }
 
@@ -550,6 +589,8 @@ export default function LeadDetail() {
                 <div className="space-y-3">
                   {activities.map(activity => {
                     const actType = ACTIVITY_TYPES.find(t => t.value === activity.type)
+                    const isEditing = editingActivityId === activity.id
+                    
                     return (
                       <div
                         key={activity.id}
@@ -559,18 +600,76 @@ export default function LeadDetail() {
                           {actType?.icon || '📝'}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs font-bold text-gray-500 uppercase">{activity.type}</span>
-                            <span className="text-gray-700">•</span>
-                            <span className="text-xs text-gray-600">
-                              {new Date(activity.created_at).toLocaleDateString('en-AU', {
-                                day: 'numeric',
-                                month: 'short',
-                                year: 'numeric'
-                              })}
-                            </span>
-                          </div>
-                          <p className="text-sm text-gray-300">{activity.notes}</p>
+                          {isEditing ? (
+                            /* Edit Mode */
+                            <div className="space-y-3">
+                              <select
+                                value={editActivityType}
+                                onChange={(e) => setEditActivityType(e.target.value)}
+                                className="w-full px-3 py-2 bg-[#1a1a2e] border border-gray-700 rounded-lg text-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/40"
+                              >
+                                {ACTIVITY_TYPES.map(type => (
+                                  <option key={type.value} value={type.value}>
+                                    {type.icon} {type.value}
+                                  </option>
+                                ))}
+                              </select>
+                              <textarea
+                                value={editActivityNotes}
+                                onChange={(e) => setEditActivityNotes(e.target.value)}
+                                rows={3}
+                                className="w-full px-3 py-2 bg-[#1a1a2e] border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-red-500/40"
+                              />
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={handleSaveActivity}
+                                  className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm"
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  onClick={() => setEditingActivityId(null)}
+                                  className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded text-sm"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            /* View Mode */
+                            <>
+                              <div className="flex items-center justify-between mb-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-bold text-gray-500 uppercase">{activity.type}</span>
+                                  <span className="text-gray-700">•</span>
+                                  <span className="text-xs text-gray-600">
+                                    {new Date(activity.created_at).toLocaleDateString('en-AU', {
+                                      day: 'numeric',
+                                      month: 'short',
+                                      year: 'numeric'
+                                    })}
+                                  </span>
+                                </div>
+                                <div className="flex gap-1">
+                                  <button
+                                    onClick={() => handleEditActivity(activity)}
+                                    className="p-1 text-gray-500 hover:text-blue-400 transition-colors"
+                                    title="Edit"
+                                  >
+                                    <Edit2 size={14} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteActivity(activity.id)}
+                                    className="p-1 text-gray-500 hover:text-red-400 transition-colors"
+                                    title="Delete"
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                </div>
+                              </div>
+                              <p className="text-sm text-gray-300">{activity.notes}</p>
+                            </>
+                          )}
                         </div>
                       </div>
                     )
