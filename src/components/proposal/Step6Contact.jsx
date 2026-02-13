@@ -150,7 +150,7 @@ const Step6Contact = ({ formData, analysis, selectedAddOns = [], prevStep, goToS
           <table style="width: 100%;">
             <tr>
               <td style="padding: 8px 0; color: #9CA3AF; font-size: 14px;">Email:</td>
-              <td style="padding: 8px 0; color: #60A5FA; font-size: 14px;">brandon@fitfocusmedia.com.au</td>
+              <td style="padding: 8px 0; color: #60A5FA; font-size: 14px;">info@fitfocusmedia.com.au</td>
             </tr>
             <tr>
               <td style="padding: 8px 0; color: #9CA3AF; font-size: 14px;">Website:</td>
@@ -370,18 +370,18 @@ const Step6Contact = ({ formData, analysis, selectedAddOns = [], prevStep, goToS
           
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
             <a
-              href="mailto:brandon@fitfocusmedia.com.au?subject=Combat Sports Media Proposal - ${formData.orgName}"
+              href="mailto:info@fitfocusmedia.com.au?subject=Combat Sports Media Proposal - ${formData.orgName}"
               className="flex items-center gap-3 p-4 sm:p-5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-all hover:scale-[1.02] group"
             >
               <Mail className="w-6 h-6 sm:w-8 sm:h-8 group-hover:rotate-12 transition-transform" />
               <div>
                 <p className="font-bold text-sm sm:text-base">Email Us</p>
-                <p className="text-xs sm:text-sm text-white/80">brandon@fitfocusmedia.com.au</p>
+                <p className="text-xs sm:text-sm text-white/80">info@fitfocusmedia.com.au</p>
               </div>
             </a>
 
             <a
-              href="mailto:brandon@fitfocusmedia.com.au?subject=Consultation Request - ${formData.orgName}&body=Hi Brandon,%0D%0A%0D%0AI'd like to schedule a consultation to discuss media production for ${formData.orgName}.%0D%0A%0D%0APlease send me your available times.%0D%0A%0D%0AThanks!"
+              href="mailto:info@fitfocusmedia.com.au?subject=Consultation Request - ${formData.orgName}&body=Hi Brandon,%0D%0A%0D%0AI'd like to schedule a consultation to discuss media production for ${formData.orgName}.%0D%0A%0D%0APlease send me your available times.%0D%0A%0D%0AThanks!"
               className="flex items-center gap-3 p-4 sm:p-5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all hover:scale-[1.02] group"
             >
               <Calendar className="w-6 h-6 sm:w-8 sm:h-8 group-hover:rotate-12 transition-transform" />

@@ -17,7 +17,7 @@ const ContactPage = () => {
     const body = encodeURIComponent(
       `Name: ${formData.name}\nEmail: ${formData.email}\nOrganization: ${formData.organization}\n\n${formData.message}`
     )
-    window.location.href = `mailto:brandon@fitfocusmedia.com.au?subject=${subject}&body=${body}`
+    window.location.href = `mailto:info@fitfocusmedia.com.au?subject=${subject}&body=${body}`
   }
 
   return (
@@ -126,7 +126,7 @@ const ContactPage = () => {
                 <h3 className="text-xl font-bold text-white mb-6">Direct Contact</h3>
                 <div className="space-y-4">
                   <a
-                    href="mailto:brandon@fitfocusmedia.com.au"
+                    href="mailto:info@fitfocusmedia.com.au"
                     className="flex items-center gap-4 p-4 bg-dark-900 rounded-lg hover:bg-primary-600/10 border border-gray-700 hover:border-primary-600/50 transition-all group"
                   >
                     <div className="w-12 h-12 bg-primary-600/20 rounded-lg flex items-center justify-center">
@@ -134,7 +134,7 @@ const ContactPage = () => {
                     </div>
                     <div>
                       <p className="text-white font-semibold">Email</p>
-                      <p className="text-gray-400 text-sm group-hover:text-primary-400 transition-colors">brandon@fitfocusmedia.com.au</p>
+                      <p className="text-gray-400 text-sm group-hover:text-primary-400 transition-colors">info@fitfocusmedia.com.au</p>
                     </div>
                   </a>
 
@@ -156,7 +156,7 @@ const ContactPage = () => {
                 <h3 className="text-xl font-bold text-white mb-6">Quick Actions</h3>
                 <div className="space-y-3">
                   <a
-                    href="mailto:brandon@fitfocusmedia.com.au?subject=Consultation Request&body=Hi Brandon,%0D%0A%0D%0AI'd like to schedule a consultation to discuss media production for my event.%0D%0A%0D%0APlease send me your available times.%0D%0A%0D%0AThanks!"
+                    href="mailto:info@fitfocusmedia.com.au?subject=Consultation Request&body=Hi Brandon,%0D%0A%0D%0AI'd like to schedule a consultation to discuss media production for my event.%0D%0A%0D%0APlease send me your available times.%0D%0A%0D%0AThanks!"
                     className="flex items-center gap-3 p-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all hover:scale-[1.02] group"
                   >
                     <Calendar className="w-6 h-6 group-hover:rotate-12 transition-transform" />

@@ -19,13 +19,13 @@ const Footer = () => {
               and help you unlock new revenue streams through PPV, content, and sponsorship opportunities.
             </p>
             <div className="flex gap-3">
-              <a href="#" className="w-10 h-10 bg-dark-800 hover:bg-primary-600/20 border border-gray-700 hover:border-primary-600 rounded-lg flex items-center justify-center transition-all">
+              <a href="https://instagram.com/fitfocusmedia" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-dark-800 hover:bg-primary-600/20 border border-gray-700 hover:border-primary-600 rounded-lg flex items-center justify-center transition-all">
                 <Instagram className="w-5 h-5 text-gray-400 hover:text-primary-400" />
               </a>
-              <a href="#" className="w-10 h-10 bg-dark-800 hover:bg-primary-600/20 border border-gray-700 hover:border-primary-600 rounded-lg flex items-center justify-center transition-all">
+              <a href="https://youtube.com/@fitfocusmedia" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-dark-800 hover:bg-primary-600/20 border border-gray-700 hover:border-primary-600 rounded-lg flex items-center justify-center transition-all">
                 <Youtube className="w-5 h-5 text-gray-400 hover:text-primary-400" />
               </a>
-              <a href="#" className="w-10 h-10 bg-dark-800 hover:bg-primary-600/20 border border-gray-700 hover:border-primary-600 rounded-lg flex items-center justify-center transition-all">
+              <a href="https://facebook.com/FitFocusMedia" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-dark-800 hover:bg-primary-600/20 border border-gray-700 hover:border-primary-600 rounded-lg flex items-center justify-center transition-all">
                 <Facebook className="w-5 h-5 text-gray-400 hover:text-primary-400" />
               </a>
             </div>
@@ -55,11 +55,11 @@ const Footer = () => {
             <h4 className="text-white font-bold mb-4">Contact</h4>
             <div className="space-y-3">
               <a
-                href="mailto:brandon@fitfocusmedia.com.au"
+                href="mailto:info@fitfocusmedia.com.au"
                 className="flex items-center gap-2 text-gray-400 hover:text-primary-400 text-sm transition-colors"
               >
                 <Mail className="w-4 h-4" />
-                brandon@fitfocusmedia.com.au
+                info@fitfocusmedia.com.au
               </a>
               <p className="text-gray-500 text-xs">
                 Based in Queensland, Australia

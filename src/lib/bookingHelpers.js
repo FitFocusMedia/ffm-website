@@ -103,7 +103,7 @@ export function generateICSFile(booking) {
     `DTSTART:${formatICSDate(startDate)}`,
     `DTEND:${formatICSDate(endDate)}`,
     `DTSTAMP:${formatICSDate(new Date())}`,
-    `ORGANIZER;CN=Brandon Hibbs:mailto:brandon@fitfocusmedia.com.au`,
+    `ORGANIZER;CN=Brandon Hibbs:mailto:info@fitfocusmedia.com.au`,
     `UID:${booking.id}@fitfocusmedia.com.au`,
     `ATTENDEE;CN=${name};RSVP=TRUE:mailto:${email}`,
     `SUMMARY:${meetingType} - Fit Focus Media`,

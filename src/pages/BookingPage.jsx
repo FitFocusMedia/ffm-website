@@ -49,7 +49,7 @@ export default function BookingPage() {
           <p className="text-gray-500 text-sm">
             Can't find a suitable time?{' '}
             <a 
-              href="mailto:brandon@fitfocusmedia.com.au" 
+              href="mailto:info@fitfocusmedia.com.au" 
               className="text-primary-400 hover:text-primary-300 transition-colors"
             >
               Email us directly

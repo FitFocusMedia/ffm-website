@@ -175,7 +175,7 @@ export default function AthleteLayout({ children }) {
               <Link to="/athlete/packages" className="text-sm text-gray-400 hover:text-white transition-colors">
                 Packages
               </Link>
-              <a href="mailto:brandon@fitfocusmedia.com.au" className="text-sm text-gray-400 hover:text-white transition-colors">
+              <a href="mailto:info@fitfocusmedia.com.au" className="text-sm text-gray-400 hover:text-white transition-colors">
                 Support
               </a>
             </div>

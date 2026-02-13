@@ -24,7 +24,7 @@ Here's what to expect during our onboarding process:
 - Pre-event venue walkthrough
 
 Your dedicated contact:
-Brandon - brandon@fitfocusmedia.com.au
+Brandon - info@fitfocusmedia.com.au
 
 We'll be reaching out soon to schedule our onboarding call.
 
@@ -33,7 +33,7 @@ Fit Focus Media Team`,
     subTasks: [
       'Personalize email with org name and contact details',
       'Include key dates and next steps',
-      'Send from brandon@fitfocusmedia.com.au',
+      'Send from info@fitfocusmedia.com.au',
       'BCC yourself for records'
     ]
   },

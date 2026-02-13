@@ -179,7 +179,7 @@ export default function AthletePackages() {
                 </ul>
 
                 <a
-                  href={`mailto:brandon@fitfocusmedia.com.au?subject=Purchase ${pkg.name}&body=Hi Brandon, I'd like to purchase the ${pkg.name} ($${pkg.price}).`}
+                  href={`mailto:info@fitfocusmedia.com.au?subject=Purchase ${pkg.name}&body=Hi Brandon, I'd like to purchase the ${pkg.name} ($${pkg.price}).`}
                   className={`block w-full bg-gradient-to-r ${pkg.color} border ${pkg.borderColor} ${pkg.textColor} font-semibold py-3 rounded-lg hover:scale-105 transition-transform text-center`}
                 >
                   Purchase Now
@@ -322,7 +322,7 @@ export default function AthletePackages() {
               Create Account
             </Link>
             <a
-              href="mailto:brandon@fitfocusmedia.com.au?subject=Package Inquiry"
+              href="mailto:info@fitfocusmedia.com.au?subject=Package Inquiry"
               className="flex items-center gap-2 bg-white/10 border border-white/20 text-white font-semibold px-8 py-4 rounded-lg hover:bg-white/20 transition-all text-lg"
             >
               <Mail className="w-5 h-5" />

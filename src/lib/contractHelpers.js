@@ -57,7 +57,7 @@ export function generateContractHTML(contract) {
       <p>
         <strong>Fit Focus Media</strong> ABN ${v(d.ffm_abn, '[ABN]')}<br>
         Represented by: Brandon Hibbs<br>
-        Email: brandon@fitfocusmedia.com.au<br>
+        Email: info@fitfocusmedia.com.au<br>
         Website: www.fitfocusmedia.com.au<br>
         (hereinafter referred to as <strong>"FFM"</strong> or <strong>"the Media Provider"</strong>)
       </p>
@@ -268,7 +268,7 @@ export function generateContractHTML(contract) {
       <p>The parties agree that:</p>
       <ul class="list-disc pl-6 my-4">
         <li><strong>Implied Consent:</strong> All athletes, by registering for and competing in the Event, are deemed to have consented to the capture, use, and publication of their image, likeness, and performance by FFM for the purposes outlined in this Agreement.</li>
-        <li><strong>Opt-Out Requirement:</strong> Any athlete who does not consent to media capture and publication must notify FFM <strong>in writing</strong> (via email to brandon@fitfocusmedia.com.au) no less than <strong>48 hours prior</strong> to the Event. FFM will make reasonable efforts to exclude such athletes from published content, however FFM cannot guarantee exclusion from all footage, particularly wide-angle or crowd shots.</li>
+        <li><strong>Opt-Out Requirement:</strong> Any athlete who does not consent to media capture and publication must notify FFM <strong>in writing</strong> (via email to info@fitfocusmedia.com.au) no less than <strong>48 hours prior</strong> to the Event. FFM will make reasonable efforts to exclude such athletes from published content, however FFM cannot guarantee exclusion from all footage, particularly wide-angle or crowd shots.</li>
         <li><strong>Client Responsibility:</strong> The Client is solely responsible for communicating media coverage terms to athletes through registration materials, event signage, and/or announcements. The Client shall include appropriate notice in registration terms and conditions that professional media coverage will be present and content may be used commercially.</li>
         <li><strong>Liability:</strong> The Client assumes all liability for any claims arising from athletes who allege they did not consent to media capture. FFM shall not be held liable for any such claims, and the Client shall indemnify FFM accordingly as outlined in Section 13.</li>
       </ul>
@@ -429,7 +429,7 @@ Once you've reviewed the terms, you can sign directly on the page. If you have a
 Cheers,
 Brandon Hibbs
 Fit Focus Media
-brandon@fitfocusmedia.com.au
+info@fitfocusmedia.com.au
 www.fitfocusmedia.com.au`
   }
 }
