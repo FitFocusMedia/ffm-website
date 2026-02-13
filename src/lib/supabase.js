@@ -2,9 +2,9 @@ import { createClient } from '@supabase/supabase-js'
 
 // Fit Focus Media Web Services project
 const supabaseUrl = 'https://gonalgubgldgpkcekaxe.supabase.co'
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdvbmFsZ3ViZ2xkZ3BrY2VrYXhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA4NTk3NDIsImV4cCI6MjA4NjQzNTc0Mn0.GuvFAgWtB0bJ_yf_6NKfPK3Gv-vJH7WhHcJFzvqm9Ew'
+const supabasePublishableKey = 'sb_publishable_SB4LfH4EkuEyu5qeC_dffQ_G9cF8Fo_'
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = createClient(supabaseUrl, supabasePublishableKey)
 
 /**
  * Submit a lead to Supabase

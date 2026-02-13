@@ -147,7 +147,12 @@ export default function ContentAdmin() {
 
   async function deleteItem(table, id) {
     if (!confirm('Are you sure you want to delete this item?')) return
-    await supabase.from(table).delete().eq('id', id)
+    const { error } = await supabase.from(table).delete().eq('id', id)
+    if (error) {
+      console.error('Delete error:', error)
+      alert(`Failed to delete: ${error.message}`)
+      return
+    }
     if (table === 'organizations') {
       loadOrganizations()
       if (selectedOrg?.id === id) setSelectedOrg(null)
