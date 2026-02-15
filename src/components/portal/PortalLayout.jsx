@@ -25,7 +25,8 @@ export default function PortalLayout({ children }) {
     { name: 'Outreach', path: '/portal/outreach' },
     { name: 'Onboarding', path: '/portal/onboarding' },
     { name: 'Content', path: '/portal/content-admin' },
-    { name: 'Orders', path: '/portal/orders' }
+    { name: 'Orders', path: '/portal/orders' },
+    { name: 'Pricing', path: '/portal/pricing' }
   ]
 
   return (

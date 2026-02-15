@@ -41,6 +41,7 @@ import AthleteEventView from './components/athlete/AthleteEventView'
 import ContentManager from './pages/admin/ContentManager'
 import ContentAdmin from './pages/portal/ContentAdmin'
 import OrderManagement from './pages/portal/OrderManagement'
+import PricingCalculator from './pages/portal/PricingCalculator'
 
 function ScrollToTop() {
   const { pathname } = useLocation()
@@ -227,6 +228,18 @@ function App() {
             <ProtectedRoute>
               <PortalLayout>
                 <OrderManagement />
+              </PortalLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Pricing Calculator */}
+        <Route
+          path="/portal/pricing"
+          element={
+            <ProtectedRoute>
+              <PortalLayout>
+                <PricingCalculator />
               </PortalLayout>
             </ProtectedRoute>
           }
