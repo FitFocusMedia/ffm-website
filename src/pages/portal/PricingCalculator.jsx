@@ -13,12 +13,16 @@ const addOnsList = [
   { id: 'teleprompter', name: 'Teleprompter', price: 150 },
   { id: 'drone', name: 'Drone Footage', price: 300, perDay: true },
   { id: 'music', name: 'Licensed Music', price: 75 },
-  { id: 'instagram', name: 'Instagram Version', price: 200 },
-  { id: 'facebook', name: 'Facebook Version', price: 150 },
   { id: 'script', name: 'Script Writing', price: 250 },
   { id: 'skin', name: 'Skin Smoothing', price: 100 },
   { id: 'rush', name: 'Rush Delivery', price: 0, multiplier: 1.5 },
   { id: 'revisions', name: 'Extra Revisions', price: 150, note: '3 rounds' }
+]
+
+const formatOptions = [
+  { id: 'horizontal', name: 'Horizontal (16:9)', icon: '📺' },
+  { id: 'vertical', name: 'Vertical (9:16)', icon: '📱' },
+  { id: 'square', name: 'Square (1:1)', icon: '⬜' }
 ]
 
 export default function PricingCalculator() {
@@ -27,13 +31,41 @@ export default function PricingCalculator() {
   const [shootDays, setShootDays] = useState(1)
   const [hoursPerDay, setHoursPerDay] = useState(4)
   const [travelKm, setTravelKm] = useState(0)
-  const [videoLength, setVideoLength] = useState(1)
-  const [editBaseRate, setEditBaseRate] = useState(500)
-  const [editPerMinute, setEditPerMinute] = useState(200)
+  
+  // Deliverables (multiple videos)
+  const [deliverables, setDeliverables] = useState([
+    { id: 1, name: 'Main Video', length: 2, format: 'horizontal' }
+  ])
+  const [baseVideoRate, setBaseVideoRate] = useState(500)
+  const [additionalVideoRate, setAdditionalVideoRate] = useState(300)
+  const [perMinuteRate, setPerMinuteRate] = useState(200)
+  
   const [discountType, setDiscountType] = useState('none')
   const [discountValue, setDiscountValue] = useState(0)
   const [addOns, setAddOns] = useState({})
   const [totals, setTotals] = useState({})
+
+  const addDeliverable = () => {
+    const newId = Math.max(...deliverables.map(d => d.id), 0) + 1
+    setDeliverables([...deliverables, { 
+      id: newId, 
+      name: `Video ${newId}`, 
+      length: 1, 
+      format: 'horizontal' 
+    }])
+  }
+
+  const removeDeliverable = (id) => {
+    if (deliverables.length > 1) {
+      setDeliverables(deliverables.filter(d => d.id !== id))
+    }
+  }
+
+  const updateDeliverable = (id, field, value) => {
+    setDeliverables(deliverables.map(d => 
+      d.id === id ? { ...d, [field]: value } : d
+    ))
+  }
 
   const calculatePricing = useCallback(() => {
     // Base and hourly rates (40/60 split)
@@ -52,11 +84,20 @@ export default function PricingCalculator() {
     const travelFee = Math.ceil(roundTripKm / 50) * 50
     const travelTotal = travelKm > 0 ? travelFee : 0
 
-    // Editing
-    let editTotal = 0
-    if (videoLength > 0) {
-      editTotal = editBaseRate + (Math.max(0, videoLength - 1) * editPerMinute)
-    }
+    // Deliverables (multi-video editing)
+    let deliverablesTotal = 0
+    const deliverableBreakdown = deliverables.map((d, index) => {
+      // First video gets base rate, additional videos get discounted rate
+      const videoBaseRate = index === 0 ? baseVideoRate : additionalVideoRate
+      // Per-minute charge for length beyond 1 minute
+      const minuteCharge = Math.max(0, d.length - 1) * perMinuteRate
+      const videoTotal = videoBaseRate + minuteCharge
+      deliverablesTotal += videoTotal
+      return {
+        ...d,
+        cost: videoTotal
+      }
+    })
 
     // Add-ons
     let addonsTotal = 0
@@ -79,7 +120,7 @@ export default function PricingCalculator() {
     })
 
     // Subtotal with rush
-    let subtotal = (shootTotal + travelTotal + editTotal + addonsTotal) * rushMultiplier
+    let subtotal = (shootTotal + travelTotal + deliverablesTotal + addonsTotal) * rushMultiplier
 
     // Discount
     let discountAmount = 0
@@ -100,7 +141,8 @@ export default function PricingCalculator() {
       shootTotal: Math.round(shootTotal),
       roundTripKm,
       travelTotal,
-      editTotal: Math.round(editTotal),
+      deliverablesTotal: Math.round(deliverablesTotal),
+      deliverableBreakdown,
       addonsTotal: Math.round(addonsTotal),
       addonsItems,
       discountAmount: Math.round(discountAmount),
@@ -108,7 +150,7 @@ export default function PricingCalculator() {
       exGst: Math.round(exGst),
       gstAmount: Math.round(gstAmount)
     })
-  }, [dayRate, crewSize, shootDays, hoursPerDay, travelKm, videoLength, editBaseRate, editPerMinute, discountType, discountValue, addOns])
+  }, [dayRate, crewSize, shootDays, hoursPerDay, travelKm, deliverables, baseVideoRate, additionalVideoRate, perMinuteRate, discountType, discountValue, addOns])
 
   useEffect(() => {
     calculatePricing()
@@ -119,6 +161,11 @@ export default function PricingCalculator() {
   }
 
   const copyQuote = () => {
+    const deliverablesList = deliverables.map((d, i) => {
+      const format = formatOptions.find(f => f.id === d.format)
+      return `• ${d.name}: ${d.length} min ${format?.name || ''} — $${totals.deliverableBreakdown?.[i]?.cost?.toLocaleString() || 0}`
+    }).join('\n')
+
     const quote = `
 FFM PROJECT QUOTE
 ==================
@@ -132,9 +179,9 @@ TRAVEL
 • ${totals.roundTripKm > 0 ? `${totals.roundTripKm}km round trip` : 'Local (no charge)'}
 • Travel: $${totals.travelTotal?.toLocaleString()}
 
-POST-PRODUCTION
-• ${videoLength > 0 ? videoLength + ' minute video' : 'No editing required'}
-• Editing: $${totals.editTotal?.toLocaleString()}
+DELIVERABLES (${deliverables.length} video${deliverables.length > 1 ? 's' : ''})
+${deliverablesList}
+• Total Editing: $${totals.deliverablesTotal?.toLocaleString()}
 
 ${totals.addonsItems?.length > 0 ? `ADD-ONS\n• ${totals.addonsItems.join('\n• ')}\n• Add-ons: $${totals.addonsTotal?.toLocaleString()}\n` : ''}
 ==================
@@ -271,59 +318,126 @@ Valid for 30 days.
             </div>
           </div>
 
-          {/* Editing Section */}
+          {/* Deliverables Section (Multi-Video) */}
           <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50">
-            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-              <span className="text-2xl">🎬</span> Editing & Post-Production
-            </h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold flex items-center gap-2">
+                <span className="text-2xl">🎬</span> Deliverables
+              </h2>
+              <button
+                onClick={addDeliverable}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition"
+              >
+                + Add Video
+              </button>
+            </div>
+            
+            {/* Pricing Rates */}
+            <div className="grid grid-cols-3 gap-4 mb-6 p-4 bg-gray-700/30 rounded-lg">
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Final Video Length</label>
-                <select
-                  value={videoLength}
-                  onChange={(e) => setVideoLength(parseInt(e.target.value))}
-                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:border-red-500 focus:outline-none"
-                >
-                  <option value="0">No Editing</option>
-                  <option value="1">1 Minute</option>
-                  <option value="2">2 Minutes</option>
-                  <option value="3">3 Minutes</option>
-                  <option value="5">5 Minutes</option>
-                  <option value="10">10 Minutes</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">Base Edit Rate</label>
+                <label className="block text-xs text-gray-400 mb-1">First Video Base</label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
                   <input
                     type="number"
-                    value={editBaseRate}
-                    onChange={(e) => setEditBaseRate(parseFloat(e.target.value) || 0)}
-                    min="0"
-                    step="50"
-                    className="w-full bg-gray-700 border border-gray-600 rounded-lg pl-8 pr-4 py-3 focus:border-red-500 focus:outline-none"
+                    value={baseVideoRate}
+                    onChange={(e) => setBaseVideoRate(parseFloat(e.target.value) || 0)}
+                    className="w-full bg-gray-700 border border-gray-600 rounded-lg pl-6 pr-2 py-2 text-sm focus:border-red-500 focus:outline-none"
                   />
                 </div>
-                <p className="text-xs text-gray-500 mt-1">First minute</p>
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Per Additional Min</label>
+                <label className="block text-xs text-gray-400 mb-1">Additional Videos</label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
                   <input
                     type="number"
-                    value={editPerMinute}
-                    onChange={(e) => setEditPerMinute(parseFloat(e.target.value) || 0)}
-                    min="0"
-                    step="25"
-                    className="w-full bg-gray-700 border border-gray-600 rounded-lg pl-8 pr-4 py-3 focus:border-red-500 focus:outline-none"
+                    value={additionalVideoRate}
+                    onChange={(e) => setAdditionalVideoRate(parseFloat(e.target.value) || 0)}
+                    className="w-full bg-gray-700 border border-gray-600 rounded-lg pl-6 pr-2 py-2 text-sm focus:border-red-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Per Extra Minute</label>
+                <div className="relative">
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                  <input
+                    type="number"
+                    value={perMinuteRate}
+                    onChange={(e) => setPerMinuteRate(parseFloat(e.target.value) || 0)}
+                    className="w-full bg-gray-700 border border-gray-600 rounded-lg pl-6 pr-2 py-2 text-sm focus:border-red-500 focus:outline-none"
                   />
                 </div>
               </div>
             </div>
+
+            {/* Video List */}
+            <div className="space-y-3">
+              {deliverables.map((d, index) => (
+                <div key={d.id} className="bg-gray-700/50 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                        index === 0 ? 'bg-red-600 text-white' : 'bg-gray-600 text-gray-300'
+                      }`}>
+                        {index === 0 ? 'Primary' : `+${index}`}
+                      </span>
+                      <input
+                        type="text"
+                        value={d.name}
+                        onChange={(e) => updateDeliverable(d.id, 'name', e.target.value)}
+                        className="bg-transparent border-b border-gray-600 focus:border-red-500 outline-none text-white font-medium"
+                        placeholder="Video name"
+                      />
+                    </div>
+                    {deliverables.length > 1 && (
+                      <button
+                        onClick={() => removeDeliverable(d.id)}
+                        className="text-red-400 hover:text-red-300 text-sm"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs text-gray-400 mb-1">Length (min)</label>
+                      <input
+                        type="number"
+                        value={d.length}
+                        onChange={(e) => updateDeliverable(d.id, 'length', parseInt(e.target.value) || 1)}
+                        min="1"
+                        max="60"
+                        className="w-full bg-gray-600 border border-gray-500 rounded px-3 py-2 text-sm focus:border-red-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-400 mb-1">Format</label>
+                      <select
+                        value={d.format}
+                        onChange={(e) => updateDeliverable(d.id, 'format', e.target.value)}
+                        className="w-full bg-gray-600 border border-gray-500 rounded px-3 py-2 text-sm focus:border-red-500 focus:outline-none"
+                      >
+                        {formatOptions.map(f => (
+                          <option key={f.id} value={f.id}>{f.icon} {f.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-400 mb-1">Cost</label>
+                      <div className="bg-gray-600/50 rounded px-3 py-2 text-sm font-semibold text-green-400">
+                        ${totals.deliverableBreakdown?.[index]?.cost?.toLocaleString() || 0}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
             <div className="mt-4 p-3 bg-gray-700/50 rounded-lg text-sm text-gray-400">
-              <strong>Includes:</strong> Color correction, color grading, audio mixing, lower thirds, file conversion
+              <strong>Each video includes:</strong> Color correction, color grading, audio mixing, lower thirds, file conversion
             </div>
           </div>
 
@@ -417,10 +531,12 @@ Valid for 30 days.
               </div>
               
               <div className="bg-black/20 rounded-lg p-4">
-                <div className="text-sm text-red-200">Editing & Post</div>
-                <div className="text-2xl font-bold">${totals.editTotal?.toLocaleString()}</div>
-                <div className="text-xs text-red-300 mt-1">
-                  {videoLength > 0 ? `${videoLength} min video` : 'No editing'}
+                <div className="text-sm text-red-200">Deliverables ({deliverables.length} video{deliverables.length > 1 ? 's' : ''})</div>
+                <div className="text-2xl font-bold">${totals.deliverablesTotal?.toLocaleString()}</div>
+                <div className="text-xs text-red-300 mt-1 space-y-0.5">
+                  {totals.deliverableBreakdown?.map((d, i) => (
+                    <div key={i}>{d.name}: {d.length}min — ${d.cost?.toLocaleString()}</div>
+                  ))}
                 </div>
               </div>
               
