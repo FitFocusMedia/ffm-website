@@ -65,12 +65,14 @@ export default function ContractBuilder({ editMode = false }) {
   ])
   const [addOns, setAddOns] = useState([])
   const [submitting, setSubmitting] = useState(false)
+  const [savingDraft, setSavingDraft] = useState(false)
   const [existingContract, setExistingContract] = useState(null)
   const [loadingContract, setLoadingContract] = useState(editMode)
   const [showPreview, setShowPreview] = useState(true)
   const signatureCanvasRef = useRef(null)
   const [signatureCanvas, setSignatureCanvas] = useState(null)
   const [confirmSignature, setConfirmSignature] = useState(false)
+  const [lastSaved, setLastSaved] = useState(null)
   const navigate = useNavigate()
 
   // Load existing contract in edit mode
@@ -303,6 +305,58 @@ export default function ContractBuilder({ editMode = false }) {
       alert('Failed to save contract: ' + error.message)
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const saveDraft = async () => {
+    setSavingDraft(true)
+
+    try {
+      const contractData = {
+        ...formData,
+        multi_events: multiEvents,
+        athlete_packages: athletePackages,
+        add_ons: addOns,
+      }
+
+      if (editMode && existingContract) {
+        // UPDATE existing draft
+        await updateContract(contractId, {
+          status: existingContract.status === 'draft' ? 'draft' : existingContract.status,
+          org_name: formData.org_name || 'Untitled Draft',
+          promoter_name: formData.promoter_name,
+          promoter_email: formData.promoter_email,
+          promoter_phone: formData.promoter_phone,
+          contract_data: contractData,
+        })
+        
+        setLastSaved(new Date())
+        alert('Draft saved!')
+      } else {
+        // CREATE new draft
+        const newContract = await createContract({
+          status: 'draft',
+          org_name: formData.org_name || 'Untitled Draft',
+          promoter_name: formData.promoter_name,
+          promoter_email: formData.promoter_email,
+          promoter_phone: formData.promoter_phone,
+          contract_data: contractData,
+        })
+
+        // Clear localStorage since we now have a saved draft
+        localStorage.removeItem('contractBuilderData')
+        
+        // Navigate to edit mode for this draft
+        navigate(`/portal/contracts/${newContract.id}/edit`, { replace: true })
+        setExistingContract(newContract)
+        setLastSaved(new Date())
+        alert('Draft saved! You can continue editing or come back later.')
+      }
+    } catch (error) {
+      console.error('Error saving draft:', error)
+      alert('Failed to save draft: ' + error.message)
+    } finally {
+      setSavingDraft(false)
     }
   }
 
@@ -1287,38 +1341,61 @@ export default function ContractBuilder({ editMode = false }) {
 
             {/* Navigation Buttons */}
             <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-700">
-              {currentStep > 1 && (
+              <div className="flex items-center gap-3">
+                {currentStep > 1 && (
+                  <button
+                    type="button"
+                    onClick={prevStep}
+                    className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                  >
+                    ← Previous
+                  </button>
+                )}
+                
+                {/* Save as Draft - always visible */}
                 <button
                   type="button"
-                  onClick={prevStep}
-                  className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                  onClick={saveDraft}
+                  disabled={savingDraft}
+                  className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 disabled:bg-yellow-800 text-white rounded-lg transition-colors flex items-center gap-2"
                 >
-                  ← Previous
+                  {savingDraft ? (
+                    <>💾 Saving...</>
+                  ) : (
+                    <>💾 Save Draft</>
+                  )}
                 </button>
-              )}
+                {lastSaved && (
+                  <span className="text-xs text-gray-500">
+                    Saved {lastSaved.toLocaleTimeString()}
+                  </span>
+                )}
+              </div>
               
-              {currentStep < TOTAL_STEPS && (
-                <button
-                  type="button"
-                  onClick={nextStep}
-                  className="ml-auto px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                >
-                  Next →
-                </button>
-              )}
-              
-              {currentStep === TOTAL_STEPS && (
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="ml-auto px-6 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-800 text-white rounded-lg transition-colors"
-                >
-                  {submitting 
-                    ? (editMode ? 'Updating Contract...' : 'Creating Contract...') 
-                    : (editMode ? 'Update Contract' : 'Create Contract')
-                  }
-                </button>
-              )}
+              <div className="flex items-center gap-3">
+                {currentStep < TOTAL_STEPS && (
+                  <button
+                    type="button"
+                    onClick={nextStep}
+                    className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                  >
+                    Next →
+                  </button>
+                )}
+                
+                {currentStep === TOTAL_STEPS && (
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-800 text-white rounded-lg transition-colors"
+                  >
+                    {submitting 
+                      ? (editMode ? 'Updating Contract...' : 'Creating Contract...') 
+                      : (editMode ? 'Update Contract' : 'Sign & Send Contract')
+                    }
+                  </button>
+                )}
+              </div>
             </div>
           </form>
         </div>

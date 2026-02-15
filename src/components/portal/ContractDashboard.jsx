@@ -18,7 +18,7 @@ export default function ContractDashboard() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [sortBy, setSortBy] = useState('created_desc')
-  const [stats, setStats] = useState({ total: 0, signedThisMonth: 0, pending: 0, value: 0 })
+  const [stats, setStats] = useState({ total: 0, signedThisMonth: 0, pending: 0, drafts: 0, value: 0 })
   const navigate = useNavigate()
 
   useEffect(() => { loadContracts() }, [])
@@ -44,6 +44,7 @@ export default function ContractDashboard() {
       return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear()
     })
     const pending = allContracts.filter(c => c.status === 'sent' || c.status === 'viewed')
+    const drafts = allContracts.filter(c => c.status === 'draft')
     const totalValue = allContracts.reduce((sum, c) => {
       const vipPrice = c.contract_data?.vip_price || 0
       const athletes = c.contract_data?.expected_athletes || 0
@@ -53,6 +54,7 @@ export default function ContractDashboard() {
       total: allContracts.length,
       signedThisMonth: thisMonthSigned.length,
       pending: pending.length,
+      drafts: drafts.length,
       value: Math.round(totalValue)
     })
   }
@@ -106,14 +108,19 @@ export default function ContractDashboard() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
         {[
-          { label: 'TOTAL CONTRACTS', value: stats.total, color: 'text-white' },
-          { label: 'SIGNED THIS MONTH', value: stats.signedThisMonth, color: 'text-pink-500' },
-          { label: 'PENDING SIGNATURES', value: stats.pending, color: 'text-pink-500' },
-          { label: 'TOTAL VALUE', value: `$${stats.value.toLocaleString()}`, color: 'text-red-400' },
-        ].map(({ label, value, color }) => (
-          <div key={label} className="bg-[#1a1a2e] rounded-xl p-5 border border-gray-800/50">
+          { label: 'TOTAL CONTRACTS', value: stats.total, color: 'text-white', filter: '' },
+          { label: 'DRAFTS', value: stats.drafts, color: 'text-yellow-500', filter: 'draft' },
+          { label: 'SIGNED THIS MONTH', value: stats.signedThisMonth, color: 'text-green-500', filter: 'signed' },
+          { label: 'PENDING SIGNATURES', value: stats.pending, color: 'text-blue-400', filter: '' },
+          { label: 'TOTAL VALUE', value: `$${stats.value.toLocaleString()}`, color: 'text-red-400', filter: '' },
+        ].map(({ label, value, color, filter }) => (
+          <div 
+            key={label} 
+            onClick={() => filter !== undefined && setStatusFilter(filter)}
+            className={`bg-[#1a1a2e] rounded-xl p-5 border border-gray-800/50 ${filter !== '' ? 'cursor-pointer hover:border-gray-600 transition-colors' : ''}`}
+          >
             <div className="text-[11px] font-bold text-gray-500 tracking-widest uppercase mb-3">{label}</div>
             <div className={`text-3xl font-black ${color}`}>{value}</div>
           </div>
@@ -183,8 +190,13 @@ export default function ContractDashboard() {
             return (
               <div
                 key={contract.id}
-                onClick={() => navigate(`/portal/contracts/${contract.id}`)}
-                className="bg-[#1a1a2e] rounded-xl p-5 border-l-4 border-l-red-600 border border-gray-800/50 hover:border-gray-700 cursor-pointer transition-all hover:bg-[#1f1f35] group"
+                onClick={() => contract.status === 'draft' 
+                  ? navigate(`/portal/contracts/${contract.id}/edit`)
+                  : navigate(`/portal/contracts/${contract.id}`)
+                }
+                className={`bg-[#1a1a2e] rounded-xl p-5 border-l-4 ${
+                  contract.status === 'draft' ? 'border-l-yellow-500' : 'border-l-red-600'
+                } border border-gray-800/50 hover:border-gray-700 cursor-pointer transition-all hover:bg-[#1f1f35] group`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
