@@ -1,0 +1,16 @@
+# Robots.txt for Fit Focus Media
+# https://www.fitfocusmedia.com.au
+
+User-agent: *
+Allow: /
+
+# Exclude private/admin areas
+Disallow: /portal
+Disallow: /portal/
+Disallow: /athlete
+Disallow: /athlete/
+Disallow: /contract/
+Disallow: /order/
+
+# Sitemap location
+Sitemap: https://www.fitfocusmedia.com.au/sitemap.xml
