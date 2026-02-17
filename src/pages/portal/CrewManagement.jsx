@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import EventBrief from '../../components/portal/EventBrief'
+import AssignmentView from '../../components/portal/AssignmentView'
 
 export default function CrewManagement() {
   const [events, setEvents] = useState([])
@@ -430,6 +431,17 @@ export default function CrewManagement() {
             {equipment.length}
           </span>
         </button>
+        <button
+          onClick={() => setActiveTab('assign')}
+          className={`flex-1 px-4 py-3 rounded-lg font-medium transition flex items-center justify-center gap-2 ${
+            activeTab === 'assign' 
+              ? 'bg-purple-600 text-white' 
+              : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+          }`}
+        >
+          <span>🎯</span>
+          <span className="hidden sm:inline">Assign</span>
+        </button>
       </div>
 
       {/* Stats - Mobile: 2x2 grid, Desktop: 4 cols */}
@@ -773,6 +785,35 @@ export default function CrewManagement() {
             )}
           </div>
         </div>
+      )}
+
+      {/* Assignment Tab Content */}
+      {activeTab === 'assign' && (
+        <AssignmentView
+          events={events}
+          crewMembers={crewMembers}
+          equipment={equipment}
+          onAssignCrew={async (event, crew) => {
+            const newCrewIds = [...(event.crew_ids || []), crew.id]
+            await supabase.from('production_events').update({ crew_ids: newCrewIds }).eq('id', event.id)
+            setEvents(events.map(e => e.id === event.id ? { ...e, crew_ids: newCrewIds } : e))
+          }}
+          onUnassignCrew={async (event, crew) => {
+            const newCrewIds = (event.crew_ids || []).filter(id => id !== crew.id)
+            await supabase.from('production_events').update({ crew_ids: newCrewIds }).eq('id', event.id)
+            setEvents(events.map(e => e.id === event.id ? { ...e, crew_ids: newCrewIds } : e))
+          }}
+          onAssignEquipment={async (event, eq) => {
+            const newEquipIds = [...(event.equipment_ids || []), eq.id]
+            await supabase.from('production_events').update({ equipment_ids: newEquipIds }).eq('id', event.id)
+            setEvents(events.map(e => e.id === event.id ? { ...e, equipment_ids: newEquipIds } : e))
+          }}
+          onUnassignEquipment={async (event, eq) => {
+            const newEquipIds = (event.equipment_ids || []).filter(id => id !== eq.id)
+            await supabase.from('production_events').update({ equipment_ids: newEquipIds }).eq('id', event.id)
+            setEvents(events.map(e => e.id === event.id ? { ...e, equipment_ids: newEquipIds } : e))
+          }}
+        />
       )}
 
       {/* ============ MODALS ============ */}
