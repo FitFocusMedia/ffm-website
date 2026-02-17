@@ -129,7 +129,7 @@ export function generateContractHTML(contract) {
       ${d.ppv_included ? `
         <p>
           <strong>Platform:</strong> ${v(d.ppv_platform)}<br>
-          <strong>PPV Price Point:</strong> ${currency(d.ppv_price)} per viewer
+          <strong>PPV Price Point:</strong> ${d.ppv_price_type === 'range' && d.ppv_price_max ? `${currency(d.ppv_price)} - ${currency(d.ppv_price_max)}` : currency(d.ppv_price)} per viewer
         </p>
       ` : ''}
       

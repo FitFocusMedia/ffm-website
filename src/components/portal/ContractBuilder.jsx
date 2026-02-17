@@ -36,6 +36,8 @@ export default function ContractBuilder({ editMode = false }) {
     ppv_included: false,
     ppv_platform: '',
     ppv_price: '',
+    ppv_price_type: 'fixed',
+    ppv_price_max: '',
     ppv_ffm_split: '70',
     ppv_client_split: '30',
     ppv_payment_days: '21',
@@ -891,16 +893,77 @@ export default function ContractBuilder({ editMode = false }) {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-2">
-                        PPV Price per Viewer
+                        PPV Pricing Type
                       </label>
-                      <input
-                        type="number"
-                        name="ppv_price"
-                        value={formData.ppv_price}
-                        onChange={handleInputChange}
-                        placeholder="e.g., 19.99"
-                        className="w-full px-4 py-2 bg-dark-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
+                      <div className="flex gap-4 mb-3">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="ppv_price_type"
+                            value="fixed"
+                            checked={formData.ppv_price_type === 'fixed'}
+                            onChange={handleInputChange}
+                            className="text-orange-500 focus:ring-orange-500"
+                          />
+                          <span className="text-gray-300">Fixed Price</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="ppv_price_type"
+                            value="range"
+                            checked={formData.ppv_price_type === 'range'}
+                            onChange={handleInputChange}
+                            className="text-orange-500 focus:ring-orange-500"
+                          />
+                          <span className="text-gray-300">Price Range</span>
+                        </label>
+                      </div>
+                      
+                      {formData.ppv_price_type === 'fixed' ? (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-300 mb-2">
+                            PPV Price per Viewer
+                          </label>
+                          <input
+                            type="number"
+                            name="ppv_price"
+                            value={formData.ppv_price}
+                            onChange={handleInputChange}
+                            placeholder="e.g., 25.00"
+                            className="w-full px-4 py-2 bg-dark-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">
+                              Minimum Price
+                            </label>
+                            <input
+                              type="number"
+                              name="ppv_price"
+                              value={formData.ppv_price}
+                              onChange={handleInputChange}
+                              placeholder="e.g., 25.00"
+                              className="w-full px-4 py-2 bg-dark-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">
+                              Maximum Price
+                            </label>
+                            <input
+                              type="number"
+                              name="ppv_price_max"
+                              value={formData.ppv_price_max}
+                              onChange={handleInputChange}
+                              placeholder="e.g., 35.00"
+                              className="w-full px-4 py-2 bg-dark-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </>
                 )}
