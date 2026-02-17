@@ -262,7 +262,15 @@ export default function CrewManagement() {
   }
 
   function getDaysUntil(dateStr) {
-    const days = Math.ceil((new Date(dateStr) - now) / (1000 * 60 * 60 * 24))
+    // Parse event date as local midnight (not UTC)
+    const [year, month, day] = dateStr.split('-').map(Number)
+    const eventDate = new Date(year, month - 1, day)
+    
+    // Get today at local midnight
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    
+    const days = Math.round((eventDate - today) / (1000 * 60 * 60 * 24))
     if (days === 0) return 'Today'
     if (days === 1) return 'Tomorrow'
     if (days < 0) return `${Math.abs(days)}d ago`
