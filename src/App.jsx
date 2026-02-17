@@ -42,6 +42,7 @@ import ContentManager from './pages/admin/ContentManager'
 import ContentAdmin from './pages/portal/ContentAdmin'
 import OrderManagement from './pages/portal/OrderManagement'
 import PricingCalculator from './pages/portal/PricingCalculator'
+import CrewManagement from './pages/portal/CrewManagement'
 
 function ScrollToTop() {
   const { pathname } = useLocation()
@@ -240,6 +241,18 @@ function App() {
             <ProtectedRoute>
               <PortalLayout>
                 <PricingCalculator />
+              </PortalLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Crew & Logistics */}
+        <Route
+          path="/portal/crews"
+          element={
+            <ProtectedRoute>
+              <PortalLayout>
+                <CrewManagement />
               </PortalLayout>
             </ProtectedRoute>
           }

@@ -76,9 +76,14 @@ const Footer = () => {
           <p className="text-gray-500 text-xs">
             © {new Date().getFullYear()} Fit Focus Media. All rights reserved.
           </p>
-          <p className="text-gray-600 text-xs">
-            Professional Combat Sports Production
-          </p>
+          <div className="text-right">
+            <p className="text-gray-600 text-xs">
+              Professional Combat Sports Production
+            </p>
+            <p className="text-gray-700 text-[10px] mt-1">
+              v{__BUILD_VERSION__}
+            </p>
+          </div>
         </div>
       </div>
     </footer>
