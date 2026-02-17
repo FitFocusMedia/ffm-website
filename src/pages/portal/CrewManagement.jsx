@@ -12,6 +12,9 @@ export default function CrewManagement() {
   const [viewMode, setViewMode] = useState('grid')
   const [showBrief, setShowBrief] = useState(null)
   
+  // Tab navigation: 'events' | 'crew' | 'equipment'
+  const [activeTab, setActiveTab] = useState('events')
+  
   // Modals
   const [showEventModal, setShowEventModal] = useState(false)
   const [showCrewModal, setShowCrewModal] = useState(false)
@@ -348,19 +351,89 @@ export default function CrewManagement() {
           <h1 className="text-xl sm:text-2xl font-bold text-white">Crew & Logistics</h1>
           <p className="text-gray-400 text-sm mt-1">Manage teams, equipment, and travel for events</p>
         </div>
-        <button 
-          onClick={() => { resetEventForm(); setEditingEvent(null); setShowEventModal(true) }}
-          className="bg-orange-600 hover:bg-orange-700 px-4 py-2.5 rounded-lg font-medium flex items-center justify-center sm:justify-start"
+        {activeTab === 'events' && (
+          <button 
+            onClick={() => { resetEventForm(); setEditingEvent(null); setShowEventModal(true) }}
+            className="bg-orange-600 hover:bg-orange-700 px-4 py-2.5 rounded-lg font-medium flex items-center justify-center sm:justify-start"
+          >
+            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            New Event
+          </button>
+        )}
+        {activeTab === 'crew' && (
+          <button 
+            onClick={() => { setEditingCrew(null); setCrewForm({ name: '', role: '', phone: '', email: '' }); setShowCrewModal(true) }}
+            className="bg-green-600 hover:bg-green-700 px-4 py-2.5 rounded-lg font-medium flex items-center justify-center sm:justify-start"
+          >
+            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Add Crew
+          </button>
+        )}
+        {activeTab === 'equipment' && (
+          <button 
+            onClick={() => { setEditingEquipment(null); setEquipmentForm({ name: '', category: 'Camera', quantity: 1, notes: '' }); setShowEquipmentModal(true) }}
+            className="bg-blue-600 hover:bg-blue-700 px-4 py-2.5 rounded-lg font-medium flex items-center justify-center sm:justify-start"
+          >
+            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Add Equipment
+          </button>
+        )}
+      </div>
+
+      {/* Tab Navigation */}
+      <div className="flex space-x-1 bg-gray-800/50 rounded-xl p-1 border border-gray-700/50">
+        <button
+          onClick={() => setActiveTab('events')}
+          className={`flex-1 px-4 py-3 rounded-lg font-medium transition flex items-center justify-center gap-2 ${
+            activeTab === 'events' 
+              ? 'bg-orange-600 text-white' 
+              : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+          }`}
         >
-          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          New Event
+          <span>📅</span>
+          <span>Events</span>
+          <span className={`text-xs px-2 py-0.5 rounded-full ${activeTab === 'events' ? 'bg-orange-700' : 'bg-gray-700'}`}>
+            {upcomingCount}
+          </span>
+        </button>
+        <button
+          onClick={() => setActiveTab('crew')}
+          className={`flex-1 px-4 py-3 rounded-lg font-medium transition flex items-center justify-center gap-2 ${
+            activeTab === 'crew' 
+              ? 'bg-green-600 text-white' 
+              : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+          }`}
+        >
+          <span>👥</span>
+          <span>Crew</span>
+          <span className={`text-xs px-2 py-0.5 rounded-full ${activeTab === 'crew' ? 'bg-green-700' : 'bg-gray-700'}`}>
+            {crewMembers.length}
+          </span>
+        </button>
+        <button
+          onClick={() => setActiveTab('equipment')}
+          className={`flex-1 px-4 py-3 rounded-lg font-medium transition flex items-center justify-center gap-2 ${
+            activeTab === 'equipment' 
+              ? 'bg-blue-600 text-white' 
+              : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+          }`}
+        >
+          <span>📷</span>
+          <span>Equipment</span>
+          <span className={`text-xs px-2 py-0.5 rounded-full ${activeTab === 'equipment' ? 'bg-blue-700' : 'bg-gray-700'}`}>
+            {equipment.length}
+          </span>
         </button>
       </div>
 
       {/* Stats - Mobile: 2x2 grid, Desktop: 4 cols */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      {activeTab === 'events' && <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
           <div className="text-2xl sm:text-3xl font-bold text-orange-500">{upcomingCount}</div>
           <div className="text-gray-400 text-xs sm:text-sm">Upcoming Events</div>
@@ -381,9 +454,10 @@ export default function CrewManagement() {
             {needsCrewCount > 0 ? '⚠️ Need Crew' : 'This Month'}
           </div>
         </div>
-      </div>
+      </div>}
 
       {/* Filter & View Toggle - Scrollable on mobile */}
+      {activeTab === 'events' && <>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center overflow-x-auto pb-2 sm:pb-0 -mx-1 px-1">
           <span className="text-gray-400 text-sm mr-3 whitespace-nowrap">Filter:</span>
@@ -618,19 +692,13 @@ export default function CrewManagement() {
           </div>
         </div>
       )}
+      </>}
 
-      {/* Crew & Equipment Sections - Stack on mobile */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Crew Members */}
+      {/* Crew Tab Content */}
+      {activeTab === 'crew' && (
         <div className="bg-gray-800/30 rounded-xl border border-gray-700/50 p-4 sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-bold text-white">👥 Crew Members</h3>
-            <button 
-              onClick={() => { setEditingCrew(null); setCrewForm({ name: '', role: '', phone: '', email: '' }); setShowCrewModal(true) }} 
-              className="text-orange-500 hover:text-orange-400 text-sm font-medium"
-            >
-              + Add
-            </button>
           </div>
           <div className="space-y-2">
             {crewMembers.map(crew => (
@@ -664,21 +732,17 @@ export default function CrewManagement() {
               </div>
             ))}
             {crewMembers.length === 0 && (
-              <p className="text-gray-500 text-center py-8">No crew members yet. Click "+ Add" to add one.</p>
+              <p className="text-gray-500 text-center py-8">No crew members yet. Click "Add Crew" to add one.</p>
             )}
           </div>
         </div>
+      )}
 
-        {/* Equipment */}
+      {/* Equipment Tab Content */}
+      {activeTab === 'equipment' && (
         <div className="bg-gray-800/30 rounded-xl border border-gray-700/50 p-4 sm:p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-white">📷 Equipment</h3>
-            <button 
-              onClick={() => { setEditingEquipment(null); setEquipmentForm({ name: '', category: 'Camera', quantity: 1, notes: '' }); setShowEquipmentModal(true) }} 
-              className="text-blue-500 hover:text-blue-400 text-sm font-medium"
-            >
-              + Add
-            </button>
+            <h3 className="text-lg font-bold text-white">📷 Equipment Inventory</h3>
           </div>
           <div className="space-y-3 max-h-[400px] overflow-y-auto">
             {categories.filter(cat => equipment.some(e => e.category === cat)).map(cat => (
@@ -705,11 +769,11 @@ export default function CrewManagement() {
               </div>
             ))}
             {equipment.length === 0 && (
-              <p className="text-gray-500 text-center py-8">No equipment yet. Click "+ Add" to add some.</p>
+              <p className="text-gray-500 text-center py-8">No equipment yet. Click "Add Equipment" to add some.</p>
             )}
           </div>
         </div>
-      </div>
+      )}
 
       {/* ============ MODALS ============ */}
 
