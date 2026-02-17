@@ -160,6 +160,15 @@ export default function ContractBuilder({ editMode = false }) {
     setMultiEvents(updated)
   }
 
+  const moveEvent = (index, direction) => {
+    const newIndex = index + direction
+    if (newIndex < 0 || newIndex >= multiEvents.length) return
+    const updated = [...multiEvents]
+    const [moved] = updated.splice(index, 1)
+    updated.splice(newIndex, 0, moved)
+    setMultiEvents(updated)
+  }
+
   const addAthletePackage = () => {
     setAthletePackages([...athletePackages, { name: '', price: '', description: '' }])
   }
@@ -688,35 +697,59 @@ export default function ContractBuilder({ editMode = false }) {
                   </div>
                   {multiEvents.map((event, index) => (
                     <div key={index} className="bg-dark-800 p-4 rounded-lg mb-2">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2">
-                        <input
-                          type="text"
-                          value={event.name}
-                          onChange={(e) => updateEvent(index, 'name', e.target.value)}
-                          placeholder="Event Name"
-                          className="px-3 py-2 bg-dark-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        <input
-                          type="date"
-                          value={event.date}
-                          onChange={(e) => updateEvent(index, 'date', e.target.value)}
-                          className="px-3 py-2 bg-dark-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        <input
-                          type="text"
-                          value={event.venue}
-                          onChange={(e) => updateEvent(index, 'venue', e.target.value)}
-                          placeholder="Venue"
-                          className="px-3 py-2 bg-dark-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-gray-400 text-sm font-medium w-6">#{index + 1}</span>
+                        <div className="flex flex-col gap-1">
+                          <button
+                            type="button"
+                            onClick={() => moveEvent(index, -1)}
+                            disabled={index === 0}
+                            className={`px-2 py-0.5 rounded text-xs ${index === 0 ? 'text-gray-600 cursor-not-allowed' : 'text-gray-400 hover:text-white hover:bg-dark-600'}`}
+                            title="Move up"
+                          >
+                            ▲
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => moveEvent(index, 1)}
+                            disabled={index === multiEvents.length - 1}
+                            className={`px-2 py-0.5 rounded text-xs ${index === multiEvents.length - 1 ? 'text-gray-600 cursor-not-allowed' : 'text-gray-400 hover:text-white hover:bg-dark-600'}`}
+                            title="Move down"
+                          >
+                            ▼
+                          </button>
+                        </div>
+                        <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-2">
+                          <input
+                            type="text"
+                            value={event.name}
+                            onChange={(e) => updateEvent(index, 'name', e.target.value)}
+                            placeholder="Event Name"
+                            className="px-3 py-2 bg-dark-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                          <input
+                            type="date"
+                            value={event.date}
+                            onChange={(e) => updateEvent(index, 'date', e.target.value)}
+                            className="px-3 py-2 bg-dark-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                          <input
+                            type="text"
+                            value={event.venue}
+                            onChange={(e) => updateEvent(index, 'venue', e.target.value)}
+                            placeholder="Venue"
+                            className="px-3 py-2 bg-dark-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeEvent(index)}
+                          className="text-red-500 hover:text-red-400 text-sm px-2"
+                          title="Remove event"
+                        >
+                          ✕
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => removeEvent(index)}
-                        className="text-red-500 hover:text-red-400 text-sm"
-                      >
-                        Remove
-                      </button>
                     </div>
                   ))}
                 </div>
