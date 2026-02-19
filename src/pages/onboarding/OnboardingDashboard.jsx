@@ -6,7 +6,7 @@ import {
   createOnboardingFromContract,
   markOnboardingReviewed,
   getContracts
-} from '../../../lib/supabase'
+} from '../../lib/supabase'
 
 export default function OnboardingDashboard() {
   const navigate = useNavigate()
@@ -321,32 +321,6 @@ export default function OnboardingDashboard() {
                 </div>
               )}
 
-              {/* Drive Sync Status */}
-              <div>
-                <h4 className="text-xs text-gray-500 uppercase mb-2">Google Drive Status</h4>
-                {selectedSession.drive_folder_id ? (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-green-400">✓</span>
-                      <span className="text-sm">Synced to Google Drive</span>
-                    </div>
-                    {(selectedSession.shared_with || []).length > 0 && (
-                      <div className="mt-2">
-                        <p className="text-xs text-gray-500 mb-1">Team access:</p>
-                        {selectedSession.shared_with.map((share, i) => (
-                          <span key={i} className="text-xs text-gray-400">{share.email}{i < selectedSession.shared_with.length - 1 ? ', ' : ''}</span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <span className="text-yellow-400">⏳</span>
-                    <span className="text-sm text-gray-400">Pending sync (runs every 10 min)</span>
-                  </div>
-                )}
-              </div>
-
               {/* Actions */}
               <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-700">
                 <a 
@@ -366,16 +340,6 @@ export default function OnboardingDashboard() {
                 >
                   📋 Copy Link
                 </button>
-                {selectedSession.drive_folder_id && (
-                  <a 
-                    href={selectedSession.drive_folder_url || `https://drive.google.com/drive/folders/${selectedSession.drive_folder_id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm"
-                  >
-                    📁 View Drive Folder
-                  </a>
-                )}
                 {selectedSession.status === 'submitted' && (
                   <button
                     onClick={() => handleMarkReviewed(selectedSession.id)}
@@ -531,7 +495,6 @@ export default function OnboardingDashboard() {
           </div>
         </div>
       )}
-
     </div>
   )
 }

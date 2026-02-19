@@ -31,6 +31,7 @@ import OutreachTemplates from './components/portal/crm/OutreachTemplates'
 import OnboardingDashboard from './components/portal/onboarding/OnboardingDashboard'
 import OnboardingCreate from './components/portal/onboarding/OnboardingCreate'
 import OnboardingDetail from './components/portal/onboarding/OnboardingDetail'
+import OnboardingPortal from './pages/onboarding/OnboardingPortal'
 
 // Athlete Portal imports
 import AthleteLogin from './components/athlete/AthleteLogin'
@@ -82,6 +83,9 @@ function App() {
 
         {/* Public Contract View - NO AUTH REQUIRED, NO Navbar/Footer */}
         <Route path="/contract/:shareToken" element={<ContractPublicView />} />
+
+        {/* Public Onboarding Portal - NO AUTH REQUIRED, NO Navbar/Footer */}
+        <Route path="/onboarding/:token" element={<OnboardingPortal />} />
 
         {/* Portal Login - NO AUTH REQUIRED, NO Navbar/Footer */}
         <Route path="/portal" element={<PortalLayout><LoginPage /></PortalLayout>} />

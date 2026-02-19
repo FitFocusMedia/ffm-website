@@ -172,3 +172,291 @@ export async function signContract(id, signature, isClient = false) {
   if (error) throw error
   return data
 }
+
+/**
+ * Onboarding Sessions
+ */
+
+// Generate unique token
+const generateToken = () => Array.from({ length: 24 }, () =>
+  Math.floor(Math.random() * 16).toString(16)
+).join('')
+
+export async function getOnboardingSessions() {
+  const { data, error } = await supabase
+    .from('onboarding_sessions')
+    .select('*')
+    .order('created_at', { ascending: false })
+  
+  if (error) throw error
+  return data
+}
+
+export async function getOnboardingSessionById(id) {
+  const { data, error } = await supabase
+    .from('onboarding_sessions')
+    .select('*')
+    .eq('id', id)
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+export async function getOnboardingSessionByToken(token) {
+  const { data, error } = await supabase
+    .from('onboarding_sessions')
+    .select('*')
+    .eq('share_token', token)
+    .single()
+  
+  if (error) throw error
+  
+  // If first access, update status to in_progress
+  if (data && data.status === 'pending') {
+    await supabase
+      .from('onboarding_sessions')
+      .update({ status: 'in_progress' })
+      .eq('id', data.id)
+    data.status = 'in_progress'
+  }
+  
+  return data
+}
+
+export async function createOnboardingSession(sessionData) {
+  const { data, error } = await supabase
+    .from('onboarding_sessions')
+    .insert({
+      ...sessionData,
+      share_token: generateToken(),
+      status: 'pending'
+    })
+    .select()
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+export async function createOnboardingFromContract(contractId) {
+  // Get contract data
+  const contract = await getContractById(contractId)
+  if (!contract) throw new Error('Contract not found')
+  
+  // Check if session already exists
+  const { data: existing } = await supabase
+    .from('onboarding_sessions')
+    .select('id, share_token')
+    .eq('contract_id', contractId)
+    .single()
+  
+  if (existing) return existing
+  
+  // Create session from contract
+  const contractData = contract.contract_data || {}
+  
+  const { data, error } = await supabase
+    .from('onboarding_sessions')
+    .insert({
+      contract_id: contractId,
+      org_name: contract.org_name,
+      contact_name: contract.promoter_name,
+      contact_email: contract.promoter_email,
+      contact_phone: contract.promoter_phone,
+      event_name: contractData.event_name,
+      event_date: contractData.event_date,
+      event_location: contractData.event_location,
+      share_token: generateToken(),
+      status: 'pending'
+    })
+    .select()
+    .single()
+  
+  if (error) throw error
+  
+  // Auto-create Google Drive folders
+  try {
+    await createOnboardingFolders(data.id, contract.org_name, contractData.event_name)
+  } catch (err) {
+    console.error('Failed to create Drive folders:', err)
+    // Don't fail the whole operation if Drive folder creation fails
+  }
+  
+  return data
+}
+
+export async function updateOnboardingSession(id, updates) {
+  // Don't allow updating certain fields
+  delete updates.id
+  delete updates.created_at
+  delete updates.share_token
+  delete updates.contract_id
+  
+  const { data, error } = await supabase
+    .from('onboarding_sessions')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+export async function updateOnboardingByToken(token, updates) {
+  delete updates.id
+  delete updates.created_at
+  delete updates.share_token
+  delete updates.contract_id
+  
+  const { data, error } = await supabase
+    .from('onboarding_sessions')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('share_token', token)
+    .select()
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+export async function submitOnboardingSession(id) {
+  const { data, error } = await supabase
+    .from('onboarding_sessions')
+    .update({ 
+      status: 'submitted',
+      submitted_at: new Date().toISOString()
+    })
+    .eq('id', id)
+    .select()
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+export async function markOnboardingReviewed(id, reviewedBy, adminNotes) {
+  const { data, error } = await supabase
+    .from('onboarding_sessions')
+    .update({ 
+      status: 'reviewed',
+      reviewed_at: new Date().toISOString(),
+      reviewed_by: reviewedBy,
+      admin_notes: adminNotes
+    })
+    .eq('id', id)
+    .select()
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+// Storage bucket name
+const STORAGE_BUCKET = 'onboarding'
+
+/**
+ * Upload file to Supabase Storage
+ * Files are synced to Google Drive automatically by background job
+ */
+export async function uploadOnboardingFile(sessionId, category, fileType, file) {
+  // Generate unique path: sessionId/category/timestamp_filename
+  const timestamp = Date.now()
+  const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
+  const storagePath = `${sessionId}/${category}/${timestamp}_${safeName}`
+  
+  // Upload to Supabase Storage
+  const { data: uploadData, error: uploadError } = await supabase.storage
+    .from(STORAGE_BUCKET)
+    .upload(storagePath, file, {
+      cacheControl: '3600',
+      upsert: false
+    })
+  
+  if (uploadError) {
+    throw new Error(uploadError.message || 'Upload failed')
+  }
+  
+  // Get public URL
+  const { data: urlData } = supabase.storage
+    .from(STORAGE_BUCKET)
+    .getPublicUrl(storagePath)
+  
+  const publicUrl = urlData?.publicUrl || null
+  
+  // Create file record in database
+  const { data: fileRecord, error: recordError } = await supabase
+    .from('onboarding_files')
+    .insert({
+      session_id: sessionId,
+      category: category,
+      file_type: fileType,
+      file_name: file.name,
+      file_size: file.size,
+      mime_type: file.type,
+      storage_path: storagePath,
+      public_url: publicUrl,
+      synced_to_drive: false // Will be synced by background job
+    })
+    .select()
+    .single()
+  
+  if (recordError) {
+    // Try to clean up the uploaded file
+    await supabase.storage.from(STORAGE_BUCKET).remove([storagePath])
+    throw new Error(recordError.message || 'Failed to create file record')
+  }
+  
+  return { 
+    file: fileRecord, 
+    url: publicUrl,
+    message: 'File uploaded. Will sync to Google Drive automatically.'
+  }
+}
+
+/**
+ * Create Google Drive folders (called by background sync, not directly)
+ * This is kept for compatibility but folders are now created during sync
+ */
+export async function createOnboardingFolders(sessionId, orgName, eventName) {
+  // Drive folders are now created automatically when files sync
+  // This function is a no-op for the frontend
+  console.log('Drive folders will be created automatically during sync')
+  return { success: true, message: 'Folders created during sync' }
+}
+
+export async function getOnboardingFiles(sessionId) {
+  const { data, error } = await supabase
+    .from('onboarding_files')
+    .select('*')
+    .eq('session_id', sessionId)
+    .order('created_at', { ascending: false })
+  
+  if (error) throw error
+  return data
+}
+
+export async function deleteOnboardingFile(fileId) {
+  // Get file record
+  const { data: file, error: fetchError } = await supabase
+    .from('onboarding_files')
+    .select('*')
+    .eq('id', fileId)
+    .single()
+  
+  if (fetchError) throw fetchError
+  
+  // Delete from storage
+  await supabase.storage
+    .from('onboarding')
+    .remove([file.storage_path])
+  
+  // Delete record
+  const { error: deleteError } = await supabase
+    .from('onboarding_files')
+    .delete()
+    .eq('id', fileId)
+  
+  if (deleteError) throw deleteError
+}

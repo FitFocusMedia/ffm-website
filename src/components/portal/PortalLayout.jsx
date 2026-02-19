@@ -31,10 +31,10 @@ export default function PortalLayout({ children }) {
   ]
 
   return (
-    <div className="min-h-screen bg-[#0d0d1a] flex flex-col">
+    <div className="min-h-screen bg-[#0d0d1a] flex flex-col overflow-x-hidden w-full max-w-full">
       {/* Portal Header - hidden when printing */}
-      <header className="print:hidden bg-gradient-to-r from-[#1a1a2e] to-[#16162a] border-b border-gray-800/50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <header className="print:hidden bg-gradient-to-r from-[#1a1a2e] to-[#16162a] border-b border-gray-800/50 w-full max-w-full overflow-hidden">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div 
               className="flex items-center gap-3 cursor-pointer"
@@ -61,14 +61,14 @@ export default function PortalLayout({ children }) {
             )}
           </div>
 
-          {/* Navigation Tabs */}
+          {/* Navigation Tabs - horizontally scrollable on mobile */}
           {user && (
-            <div className="flex gap-6 -mb-px">
+            <div className="flex gap-1 sm:gap-4 -mb-px overflow-x-auto scrollbar-hide pb-px">
               {tabs.map(tab => (
                 <button
                   key={tab.path}
                   onClick={() => navigate(tab.path)}
-                  className={`relative px-4 py-3 font-bold text-sm transition-colors ${
+                  className={`relative px-3 sm:px-4 py-3 font-bold text-xs sm:text-sm transition-colors whitespace-nowrap flex-shrink-0 ${
                     isActive(tab.path)
                       ? 'text-red-500'
                       : 'text-gray-400 hover:text-gray-300'

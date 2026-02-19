@@ -9,6 +9,14 @@ export function generateContractHTML(contract) {
     return value ? value : `<span class="text-gray-500">${placeholder}</span>`
   }
   
+  // Helper to display range values (e.g., "2-3" or just "2")
+  const range = (min, max, placeholder = '[NOT SET]') => {
+    if (!min && !max) return `<span class="text-gray-500">${placeholder}</span>`
+    if (!min) return max
+    if (!max || max === min) return min
+    return `${min}–${max}`
+  }
+  
   const checked = (value) => value ? '☑' : '☐'
   
   // Build multi-event table
@@ -94,12 +102,12 @@ export function generateContractHTML(contract) {
       
       <h3 class="text-xl font-bold mt-4 mb-2">2.2 What FFM Provides at Zero Cost</h3>
       <ul class="list-disc pl-6 my-4">
-        <li>Multi-camera professional video coverage (minimum ${v(d.camera_angles, '2')} camera angles per mat)</li>
+        <li>Multi-camera professional video coverage (${range(d.camera_angles, d.camera_angles_max, '2')} camera angles per mat)</li>
         <li>Professional event photography</li>
         <li>Livestream and/or PPV broadcast production (if applicable)</li>
         <li>Post-event highlight reel for the Client's promotional use</li>
         <li>Access to the FFM Athlete Media Portal for athlete content delivery</li>
-        <li>On-site crew (minimum ${v(d.crew_size, '2')} persons)</li>
+        <li>On-site crew (${range(d.crew_size, d.crew_size_max, '2')} persons)</li>
       </ul>
       
       <h3 class="text-xl font-bold mt-4 mb-2">2.3 Multi-Event Commitment</h3>
@@ -116,9 +124,9 @@ export function generateContractHTML(contract) {
       
       <h3 class="text-xl font-bold mt-4 mb-2">3.1 Post-Production Deliverables for the Client</h3>
       <ul class="list-disc pl-6 my-4">
-        <li>One (1) Event Highlight Reel (60–120 seconds) within ${v(d.highlight_delivery_days, '7')} business days</li>
-        <li>Up to ${v(d.social_clips_count, '5')} social media clips within ${v(d.social_clips_delivery_days, '5')} business days</li>
-        <li>Curated photo gallery of ${v(d.photo_count, '50')} edited images</li>
+        <li>One (1) Event Highlight Reel (60–120 seconds) within ${range(d.highlight_delivery_days, d.highlight_delivery_days_max, '7')} business days</li>
+        <li>${range(d.social_clips_count, d.social_clips_count_max, '5')} social media clips within ${range(d.social_clips_delivery_days, d.social_clips_delivery_days_max, '5')} business days</li>
+        <li>Curated photo gallery of ${range(d.photo_count, d.photo_count_max, '50')} edited images</li>
       </ul>
       
       <h3 class="text-xl font-bold mt-4 mb-2">3.2 Livestream / PPV Production</h3>
@@ -206,7 +214,7 @@ export function generateContractHTML(contract) {
       <h2 class="text-2xl font-bold mt-6 mb-4">7. ACCESS & LOGISTICS</h2>
       <ul class="list-disc pl-6 my-4">
         <li>FFM requires venue access at least ${v(d.setup_hours, '2')} hours prior to first match</li>
-        <li>Crew size: ${v(d.crew_size, '2')} persons with complimentary entry</li>
+        <li>Crew size: ${range(d.crew_size, d.crew_size_max, '2')} persons with complimentary entry</li>
         ${d.internet_speed ? `<li>Internet upload speed: minimum ${d.internet_speed} Mbps</li>` : ''}
         <li>Event schedule to be provided ${v(d.schedule_hours_before, '48')} hours before Event</li>
         <li>Athlete list to be provided ${v(d.athlete_list_days_before, '7')} days before Event</li>

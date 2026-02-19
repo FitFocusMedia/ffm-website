@@ -25,13 +25,19 @@ export default function ContractBuilder({ editMode = false }) {
     expected_athletes: '',
     expected_audience: '',
     camera_angles: '2',
+    camera_angles_max: '',
     crew_size: '2',
+    crew_size_max: '',
     multi_event_count: '1',
     multi_event_duration: '',
     highlight_delivery_days: '7',
+    highlight_delivery_days_max: '',
     social_clips_count: '5',
+    social_clips_count_max: '',
     social_clips_delivery_days: '5',
+    social_clips_delivery_days_max: '',
     photo_count: '50',
+    photo_count_max: '',
     livestream_included: false,
     ppv_included: false,
     ppv_platform: '',
@@ -762,89 +768,189 @@ export default function ContractBuilder({ editMode = false }) {
             {currentStep === 3 && (
               <div className="space-y-6">
                 <h2 className="text-2xl font-bold text-white mb-4">Step 3: Coverage & Deliverables</h2>
+                
+                <p className="text-sm text-gray-400 mb-4">
+                  💡 All fields support ranges. Leave "Max" empty for a single value, or enter a max to specify a range (e.g., "2-3").
+                </p>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     Camera Angles per Mat
                   </label>
-                  <input
-                    type="number"
-                    name="camera_angles"
-                    value={formData.camera_angles}
-                    onChange={handleInputChange}
-                    placeholder="e.g., 2"
-                    className="w-full px-4 py-2 bg-dark-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <input
+                        type="number"
+                        name="camera_angles"
+                        value={formData.camera_angles}
+                        onChange={handleInputChange}
+                        placeholder="Min"
+                        className="w-full px-4 py-2 bg-dark-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <span className="text-xs text-gray-500 mt-1 block">Min</span>
+                    </div>
+                    <div>
+                      <input
+                        type="number"
+                        name="camera_angles_max"
+                        value={formData.camera_angles_max}
+                        onChange={handleInputChange}
+                        placeholder="Max (optional)"
+                        className="w-full px-4 py-2 bg-dark-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <span className="text-xs text-gray-500 mt-1 block">Max (optional)</span>
+                    </div>
+                  </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     On-Site Crew Size
                   </label>
-                  <input
-                    type="number"
-                    name="crew_size"
-                    value={formData.crew_size}
-                    onChange={handleInputChange}
-                    placeholder="e.g., 2"
-                    className="w-full px-4 py-2 bg-dark-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <input
+                        type="number"
+                        name="crew_size"
+                        value={formData.crew_size}
+                        onChange={handleInputChange}
+                        placeholder="Min"
+                        className="w-full px-4 py-2 bg-dark-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <span className="text-xs text-gray-500 mt-1 block">Min</span>
+                    </div>
+                    <div>
+                      <input
+                        type="number"
+                        name="crew_size_max"
+                        value={formData.crew_size_max}
+                        onChange={handleInputChange}
+                        placeholder="Max (optional)"
+                        className="w-full px-4 py-2 bg-dark-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <span className="text-xs text-gray-500 mt-1 block">Max (optional)</span>
+                    </div>
+                  </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     Highlight Reel Delivery (Days)
                   </label>
-                  <input
-                    type="number"
-                    name="highlight_delivery_days"
-                    value={formData.highlight_delivery_days}
-                    onChange={handleInputChange}
-                    placeholder="e.g., 7"
-                    className="w-full px-4 py-2 bg-dark-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <input
+                        type="number"
+                        name="highlight_delivery_days"
+                        value={formData.highlight_delivery_days}
+                        onChange={handleInputChange}
+                        placeholder="Min"
+                        className="w-full px-4 py-2 bg-dark-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <span className="text-xs text-gray-500 mt-1 block">Min</span>
+                    </div>
+                    <div>
+                      <input
+                        type="number"
+                        name="highlight_delivery_days_max"
+                        value={formData.highlight_delivery_days_max}
+                        onChange={handleInputChange}
+                        placeholder="Max (optional)"
+                        className="w-full px-4 py-2 bg-dark-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <span className="text-xs text-gray-500 mt-1 block">Max (optional)</span>
+                    </div>
+                  </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     Social Media Clips Count
                   </label>
-                  <input
-                    type="number"
-                    name="social_clips_count"
-                    value={formData.social_clips_count}
-                    onChange={handleInputChange}
-                    placeholder="e.g., 5"
-                    className="w-full px-4 py-2 bg-dark-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <input
+                        type="number"
+                        name="social_clips_count"
+                        value={formData.social_clips_count}
+                        onChange={handleInputChange}
+                        placeholder="Min"
+                        className="w-full px-4 py-2 bg-dark-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <span className="text-xs text-gray-500 mt-1 block">Min</span>
+                    </div>
+                    <div>
+                      <input
+                        type="number"
+                        name="social_clips_count_max"
+                        value={formData.social_clips_count_max}
+                        onChange={handleInputChange}
+                        placeholder="Max (optional)"
+                        className="w-full px-4 py-2 bg-dark-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <span className="text-xs text-gray-500 mt-1 block">Max (optional)</span>
+                    </div>
+                  </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     Social Clips Delivery (Days)
                   </label>
-                  <input
-                    type="number"
-                    name="social_clips_delivery_days"
-                    value={formData.social_clips_delivery_days}
-                    onChange={handleInputChange}
-                    placeholder="e.g., 5"
-                    className="w-full px-4 py-2 bg-dark-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <input
+                        type="number"
+                        name="social_clips_delivery_days"
+                        value={formData.social_clips_delivery_days}
+                        onChange={handleInputChange}
+                        placeholder="Min"
+                        className="w-full px-4 py-2 bg-dark-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <span className="text-xs text-gray-500 mt-1 block">Min</span>
+                    </div>
+                    <div>
+                      <input
+                        type="number"
+                        name="social_clips_delivery_days_max"
+                        value={formData.social_clips_delivery_days_max}
+                        onChange={handleInputChange}
+                        placeholder="Max (optional)"
+                        className="w-full px-4 py-2 bg-dark-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <span className="text-xs text-gray-500 mt-1 block">Max (optional)</span>
+                    </div>
+                  </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     Photo Count
                   </label>
-                  <input
-                    type="number"
-                    name="photo_count"
-                    value={formData.photo_count}
-                    onChange={handleInputChange}
-                    placeholder="e.g., 50"
-                    className="w-full px-4 py-2 bg-dark-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <input
+                        type="number"
+                        name="photo_count"
+                        value={formData.photo_count}
+                        onChange={handleInputChange}
+                        placeholder="Min"
+                        className="w-full px-4 py-2 bg-dark-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <span className="text-xs text-gray-500 mt-1 block">Min</span>
+                    </div>
+                    <div>
+                      <input
+                        type="number"
+                        name="photo_count_max"
+                        value={formData.photo_count_max}
+                        onChange={handleInputChange}
+                        placeholder="Max (optional)"
+                        className="w-full px-4 py-2 bg-dark-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <span className="text-xs text-gray-500 mt-1 block">Max (optional)</span>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="flex items-center">
