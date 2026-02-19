@@ -62,6 +62,7 @@ const checklistConfig = [
       { id: 'org_facebook', label: 'Organization Facebook', type: 'text', placeholder: 'facebook.com/yourorg', priority: 'nice' },
       { id: 'org_website', label: 'Organization Website', type: 'text', placeholder: 'https://...', priority: 'nice' },
       { id: 'existing_content', label: 'Existing footage/photos for promos', type: 'file', accept: 'image/*,video/*,.zip', priority: 'nice' },
+      { id: 'existing_content_links', label: 'Links to existing footage (Google Drive, Dropbox, etc.)', type: 'textarea', placeholder: 'Paste links to your existing footage, one per line...', priority: 'nice' },
     ]
   },
 ]
@@ -326,9 +327,11 @@ export default function OnboardingPortal() {
       <header className="sticky top-0 z-40 bg-gray-900/95 backdrop-blur-lg border-b border-gray-800">
         <div className="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-orange-500/20 rounded-xl flex items-center justify-center">
-              <span className="text-xl">📹</span>
-            </div>
+            <img 
+              src="/ffm-logo.jpg" 
+              alt="Fit Focus Media" 
+              className="w-10 h-10 rounded-xl object-cover"
+            />
             <div>
               <div className="font-semibold text-white">Fit Focus Media</div>
               <div className="text-xs text-gray-500">{session?.org_name || 'Partner Onboarding'}</div>
