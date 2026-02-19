@@ -347,10 +347,28 @@ export async function markOnboardingReviewed(id, reviewedBy, adminNotes) {
     })
     .eq('id', id)
     .select()
-    .single()
   
   if (error) throw error
   return data
+}
+
+export async function deleteOnboardingSession(id) {
+  // First delete any associated files
+  const { error: filesError } = await supabase
+    .from('onboarding_files')
+    .delete()
+    .eq('session_id', id)
+  
+  if (filesError) console.error('Error deleting files:', filesError)
+  
+  // Then delete the session
+  const { error } = await supabase
+    .from('onboarding_sessions')
+    .delete()
+    .eq('id', id)
+  
+  if (error) throw error
+  return true
 }
 
 // Storage bucket name

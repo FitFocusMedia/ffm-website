@@ -5,6 +5,7 @@ import {
   createOnboardingSession, 
   createOnboardingFromContract,
   markOnboardingReviewed,
+  deleteOnboardingSession,
   getContracts
 } from '../../lib/supabase'
 
@@ -87,6 +88,20 @@ export default function OnboardingDashboard() {
       setSelectedSession(null)
     } catch (err) {
       alert('Error: ' + err.message)
+    }
+  }
+
+  const handleDeleteSession = async (sessionId) => {
+    if (!confirm('Are you sure you want to delete this onboarding session? This cannot be undone.')) {
+      return
+    }
+    try {
+      await deleteOnboardingSession(sessionId)
+      setSessions(prev => prev.filter(s => s.id !== sessionId))
+      setSelectedSession(null)
+      alert('Session deleted successfully')
+    } catch (err) {
+      alert('Error deleting session: ' + err.message)
     }
   }
 
@@ -348,6 +363,12 @@ export default function OnboardingDashboard() {
                     ✓ Mark Reviewed
                   </button>
                 )}
+                <button
+                  onClick={() => handleDeleteSession(selectedSession.id)}
+                  className="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg text-sm"
+                >
+                  🗑 Delete
+                </button>
               </div>
             </div>
           </div>
