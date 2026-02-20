@@ -6,9 +6,11 @@ import {
   createOnboardingFromContract,
   markOnboardingReviewed,
   deleteOnboardingSession,
-  getContracts
+  getContracts,
+  getOnboardingFiles
 } from '../../../lib/supabase'
 import OnboardingEditModal from './OnboardingEditModal'
+import CollectedDataView from './CollectedDataView'
 
 export default function OnboardingDashboard() {
   const navigate = useNavigate()
@@ -17,6 +19,7 @@ export default function OnboardingDashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [selectedSession, setSelectedSession] = useState(null)
+  const [sessionFiles, setSessionFiles] = useState([])
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -116,6 +119,18 @@ export default function OnboardingDashboard() {
     // Update the selected session to reflect changes immediately
     setSelectedSession(prev => ({ ...prev, ...updates }))
     setShowEditModal(false)
+  }
+
+  // Handle selecting a session - also fetch its files
+  const handleSelectSession = async (session) => {
+    setSelectedSession(session)
+    try {
+      const files = await getOnboardingFiles(session.id)
+      setSessionFiles(files || [])
+    } catch (err) {
+      console.error('Error fetching files:', err)
+      setSessionFiles([])
+    }
   }
 
   const getStatusBadge = (status) => {
@@ -256,7 +271,7 @@ export default function OnboardingDashboard() {
             {filteredSessions.map((session) => (
               <div
                 key={session.id}
-                onClick={() => setSelectedSession(session)}
+                onClick={() => handleSelectSession(session)}
                 className="bg-gray-800 rounded-xl p-5 border border-gray-700 hover:border-gray-600 cursor-pointer transition-colors"
               >
                 <div className="flex justify-between items-start">
@@ -289,7 +304,7 @@ export default function OnboardingDashboard() {
           onClick={() => setSelectedSession(null)}
         >
           <div
-            className="bg-gray-800 rounded-2xl max-w-xl w-full max-h-[90vh] overflow-auto border border-gray-700"
+            className="bg-gray-800 rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-auto border border-gray-700"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6 border-b border-gray-700 flex justify-between items-start">
@@ -339,15 +354,16 @@ export default function OnboardingDashboard() {
                 </div>
               </div>
 
-              {/* Collected Data */}
-              {selectedSession.collected_data && Object.keys(selectedSession.collected_data).length > 0 && (
+              {/* Collected Data - Visual Dashboard */}
+              {(selectedSession.collected_data && Object.keys(selectedSession.collected_data).length > 0) || sessionFiles.length > 0 ? (
                 <div>
-                  <h4 className="text-xs text-gray-500 uppercase mb-2">Collected Information</h4>
-                  <pre className="bg-gray-900 p-3 rounded-lg text-xs overflow-auto max-h-40 text-gray-400">
-                    {JSON.stringify(selectedSession.collected_data, null, 2)}
-                  </pre>
+                  <h4 className="text-xs text-gray-500 uppercase mb-3">Collected Information</h4>
+                  <CollectedDataView 
+                    data={selectedSession.collected_data}
+                    files={sessionFiles}
+                  />
                 </div>
-              )}
+              ) : null}
 
               {/* Drive Sync Status */}
               <div>

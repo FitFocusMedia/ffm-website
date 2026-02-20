@@ -257,20 +257,24 @@ export async function getOnboardingSessionByToken(token) {
     .from('onboarding_sessions')
     .select('*')
     .eq('share_token', token)
-    .single()
   
   if (error) throw error
+  if (!data || data.length === 0) {
+    throw new Error('Onboarding session not found. Please check your link or contact Fit Focus Media.')
+  }
+  
+  const session = data[0]
   
   // If first access, update status to in_progress
-  if (data && data.status === 'pending') {
+  if (session && session.status === 'pending') {
     await supabase
       .from('onboarding_sessions')
       .update({ status: 'in_progress' })
-      .eq('id', data.id)
-    data.status = 'in_progress'
+      .eq('share_token', token)
+    session.status = 'in_progress'
   }
   
-  return data
+  return session
 }
 
 export async function createOnboardingSession(sessionData) {
@@ -410,25 +414,38 @@ export async function updateOnboardingByToken(token, updates) {
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq('share_token', token)
     .select()
-    .single()
   
   if (error) throw error
-  return data
+  if (!data || data.length === 0) {
+    throw new Error('Failed to save changes - session not found')
+  }
+  return data[0]
 }
 
-export async function submitOnboardingSession(id) {
+export async function submitOnboardingSession(sessionOrToken) {
+  // Accept either session object (with share_token) or raw token string
+  const token = typeof sessionOrToken === 'string' 
+    ? sessionOrToken 
+    : sessionOrToken?.share_token
+  
+  if (!token) {
+    throw new Error('No share token provided for submission')
+  }
+  
   const { data, error } = await supabase
     .from('onboarding_sessions')
     .update({ 
       status: 'submitted',
       submitted_at: new Date().toISOString()
     })
-    .eq('id', id)
+    .eq('share_token', token)
     .select()
-    .single()
   
   if (error) throw error
-  return data
+  if (!data || data.length === 0) {
+    throw new Error('Session not found or update blocked by permissions')
+  }
+  return data[0]
 }
 
 export async function markOnboardingReviewed(id, reviewedBy, adminNotes) {
@@ -474,10 +491,26 @@ const STORAGE_BUCKET = 'onboarding'
  * Files are synced to Google Drive automatically by background job
  */
 export async function uploadOnboardingFile(sessionId, category, fileType, file) {
-  // Generate unique path: sessionId/category/timestamp_filename
+  // Fetch session to get org name for human-readable folder
+  const { data: session } = await supabase
+    .from('onboarding_sessions')
+    .select('org_name, event_name')
+    .eq('id', sessionId)
+    .single()
+  
+  // Build nested folder structure: OrgName/EventName/category/file
+  // Sanitize for folder name (remove special chars except spaces and hyphens)
+  const sanitize = (str) => str?.replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 50) || ''
+  const orgPart = sanitize(session?.org_name) || sessionId.substring(0, 8)
+  const eventPart = session?.event_name ? sanitize(session.event_name) : null
+  
+  // Generate unique path: OrgName/EventName/category/timestamp_filename
+  // If no event, just: OrgName/category/timestamp_filename
   const timestamp = Date.now()
   const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
-  const storagePath = `${sessionId}/${category}/${timestamp}_${safeName}`
+  const storagePath = eventPart 
+    ? `${orgPart}/${eventPart}/${category}/${timestamp}_${safeName}`
+    : `${orgPart}/${category}/${timestamp}_${safeName}`
   
   // Upload to Supabase Storage
   const { data: uploadData, error: uploadError } = await supabase.storage

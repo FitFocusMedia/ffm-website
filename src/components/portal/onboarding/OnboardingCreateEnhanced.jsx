@@ -12,7 +12,10 @@ import {
   AlertCircle,
   ChevronRight,
   Settings,
-  Sparkles
+  Sparkles,
+  Trash2,
+  Edit3,
+  PlusCircle
 } from 'lucide-react'
 import { 
   createOnboardingSession, 
@@ -122,6 +125,13 @@ export default function OnboardingCreateEnhanced() {
   })
   
   const [errors, setErrors] = useState({})
+  
+  // Custom fields state
+  const [customFields, setCustomFields] = useState({}) // { categoryId: [{ id, label, type }] }
+  const [showAddField, setShowAddField] = useState(null) // categoryId when adding
+  const [newFieldLabel, setNewFieldLabel] = useState('')
+  const [newFieldType, setNewFieldType] = useState('text')
+  const [editingField, setEditingField] = useState(null) // { categoryId, itemId, label }
 
   useEffect(() => {
     loadContracts()
@@ -265,6 +275,107 @@ export default function OnboardingCreateEnhanced() {
     }))
   }
 
+  // Add custom field to a category
+  const handleAddCustomField = (categoryId) => {
+    if (!newFieldLabel.trim()) return
+    
+    const fieldId = `custom_${Date.now()}`
+    const newField = {
+      id: fieldId,
+      label: newFieldLabel.trim(),
+      type: newFieldType,
+      priority: 'important',
+      isCustom: true
+    }
+    
+    // Add to custom fields list
+    setCustomFields(prev => ({
+      ...prev,
+      [categoryId]: [...(prev[categoryId] || []), newField]
+    }))
+    
+    // Add to checklist items state
+    setChecklistItems(prev => ({
+      ...prev,
+      [categoryId]: {
+        ...prev[categoryId],
+        [fieldId]: {
+          enabled: true,
+          priority: 'important',
+          alreadyHave: false,
+          prefilledValue: '',
+          isCustom: true,
+          label: newFieldLabel.trim(),
+          type: newFieldType
+        }
+      }
+    }))
+    
+    // Reset form
+    setNewFieldLabel('')
+    setNewFieldType('text')
+    setShowAddField(null)
+  }
+
+  // Remove a field (custom or default)
+  const handleRemoveField = (categoryId, itemId) => {
+    // Remove from custom fields if it's custom
+    setCustomFields(prev => ({
+      ...prev,
+      [categoryId]: (prev[categoryId] || []).filter(f => f.id !== itemId)
+    }))
+    
+    // Remove from checklist items (or just disable for default items)
+    setChecklistItems(prev => {
+      const newItems = { ...prev }
+      if (newItems[categoryId][itemId]?.isCustom) {
+        // Actually remove custom fields
+        delete newItems[categoryId][itemId]
+      } else {
+        // Just disable default fields
+        newItems[categoryId][itemId] = {
+          ...newItems[categoryId][itemId],
+          enabled: false
+        }
+      }
+      return newItems
+    })
+  }
+
+  // Edit field label
+  const handleEditFieldLabel = (categoryId, itemId, newLabel) => {
+    if (!newLabel.trim()) return
+    
+    // Update in custom fields
+    setCustomFields(prev => ({
+      ...prev,
+      [categoryId]: (prev[categoryId] || []).map(f => 
+        f.id === itemId ? { ...f, label: newLabel.trim() } : f
+      )
+    }))
+    
+    // Update in checklist items
+    setChecklistItems(prev => ({
+      ...prev,
+      [categoryId]: {
+        ...prev[categoryId],
+        [itemId]: {
+          ...prev[categoryId][itemId],
+          label: newLabel.trim()
+        }
+      }
+    }))
+    
+    setEditingField(null)
+  }
+
+  // Get all items for a category (default + custom)
+  const getCategoryItems = (category) => {
+    const defaultItems = category.items
+    const customItems = customFields[category.id] || []
+    return [...defaultItems, ...customItems]
+  }
+
   const validateStep1 = () => {
     const newErrors = {}
     
@@ -323,15 +434,22 @@ export default function OnboardingCreateEnhanced() {
         })
       })
 
-      // Build checklist_config with enabled/disabled items and priorities
+      // Build checklist_config with enabled/disabled items, priorities, and custom fields
       const checklistConfig_custom = {}
       Object.keys(checklistItems).forEach(catId => {
         checklistConfig_custom[catId] = {}
         Object.keys(checklistItems[catId]).forEach(itemId => {
+          const item = checklistItems[catId][itemId]
           checklistConfig_custom[catId][itemId] = {
-            enabled: checklistItems[catId][itemId].enabled,
-            priority: checklistItems[catId][itemId].priority,
-            alreadyHave: checklistItems[catId][itemId].alreadyHave
+            enabled: item.enabled,
+            priority: item.priority,
+            alreadyHave: item.alreadyHave,
+            // Include custom field metadata
+            ...(item.isCustom ? {
+              isCustom: true,
+              label: item.label,
+              type: item.type
+            } : {})
           }
         })
       })
@@ -382,10 +500,11 @@ export default function OnboardingCreateEnhanced() {
   const getEnabledCount = () => {
     let enabled = 0
     let total = 0
-    Object.keys(checklistItems).forEach(catId => {
-      Object.keys(checklistItems[catId]).forEach(itemId => {
+    checklistConfig.forEach(category => {
+      const allItems = getCategoryItems(category)
+      allItems.forEach(item => {
         total++
-        if (checklistItems[catId][itemId].enabled) enabled++
+        if (checklistItems[category.id]?.[item.id]?.enabled) enabled++
       })
     })
     return { enabled, total }
@@ -656,88 +775,204 @@ export default function OnboardingCreateEnhanced() {
                   </div>
 
                   <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
-                    {checklistConfig.map(category => (
-                      <div key={category.id} className="bg-gray-900/50 rounded-lg border border-gray-700">
-                        <div className="px-4 py-3 border-b border-gray-700 bg-gray-800/50">
-                          <div className="flex items-center gap-3">
-                            <span className="text-2xl">{category.icon}</span>
-                            <h3 className="font-bold text-white">{category.category}</h3>
-                            <span className="text-sm text-gray-400 ml-auto">
-                              {category.items.filter(item => checklistItems[category.id][item.id].enabled).length}/{category.items.length} enabled
-                            </span>
+                    {checklistConfig.map(category => {
+                      const allItems = getCategoryItems(category)
+                      const enabledCount = allItems.filter(item => checklistItems[category.id]?.[item.id]?.enabled).length
+                      
+                      return (
+                        <div key={category.id} className="bg-gray-900/50 rounded-lg border border-gray-700">
+                          <div className="px-4 py-3 border-b border-gray-700 bg-gray-800/50">
+                            <div className="flex items-center gap-3">
+                              <span className="text-2xl">{category.icon}</span>
+                              <h3 className="font-bold text-white">{category.category}</h3>
+                              <span className="text-sm text-gray-400 ml-auto">
+                                {enabledCount}/{allItems.length} enabled
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                        <div className="p-4 space-y-3">
-                          {category.items.map(item => {
-                            const config = checklistItems[category.id][item.id]
-                            return (
-                              <div 
-                                key={item.id} 
-                                className={`p-3 rounded-lg border transition-all ${
-                                  config.enabled 
-                                    ? 'bg-gray-800/50 border-gray-700' 
-                                    : 'bg-gray-900/30 border-gray-800 opacity-50'
-                                }`}
-                              >
-                                <div className="flex items-start gap-3">
-                                  {/* Enable/Disable Toggle */}
-                                  <button
-                                    onClick={() => toggleChecklistItem(category.id, item.id)}
-                                    className={`flex-shrink-0 w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${
-                                      config.enabled 
-                                        ? 'bg-red-500 border-red-500' 
-                                        : 'bg-transparent border-gray-600'
-                                    }`}
-                                  >
-                                    {config.enabled && <Check size={16} className="text-white" />}
-                                  </button>
+                          <div className="p-4 space-y-3">
+                            {allItems.map(item => {
+                              const config = checklistItems[category.id]?.[item.id] || { enabled: true, priority: item.priority }
+                              const isCustom = item.isCustom || config.isCustom
+                              const displayLabel = config.label || item.label
+                              const isEditing = editingField?.categoryId === category.id && editingField?.itemId === item.id
+                              
+                              return (
+                                <div 
+                                  key={item.id} 
+                                  className={`p-3 rounded-lg border transition-all ${
+                                    config.enabled 
+                                      ? 'bg-gray-800/50 border-gray-700' 
+                                      : 'bg-gray-900/30 border-gray-800 opacity-50'
+                                  }`}
+                                >
+                                  <div className="flex items-start gap-3">
+                                    {/* Enable/Disable Toggle */}
+                                    <button
+                                      onClick={() => toggleChecklistItem(category.id, item.id)}
+                                      className={`flex-shrink-0 w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${
+                                        config.enabled 
+                                          ? 'bg-red-500 border-red-500' 
+                                          : 'bg-transparent border-gray-600'
+                                      }`}
+                                    >
+                                      {config.enabled && <Check size={16} className="text-white" />}
+                                    </button>
 
-                                  <div className="flex-1">
-                                    <div className="flex items-center justify-between mb-2">
-                                      <span className={`font-medium ${config.enabled ? 'text-white' : 'text-gray-500'}`}>
-                                        {item.label}
-                                      </span>
-                                      {config.prefilledValue && (
-                                        <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded-full border border-green-500/30">
-                                          Pre-filled ✓
-                                        </span>
+                                    <div className="flex-1">
+                                      <div className="flex items-center justify-between mb-2">
+                                        {isEditing ? (
+                                          <div className="flex items-center gap-2 flex-1">
+                                            <input
+                                              type="text"
+                                              defaultValue={displayLabel}
+                                              autoFocus
+                                              onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                  handleEditFieldLabel(category.id, item.id, e.target.value)
+                                                } else if (e.key === 'Escape') {
+                                                  setEditingField(null)
+                                                }
+                                              }}
+                                              onBlur={(e) => handleEditFieldLabel(category.id, item.id, e.target.value)}
+                                              className="flex-1 bg-gray-900 border border-red-500 rounded px-2 py-1 text-white text-sm focus:outline-none"
+                                            />
+                                          </div>
+                                        ) : (
+                                          <div className="flex items-center gap-2">
+                                            <span className={`font-medium ${config.enabled ? 'text-white' : 'text-gray-500'}`}>
+                                              {displayLabel}
+                                            </span>
+                                            {isCustom && (
+                                              <span className="text-xs bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded border border-purple-500/30">
+                                                Custom
+                                              </span>
+                                            )}
+                                            {/* Edit button */}
+                                            {isCustom && config.enabled && (
+                                              <button
+                                                onClick={() => setEditingField({ categoryId: category.id, itemId: item.id, label: displayLabel })}
+                                                className="text-gray-500 hover:text-white transition-colors"
+                                              >
+                                                <Edit3 size={14} />
+                                              </button>
+                                            )}
+                                          </div>
+                                        )}
+                                        <div className="flex items-center gap-2">
+                                          {config.prefilledValue && (
+                                            <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded-full border border-green-500/30">
+                                              Pre-filled ✓
+                                            </span>
+                                          )}
+                                          {/* Remove button */}
+                                          <button
+                                            onClick={() => handleRemoveField(category.id, item.id)}
+                                            className="text-gray-500 hover:text-red-400 transition-colors"
+                                            title={isCustom ? "Remove field" : "Disable field"}
+                                          >
+                                            <Trash2 size={16} />
+                                          </button>
+                                        </div>
+                                      </div>
+
+                                      {config.enabled && (
+                                        <div className="flex items-center gap-2 mt-2">
+                                          {/* Priority Selector */}
+                                          <select
+                                            value={config.priority || 'important'}
+                                            onChange={(e) => updatePriority(category.id, item.id, e.target.value)}
+                                            className="text-xs bg-gray-900 border border-gray-700 rounded px-2 py-1 text-white focus:outline-none focus:border-red-500"
+                                          >
+                                            <option value="essential">Essential</option>
+                                            <option value="important">Important</option>
+                                            <option value="nice">Nice to have</option>
+                                          </select>
+
+                                          {/* Already Have Toggle */}
+                                          <button
+                                            onClick={() => toggleAlreadyHave(category.id, item.id)}
+                                            className={`text-xs px-3 py-1 rounded border transition-colors ${
+                                              config.alreadyHave 
+                                                ? 'bg-green-500/20 text-green-400 border-green-500/30' 
+                                                : 'bg-gray-900 text-gray-400 border-gray-700'
+                                            }`}
+                                          >
+                                            {config.alreadyHave ? '✓ Already Have' : 'Mark as "Already Have"'}
+                                          </button>
+                                          
+                                          {/* Field type indicator */}
+                                          <span className="text-xs text-gray-500">
+                                            ({item.type || config.type || 'text'})
+                                          </span>
+                                        </div>
                                       )}
                                     </div>
-
-                                    {config.enabled && (
-                                      <div className="flex items-center gap-2 mt-2">
-                                        {/* Priority Selector */}
-                                        <select
-                                          value={config.priority}
-                                          onChange={(e) => updatePriority(category.id, item.id, e.target.value)}
-                                          className="text-xs bg-gray-900 border border-gray-700 rounded px-2 py-1 text-white focus:outline-none focus:border-red-500"
-                                        >
-                                          <option value="essential">Essential</option>
-                                          <option value="important">Important</option>
-                                          <option value="nice">Nice to have</option>
-                                        </select>
-
-                                        {/* Already Have Toggle */}
-                                        <button
-                                          onClick={() => toggleAlreadyHave(category.id, item.id)}
-                                          className={`text-xs px-3 py-1 rounded border transition-colors ${
-                                            config.alreadyHave 
-                                              ? 'bg-green-500/20 text-green-400 border-green-500/30' 
-                                              : 'bg-gray-900 text-gray-400 border-gray-700'
-                                          }`}
-                                        >
-                                          {config.alreadyHave ? '✓ Already Have' : 'Mark as "Already Have"'}
-                                        </button>
-                                      </div>
-                                    )}
                                   </div>
                                 </div>
+                              )
+                            })}
+                            
+                            {/* Add Field Button/Form */}
+                            {showAddField === category.id ? (
+                              <div className="p-3 rounded-lg border border-dashed border-green-500/50 bg-green-500/5">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <input
+                                    type="text"
+                                    value={newFieldLabel}
+                                    onChange={(e) => setNewFieldLabel(e.target.value)}
+                                    placeholder="Field label..."
+                                    autoFocus
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') handleAddCustomField(category.id)
+                                      if (e.key === 'Escape') setShowAddField(null)
+                                    }}
+                                    className="flex-1 bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-green-500"
+                                  />
+                                  <select
+                                    value={newFieldType}
+                                    onChange={(e) => setNewFieldType(e.target.value)}
+                                    className="bg-gray-900 border border-gray-700 rounded px-2 py-2 text-white text-sm focus:outline-none focus:border-green-500"
+                                  >
+                                    <option value="text">Text</option>
+                                    <option value="textarea">Long Text</option>
+                                    <option value="file">File Upload</option>
+                                    <option value="number">Number</option>
+                                  </select>
+                                </div>
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => handleAddCustomField(category.id)}
+                                    disabled={!newFieldLabel.trim()}
+                                    className="flex-1 bg-green-600 hover:bg-green-500 disabled:bg-gray-700 text-white text-sm font-medium py-2 rounded transition-colors"
+                                  >
+                                    Add Field
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setShowAddField(null)
+                                      setNewFieldLabel('')
+                                      setNewFieldType('text')
+                                    }}
+                                    className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded transition-colors"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
                               </div>
-                            )
-                          })}
+                            ) : (
+                              <button
+                                onClick={() => setShowAddField(category.id)}
+                                className="w-full p-3 rounded-lg border border-dashed border-gray-700 hover:border-green-500/50 hover:bg-green-500/5 text-gray-500 hover:text-green-400 transition-all flex items-center justify-center gap-2"
+                              >
+                                <PlusCircle size={18} />
+                                Add Custom Field
+                              </button>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
               )}
@@ -902,8 +1137,9 @@ export default function OnboardingCreateEnhanced() {
                         Checklist ({counts.enabled} items)
                       </div>
                       {checklistConfig.map(category => {
-                        const enabledItems = category.items.filter(item => 
-                          checklistItems[category.id][item.id].enabled
+                        const allItems = getCategoryItems(category)
+                        const enabledItems = allItems.filter(item => 
+                          checklistItems[category.id]?.[item.id]?.enabled
                         )
                         if (enabledItems.length === 0) return null
                         
@@ -915,7 +1151,8 @@ export default function OnboardingCreateEnhanced() {
                             </div>
                             <div className="space-y-1">
                               {enabledItems.map(item => {
-                                const config = checklistItems[category.id][item.id]
+                                const config = checklistItems[category.id]?.[item.id] || {}
+                                const displayLabel = config.label || item.label
                                 return (
                                   <div key={item.id} className="flex items-center gap-2 text-xs">
                                     <div className={`w-3 h-3 rounded border ${
@@ -926,7 +1163,8 @@ export default function OnboardingCreateEnhanced() {
                                       {config.alreadyHave && <Check size={10} className="text-white" />}
                                     </div>
                                     <span className={`flex-1 ${config.alreadyHave ? 'text-gray-500 line-through' : 'text-gray-400'}`}>
-                                      {item.label}
+                                      {displayLabel}
+                                      {(item.isCustom || config.isCustom) && <span className="text-purple-400 ml-1">*</span>}
                                     </span>
                                     {config.prefilledValue && (
                                       <span className="text-green-400">✓</span>
