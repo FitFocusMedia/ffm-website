@@ -410,7 +410,7 @@ export default function CollectedDataView({ data, files = [], checklistConfig: c
                         <FilePreview 
                           key={file.id || idx}
                           url={file.url}
-                          label={file.fileName || file.label}
+                          label={file.label || file.fileName || 'Uploaded file'}
                         />
                       ))}
                     </div>
