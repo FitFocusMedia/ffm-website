@@ -242,6 +242,14 @@ export default function CollectedDataView({ data, files = [], checklistConfig: c
   
   const config = customConfig || checklistConfig
   
+  // Helper: Look up the label for a file type from checklist config
+  const getFieldLabel = (categoryId, fileType) => {
+    const category = config.find(c => c.id === categoryId)
+    if (!category) return null
+    const item = category.items.find(i => i.id === fileType)
+    return item?.label || null
+  }
+  
   // Group files by category from the onboarding_files table
   const filesByCategory = {}
   for (const file of files) {
@@ -249,9 +257,13 @@ export default function CollectedDataView({ data, files = [], checklistConfig: c
     if (!filesByCategory[file.category]) {
       filesByCategory[file.category] = []
     }
+    
+    // Look up the proper label from checklist config using file_type
+    const fieldLabel = getFieldLabel(file.category, file.file_type)
+    
     filesByCategory[file.category].push({
       id: file.file_type || file.id,
-      label: file.file_name,
+      label: fieldLabel || file.file_type || 'Uploaded file', // Use config label, fallback to file_type, then generic
       url: file.drive_file_url || file.public_url, // Prefer Drive URL
       fileName: file.file_name,
       mimeType: file.mime_type
