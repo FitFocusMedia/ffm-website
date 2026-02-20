@@ -339,20 +339,25 @@ export default function CollectedDataView({ data, files = [], checklistConfig: c
         
         // Get files for this category from the files prop (onboarding_files table)
         // This shows ALL files uploaded, not just the last one per field
+        // These already have Drive URLs (after sync) and proper labels
         const categoryFiles = filesByCategory[category.id] || []
         
-        // Fallback: also check collected_data for any URLs not in onboarding_files
+        // Get file types that are already covered by onboarding_files
+        const fileTypesInTable = new Set(categoryFiles.map(f => f.id))
+        
+        // Fallback: only check collected_data for file types NOT in onboarding_files
+        // This handles edge cases where a file exists in collected_data but wasn't tracked in the files table
         const collectedDataFiles = category.items
           .filter(item => item.type === 'file')
+          // Skip if this file type already has entries in onboarding_files
+          .filter(item => !fileTypesInTable.has(item.id))
           .map(item => ({
             ...item,
             url: catData[`${item.id}_url`] || catData[item.id]
           }))
           .filter(f => f.url && f.url.startsWith('http'))
-          // Only include if not already in categoryFiles
-          .filter(f => !categoryFiles.some(cf => cf.url === f.url))
         
-        // Combine: prefer files from onboarding_files table, add any extras from collected_data
+        // Combine: prefer files from onboarding_files table (has Drive URLs), add any extras from collected_data
         const allFiles = [...categoryFiles, ...collectedDataFiles]
         
         // Collect all text items
