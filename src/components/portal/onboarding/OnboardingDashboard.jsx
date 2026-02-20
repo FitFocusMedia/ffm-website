@@ -8,6 +8,7 @@ import {
   deleteOnboardingSession,
   getContracts
 } from '../../../lib/supabase'
+import OnboardingEditModal from './OnboardingEditModal'
 
 export default function OnboardingDashboard() {
   const navigate = useNavigate()
@@ -20,6 +21,7 @@ export default function OnboardingDashboard() {
   const [search, setSearch] = useState('')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showContractModal, setShowContractModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
   const [creating, setCreating] = useState(false)
   
   // New session form
@@ -102,6 +104,18 @@ export default function OnboardingDashboard() {
     } catch (err) {
       alert('Error deleting session: ' + err.message)
     }
+  }
+
+  const handleEditSave = (updates) => {
+    // Update the session in local state
+    setSessions(prev => prev.map(s => 
+      s.id === selectedSession.id 
+        ? { ...s, ...updates }
+        : s
+    ))
+    // Update the selected session to reflect changes immediately
+    setSelectedSession(prev => ({ ...prev, ...updates }))
+    setShowEditModal(false)
   }
 
   const getStatusBadge = (status) => {
@@ -363,6 +377,12 @@ export default function OnboardingDashboard() {
 
               {/* Actions */}
               <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-700">
+                <button
+                  onClick={() => setShowEditModal(true)}
+                  className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm"
+                >
+                  ✏️ Edit Session
+                </button>
                 <a 
                   href={portalUrl(selectedSession.share_token)}
                   target="_blank"
@@ -550,6 +570,15 @@ export default function OnboardingDashboard() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Edit Session Modal */}
+      {showEditModal && selectedSession && (
+        <OnboardingEditModal
+          session={selectedSession}
+          onClose={() => setShowEditModal(false)}
+          onSave={handleEditSave}
+        />
       )}
 
     </div>
