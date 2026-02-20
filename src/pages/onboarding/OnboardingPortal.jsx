@@ -310,15 +310,25 @@ export default function OnboardingPortal() {
   }
   
   // Handle saving Drive link from large file modal
+  // Saves to [itemId]_links array to prevent overwrite by file uploads
   const handleSaveDriveLink = () => {
     if (!driveLink.trim() || !fileSizeModal) return
     
     const { categoryId, itemId } = fileSizeModal
+    const linksKey = `${itemId}_links`
+    const existingLinks = formData[categoryId]?.[linksKey] || []
+    
+    // Add new link to array (avoid duplicates)
+    const newLink = driveLink.trim()
+    const updatedLinks = existingLinks.includes(newLink) 
+      ? existingLinks 
+      : [...existingLinks, newLink]
+    
     const newData = {
       ...formData,
       [categoryId]: {
         ...(formData[categoryId] || {}),
-        [itemId]: driveLink.trim()
+        [linksKey]: updatedLinks
       }
     }
     setFormData(newData)
@@ -670,6 +680,7 @@ export default function OnboardingPortal() {
                                       />
                                     </label>
                                   )}
+                                  {/* Show uploaded files */}
                                   {(files.length > 0 || value) && (
                                     <div className="mt-2 space-y-1">
                                       {files.map((f, i) => (
@@ -686,6 +697,18 @@ export default function OnboardingPortal() {
                                           <a href={value} target="_blank" rel="noopener noreferrer" className="text-orange-500 hover:underline ml-auto">View</a>
                                         </div>
                                       )}
+                                    </div>
+                                  )}
+                                  {/* Show external links (Drive/Dropbox) */}
+                                  {catData[`${item.id}_links`]?.length > 0 && (
+                                    <div className="mt-2 space-y-1">
+                                      {catData[`${item.id}_links`].map((link, i) => (
+                                        <div key={`link-${i}`} className="flex items-center gap-2 p-2 bg-blue-500/10 rounded-lg text-sm">
+                                          <span className="text-blue-400">🔗</span>
+                                          <span className="flex-1 text-white truncate">{link.includes('drive.google') ? 'Google Drive' : link.includes('dropbox') ? 'Dropbox' : 'External'} link</span>
+                                          <a href={link} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Open</a>
+                                        </div>
+                                      ))}
                                     </div>
                                   )}
                                 </div>

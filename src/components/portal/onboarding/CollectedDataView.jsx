@@ -164,6 +164,27 @@ function FilePreview({ url, label }) {
 function TextValue({ value, isUrl }) {
   if (!value) return <span className="text-gray-500 italic">Not provided</span>
   
+  // Handle arrays (like _links)
+  if (Array.isArray(value)) {
+    if (value.length === 0) return <span className="text-gray-500 italic">No links provided</span>
+    return (
+      <div className="space-y-1">
+        {value.map((link, i) => (
+          <a 
+            key={i}
+            href={link}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-400 hover:text-blue-300 break-all flex items-center gap-1 block"
+          >
+            🔗 {link.includes('drive.google') ? 'Google Drive' : link.includes('dropbox') ? 'Dropbox' : 'External'} link
+            <ExternalLink size={14} />
+          </a>
+        ))}
+      </div>
+    )
+  }
+  
   // Check if it's a URL
   if (isUrl || value.startsWith('http://') || value.startsWith('https://')) {
     return (
@@ -409,6 +430,50 @@ export default function CollectedDataView({ data, files = [], checklistConfig: c
                           </div>
                         )
                       })}
+                    </div>
+                  </div>
+                )}
+                
+                {/* External Links (Drive/Dropbox) */}
+                {Object.entries(catData)
+                  .filter(([key, value]) => key.endsWith('_links') && Array.isArray(value) && value.length > 0)
+                  .length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-gray-700">
+                    <h4 className="text-xs text-gray-500 uppercase mb-3">External Links</h4>
+                    <div className="space-y-4">
+                      {Object.entries(catData)
+                        .filter(([key, value]) => key.endsWith('_links') && Array.isArray(value) && value.length > 0)
+                        .map(([key, links]) => {
+                          // Find the label from the checklist config
+                          const baseItemId = key.replace(/_links$/, '')
+                          const item = category.items.find(i => i.id === baseItemId)
+                          const label = item?.label || baseItemId.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+                          
+                          return (
+                            <div key={key}>
+                              <label className="text-sm text-gray-400 block mb-1">
+                                {label} (external links)
+                              </label>
+                              <div className="space-y-1">
+                                {links.map((link, i) => (
+                                  <a 
+                                    key={i}
+                                    href={link}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-400 hover:text-blue-300 break-all flex items-center gap-2 p-2 bg-blue-500/10 rounded-lg text-sm"
+                                  >
+                                    <span>🔗</span>
+                                    <span className="flex-1 truncate">
+                                      {link.includes('drive.google') ? 'Google Drive' : link.includes('dropbox') ? 'Dropbox' : 'External'} link
+                                    </span>
+                                    <ExternalLink size={14} />
+                                  </a>
+                                ))}
+                              </div>
+                            </div>
+                          )
+                        })}
                     </div>
                   </div>
                 )}
