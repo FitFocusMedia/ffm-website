@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   ArrowLeft, 
@@ -84,11 +84,13 @@ const checklistConfig = [
 
 export default function OnboardingCreateEnhanced() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [step, setStep] = useState(1) // 1: Contract Selection, 2: Customize Checklist, 3: Preview & Confirm
   const [contracts, setContracts] = useState([])
   const [selectedContract, setSelectedContract] = useState(null)
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
+  const [contractIdFromUrl] = useState(() => searchParams.get('contractId')) // Capture on mount
   
   // Form data (pre-filled from contract)
   const [formData, setFormData] = useState({
@@ -136,6 +138,17 @@ export default function OnboardingCreateEnhanced() {
   useEffect(() => {
     loadContracts()
   }, [])
+  
+  // Auto-select contract from URL param after contracts load
+  useEffect(() => {
+    if (contractIdFromUrl && contracts.length > 0 && !selectedContract) {
+      const contract = contracts.find(c => c.id === contractIdFromUrl)
+      if (contract) {
+        // Simulate the contract select to populate form
+        handleContractSelectById(contractIdFromUrl)
+      }
+    }
+  }, [contracts, contractIdFromUrl])
 
   const loadContracts = async () => {
     try {
@@ -149,8 +162,8 @@ export default function OnboardingCreateEnhanced() {
     }
   }
 
-  const handleContractSelect = async (e) => {
-    const contractId = e.target.value
+  // Handle contract selection by ID (used for URL auto-select)
+  const handleContractSelectById = async (contractId) => {
     if (!contractId) {
       setSelectedContract(null)
       resetForm()
@@ -193,6 +206,11 @@ export default function OnboardingCreateEnhanced() {
     updateChecklistPrefill('social', 'org_instagram', formatInstagram(crmContact.instagram || contractData.org_instagram || ''))
     updateChecklistPrefill('social', 'org_facebook', formatFacebook(crmContact.facebook || contractData.org_facebook || ''))
     updateChecklistPrefill('social', 'org_website', crmContact.website || contractData.org_website || '')
+  }
+  
+  const handleContractSelect = async (e) => {
+    const contractId = e.target.value
+    handleContractSelectById(contractId)
   }
 
   const formatInstagram = (value) => {
