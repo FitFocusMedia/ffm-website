@@ -525,7 +525,7 @@ export default function OnboardingDashboard() {
                     return (
                       <button
                         key={contract.id}
-                        onClick={() => !hasSession && handleCreateFromContract(contract.id)}
+                        onClick={() => !hasSession && navigate(`/portal/onboarding/new?contractId=${contract.id}`)}
                         disabled={hasSession}
                         className={`w-full p-4 rounded-xl text-left transition-colors ${
                           hasSession 
