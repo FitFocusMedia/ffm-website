@@ -160,9 +160,27 @@ export default function OnboardingPortal() {
     window.saveTimeout = setTimeout(() => saveProgress(newData), 1000)
   }
 
+  // File size limit (20MB)
+  const MAX_FILE_SIZE = 20 * 1024 * 1024
+
   // Handle file upload
   const handleFileUpload = async (categoryId, itemId, files) => {
     if (!files || files.length === 0 || !session) return
+    
+    // Check file size
+    for (const file of files) {
+      if (file.size > MAX_FILE_SIZE) {
+        const sizeMB = (file.size / (1024 * 1024)).toFixed(1)
+        alert(
+          `📁 "${file.name}" is ${sizeMB}MB — too large for direct upload.\n\n` +
+          `For files over 20MB, please:\n` +
+          `1. Upload to Google Drive, Dropbox, or similar\n` +
+          `2. Paste the share link in the "Links to existing footage" field below\n\n` +
+          `This helps us keep the system fast and reliable! 🚀`
+        )
+        return
+      }
+    }
     
     setUploadingFile(`${categoryId}.${itemId}`)
     
