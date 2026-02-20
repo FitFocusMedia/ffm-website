@@ -17,6 +17,9 @@ export default function ContractBuilder({ editMode = false }) {
     promoter_position: '',
     promoter_email: '',
     promoter_phone: '',
+    org_instagram: '',
+    org_facebook: '',
+    org_website: '',
     event_name: '',
     event_date: '',
     event_location: '',
@@ -38,6 +41,8 @@ export default function ContractBuilder({ editMode = false }) {
     social_clips_delivery_days_max: '',
     photo_count: '50',
     photo_count_max: '',
+    photography_included: true,
+    photography_type: 'professional', // 'none', 'base', 'professional'
     livestream_included: false,
     ppv_included: false,
     ppv_platform: '',
@@ -550,6 +555,52 @@ export default function ContractBuilder({ editMode = false }) {
                     className="w-full px-4 py-2 bg-dark-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
+
+                {/* Social Links (Optional) */}
+                <div className="pt-4 border-t border-gray-700">
+                  <h3 className="text-lg font-semibold text-gray-300 mb-4">Social & Web (Optional)</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Instagram
+                      </label>
+                      <input
+                        type="text"
+                        name="org_instagram"
+                        value={formData.org_instagram}
+                        onChange={handleInputChange}
+                        placeholder="@yourorg"
+                        className="w-full px-4 py-2 bg-dark-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Facebook
+                      </label>
+                      <input
+                        type="text"
+                        name="org_facebook"
+                        value={formData.org_facebook}
+                        onChange={handleInputChange}
+                        placeholder="facebook.com/yourorg"
+                        className="w-full px-4 py-2 bg-dark-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Website
+                      </label>
+                      <input
+                        type="text"
+                        name="org_website"
+                        value={formData.org_website}
+                        onChange={handleInputChange}
+                        placeholder="https://yourorg.com"
+                        className="w-full px-4 py-2 bg-dark-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -775,7 +826,7 @@ export default function ContractBuilder({ editMode = false }) {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Camera Angles per Mat
+                    Camera Angles
                   </label>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -925,33 +976,76 @@ export default function ContractBuilder({ editMode = false }) {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Photo Count
+                    Photography
                   </label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
+                  <div className="space-y-2">
+                    <label className="flex items-center space-x-3 cursor-pointer">
                       <input
-                        type="number"
-                        name="photo_count"
-                        value={formData.photo_count}
+                        type="radio"
+                        name="photography_type"
+                        value="none"
+                        checked={formData.photography_type === 'none'}
                         onChange={handleInputChange}
-                        placeholder="Min"
-                        className="w-full px-4 py-2 bg-dark-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-4 h-4 text-blue-600 bg-dark-800 border-gray-700 focus:ring-2 focus:ring-blue-500"
                       />
-                      <span className="text-xs text-gray-500 mt-1 block">Min</span>
-                    </div>
-                    <div>
+                      <span className="text-gray-300">No photography included</span>
+                    </label>
+                    <label className="flex items-center space-x-3 cursor-pointer">
                       <input
-                        type="number"
-                        name="photo_count_max"
-                        value={formData.photo_count_max}
+                        type="radio"
+                        name="photography_type"
+                        value="base"
+                        checked={formData.photography_type === 'base'}
                         onChange={handleInputChange}
-                        placeholder="Max (optional)"
-                        className="w-full px-4 py-2 bg-dark-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-4 h-4 text-blue-600 bg-dark-800 border-gray-700 focus:ring-2 focus:ring-blue-500"
                       />
-                      <span className="text-xs text-gray-500 mt-1 block">Max (optional)</span>
-                    </div>
+                      <span className="text-gray-300">Base event photography</span>
+                    </label>
+                    <label className="flex items-center space-x-3 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="photography_type"
+                        value="professional"
+                        checked={formData.photography_type === 'professional'}
+                        onChange={handleInputChange}
+                        className="w-4 h-4 text-blue-600 bg-dark-800 border-gray-700 focus:ring-2 focus:ring-blue-500"
+                      />
+                      <span className="text-gray-300">Professional event photography</span>
+                    </label>
                   </div>
                 </div>
+
+                {formData.photography_type !== 'none' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Photo Count
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <input
+                          type="number"
+                          name="photo_count"
+                          value={formData.photo_count}
+                          onChange={handleInputChange}
+                          placeholder="Min"
+                          className="w-full px-4 py-2 bg-dark-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <span className="text-xs text-gray-500 mt-1 block">Min</span>
+                      </div>
+                      <div>
+                        <input
+                          type="number"
+                          name="photo_count_max"
+                          value={formData.photo_count_max}
+                          onChange={handleInputChange}
+                          placeholder="Max (optional)"
+                          className="w-full px-4 py-2 bg-dark-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <span className="text-xs text-gray-500 mt-1 block">Max (optional)</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex items-center">
                   <input

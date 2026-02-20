@@ -42,6 +42,55 @@ export async function markLeadCompleted(leadId, formData) {
 }
 
 /**
+ * Look up a CRM lead by org_name (flexible matching)
+ */
+export async function getLeadByOrgName(orgName) {
+  if (!orgName) return null
+  
+  // First try exact match
+  let { data, error } = await supabase
+    .from('crm_leads')
+    .select('*')
+    .ilike('org_name', orgName)
+    .limit(1)
+    .single()
+  
+  if (data) return data
+  
+  // Try partial match - extract key words and search
+  // Remove common suffixes like "Pty Ltd", "Inc", etc.
+  const cleanName = orgName
+    .replace(/\s*(Pty|Ltd|Inc|LLC|Pty Ltd|PTY LTD|Corporation|Corp)\.?\s*/gi, '')
+    .trim()
+  
+  // Try with cleaned name
+  const result = await supabase
+    .from('crm_leads')
+    .select('*')
+    .ilike('org_name', `%${cleanName}%`)
+    .limit(1)
+    .single()
+  
+  if (result.data) return result.data
+  
+  // Try matching first significant word (e.g., "Queensland" from "Queensland Brazilian...")
+  const words = cleanName.split(/\s+/).filter(w => w.length > 3)
+  if (words.length > 0) {
+    const firstWord = words[0]
+    const lastResult = await supabase
+      .from('crm_leads')
+      .select('*')
+      .ilike('org_name', `%${firstWord}%BJJ%`)
+      .limit(1)
+      .single()
+    
+    if (lastResult.data) return lastResult.data
+  }
+  
+  return null
+}
+
+/**
  * Contract Management
  */
 
@@ -236,6 +285,17 @@ export async function createOnboardingSession(sessionData) {
     .single()
   
   if (error) throw error
+  
+  // Auto-create Google Drive folders if org_name and event_name are provided
+  if (data && data.org_name && data.event_name) {
+    try {
+      await createOnboardingFolders(data.id, data.org_name, data.event_name)
+    } catch (err) {
+      console.error('Failed to create Drive folders:', err)
+      // Don't fail the whole operation
+    }
+  }
+  
   return data
 }
 
@@ -256,6 +316,40 @@ export async function createOnboardingFromContract(contractId) {
   // Create session from contract
   const contractData = contract.contract_data || {}
   
+  // Try to find matching lead in CRM to pull social data
+  const crmLead = await getLeadByOrgName(contract.org_name)
+  const crmContact = crmLead?.contact || {}
+  
+  // Pre-fill collected_data - prioritize CRM data, fallback to contract data
+  const collectedData = {}
+  
+  // Helper to format social URLs
+  const formatFacebookUrl = (fb) => {
+    if (!fb) return null
+    if (fb.startsWith('http')) return fb
+    // Remove @ if present and create full URL
+    const handle = fb.replace(/^@/, '').replace(/^\//, '')
+    return `https://facebook.com/${handle}`
+  }
+  
+  const formatInstagramHandle = (ig) => {
+    if (!ig) return null
+    // Ensure @ prefix for consistency
+    return ig.startsWith('@') ? ig : `@${ig}`
+  }
+  
+  // Social & Promotion fields - pull from CRM first, then contract
+  const orgInstagram = crmContact.instagram || contractData.org_instagram
+  const orgFacebook = crmContact.facebook || contractData.org_facebook
+  const orgWebsite = crmContact.website || contractData.org_website
+  
+  if (orgInstagram || orgFacebook || orgWebsite) {
+    collectedData.social = {}
+    if (orgInstagram) collectedData.social.org_instagram = formatInstagramHandle(orgInstagram)
+    if (orgFacebook) collectedData.social.org_facebook = formatFacebookUrl(orgFacebook)
+    if (orgWebsite) collectedData.social.org_website = orgWebsite
+  }
+  
   const { data, error } = await supabase
     .from('onboarding_sessions')
     .insert({
@@ -267,6 +361,7 @@ export async function createOnboardingFromContract(contractId) {
       event_name: contractData.event_name,
       event_date: contractData.event_date,
       event_location: contractData.event_location,
+      collected_data: Object.keys(collectedData).length > 0 ? collectedData : null,
       share_token: generateToken(),
       status: 'pending'
     })

@@ -29,7 +29,7 @@ import PipelineBoard from './components/portal/crm/PipelineBoard'
 import LeadDetail from './components/portal/crm/LeadDetail'
 import OutreachTemplates from './components/portal/crm/OutreachTemplates'
 import OnboardingDashboard from './components/portal/onboarding/OnboardingDashboard'
-import OnboardingCreate from './components/portal/onboarding/OnboardingCreate'
+import OnboardingCreateEnhanced from './components/portal/onboarding/OnboardingCreateEnhanced'
 import OnboardingDetail from './components/portal/onboarding/OnboardingDetail'
 import OnboardingPortal from './pages/onboarding/OnboardingPortal'
 
@@ -148,7 +148,7 @@ function App() {
           element={
             <ProtectedRoute>
               <PortalLayout>
-                <OnboardingCreate />
+                <OnboardingCreateEnhanced />
               </PortalLayout>
             </ProtectedRoute>
           }

@@ -102,8 +102,9 @@ export function generateContractHTML(contract) {
       
       <h3 class="text-xl font-bold mt-4 mb-2">2.2 What FFM Provides at Zero Cost</h3>
       <ul class="list-disc pl-6 my-4">
-        <li>Multi-camera professional video coverage (${range(d.camera_angles, d.camera_angles_max, '2')} camera angles per mat)</li>
-        <li>Professional event photography</li>
+        <li>Multi-camera professional video coverage (${range(d.camera_angles, d.camera_angles_max, '2')} camera angles)</li>
+        ${d.photography_type === 'professional' ? '<li>Professional event photography</li>' : ''}
+        ${d.photography_type === 'base' ? '<li>Base event photography</li>' : ''}
         <li>Livestream and/or PPV broadcast production (if applicable)</li>
         <li>Post-event highlight reel for the Client's promotional use</li>
         <li>Access to the FFM Athlete Media Portal for athlete content delivery</li>
@@ -126,7 +127,7 @@ export function generateContractHTML(contract) {
       <ul class="list-disc pl-6 my-4">
         <li>One (1) Event Highlight Reel (60–120 seconds) within ${range(d.highlight_delivery_days, d.highlight_delivery_days_max, '7')} business days</li>
         <li>${range(d.social_clips_count, d.social_clips_count_max, '5')} social media clips within ${range(d.social_clips_delivery_days, d.social_clips_delivery_days_max, '5')} business days</li>
-        <li>Curated photo gallery of ${range(d.photo_count, d.photo_count_max, '50')} edited images</li>
+        ${d.photography_type && d.photography_type !== 'none' ? `<li>Curated photo gallery of ${range(d.photo_count, d.photo_count_max, '50')} edited images</li>` : ''}
       </ul>
       
       <h3 class="text-xl font-bold mt-4 mb-2">3.2 Livestream / PPV Production</h3>
@@ -219,6 +220,22 @@ export function generateContractHTML(contract) {
         <li>Event schedule to be provided ${v(d.schedule_hours_before, '48')} hours before Event</li>
         <li>Athlete list to be provided ${v(d.athlete_list_days_before, '7')} days before Event</li>
       </ul>
+      
+      <h3 class="text-xl font-bold mt-4 mb-2">7.1 Athlete Contact Information</h3>
+      <p>The Client <strong>must provide</strong> FFM with contact information for all registered athletes, including but not limited to:</p>
+      <ul class="list-disc pl-6 my-4">
+        <li>Full name</li>
+        <li>Email address</li>
+        <li>Phone number (where available)</li>
+        <li>Social media handles (Instagram, etc.)</li>
+      </ul>
+      <p>This information will be used by FFM for:</p>
+      <ul class="list-disc pl-6 my-4">
+        <li>Delivering content and media packages to athletes via the FFM Athlete Media Portal</li>
+        <li>Marketing and promotional communications regarding event content and athlete media services</li>
+        <li>Tagging athletes in social media content</li>
+      </ul>
+      <p>The Client warrants that appropriate consent has been obtained from athletes for their contact information to be shared with FFM for these purposes, as outlined in Section 12.</p>
       
       <h2 class="text-2xl font-bold mt-6 mb-4">8. CANCELLATION & RESCHEDULING</h2>
       <p>Cancellation less than 15 days before Event: Client will pay ${currency(d.cancellation_fee || 500)} cancellation fee plus non-recoverable expenses.</p>

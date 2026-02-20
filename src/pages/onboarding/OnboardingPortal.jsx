@@ -7,6 +7,10 @@ import {
   uploadOnboardingFile 
 } from '../../lib/supabase'
 
+// Common file types accepted across all uploads
+const COMMON_DOCS = '.pdf,.doc,.docx,.xls,.xlsx,.csv,.zip';
+const ALL_FILES = `image/*,video/*,${COMMON_DOCS},.svg,.ai,.eps`;
+
 // Checklist structure with input types
 const checklistConfig = [
   {
@@ -14,10 +18,10 @@ const checklistConfig = [
     category: 'Branding & Assets',
     icon: '✨',
     items: [
-      { id: 'logo', label: 'High-resolution logo', type: 'file', accept: 'image/*,.svg,.ai,.eps', priority: 'essential' },
-      { id: 'brand_kit', label: 'Brand kit (colors, fonts, guidelines)', type: 'file', accept: '.pdf,.zip,image/*', priority: 'important' },
-      { id: 'event_graphics', label: 'Event-specific graphics/banners', type: 'file', accept: 'image/*,.pdf,.zip', priority: 'important' },
-      { id: 'sponsor_logos', label: 'Sponsor logos for on-screen display', type: 'file', accept: 'image/*,.zip', priority: 'nice' },
+      { id: 'logo', label: 'High-resolution logo', type: 'file', accept: ALL_FILES, priority: 'essential' },
+      { id: 'brand_kit', label: 'Brand kit (colors, fonts, guidelines)', type: 'file', accept: ALL_FILES, priority: 'important' },
+      { id: 'event_graphics', label: 'Event-specific graphics/banners', type: 'file', accept: ALL_FILES, priority: 'important' },
+      { id: 'sponsor_logos', label: 'Sponsor logos for on-screen display', type: 'file', accept: ALL_FILES, priority: 'nice' },
     ]
   },
   {
@@ -25,8 +29,7 @@ const checklistConfig = [
     category: 'Athlete Information',
     icon: '👥',
     items: [
-      { id: 'registration_list', label: 'Registration list (Name, Email, Phone)', type: 'file', accept: '.csv,.xlsx,.xls,.pdf', priority: 'essential' },
-      { id: 'instagram_handles', label: 'Athlete Instagram handles', type: 'textarea', placeholder: 'List athlete handles, one per line...', priority: 'essential' },
+      { id: 'registration_list', label: 'Registration list (Name, Email, Phone, Instagram)', type: 'file', accept: ALL_FILES, priority: 'essential' },
       { id: 'notable_athletes', label: 'Notable athletes to feature', type: 'textarea', placeholder: 'Champions, rising stars, fan favorites...', priority: 'important' },
     ]
   },
@@ -35,7 +38,7 @@ const checklistConfig = [
     category: 'Venue & Technical',
     icon: '📍',
     items: [
-      { id: 'floor_plan', label: 'Venue floor plan (mat layout)', type: 'file', accept: 'image/*,.pdf', priority: 'essential' },
+      { id: 'floor_plan', label: 'Venue floor plan (mat layout)', type: 'file', accept: ALL_FILES, priority: 'essential' },
       { id: 'internet_specs', label: 'Internet specs (upload speed, hardwired access)', type: 'textarea', placeholder: 'e.g., 100Mbps up/down, ethernet available at...', priority: 'essential' },
       { id: 'power_locations', label: 'Power outlet locations', type: 'textarea', placeholder: 'Describe where power is available...', priority: 'important' },
       { id: 'load_in_time', label: 'Load-in/crew access time', type: 'text', placeholder: 'e.g., 6:00 AM', priority: 'important' },
@@ -48,7 +51,7 @@ const checklistConfig = [
     icon: '📅',
     items: [
       { id: 'mat_count', label: 'Number of mats running', type: 'number', placeholder: 'e.g., 4', priority: 'essential' },
-      { id: 'schedule', label: 'Event schedule/run sheet', type: 'file', accept: '.pdf,.doc,.docx,image/*', priority: 'essential' },
+      { id: 'schedule', label: 'Event schedule/run sheet', type: 'file', accept: ALL_FILES, priority: 'essential' },
       { id: 'bracket_system', label: 'Bracket/scoring system used', type: 'text', placeholder: 'e.g., Smoothcomp, FloArena...', priority: 'important' },
       { id: 'match_comms_method', label: 'How match order will be communicated', type: 'textarea', placeholder: 'e.g., WhatsApp group, printed sheets...', priority: 'important' },
     ]
@@ -61,7 +64,7 @@ const checklistConfig = [
       { id: 'org_instagram', label: 'Organization Instagram', type: 'text', placeholder: '@yourorg', priority: 'important' },
       { id: 'org_facebook', label: 'Organization Facebook', type: 'text', placeholder: 'facebook.com/yourorg', priority: 'nice' },
       { id: 'org_website', label: 'Organization Website', type: 'text', placeholder: 'https://...', priority: 'nice' },
-      { id: 'existing_content', label: 'Existing footage/photos for promos', type: 'file', accept: 'image/*,video/*,.zip', priority: 'nice' },
+      { id: 'existing_content', label: 'Existing footage/photos for promos', type: 'file', accept: ALL_FILES, priority: 'nice' },
       { id: 'existing_content_links', label: 'Links to existing footage (Google Drive, Dropbox, etc.)', type: 'textarea', placeholder: 'Paste links to your existing footage, one per line...', priority: 'nice' },
     ]
   },
@@ -85,9 +88,11 @@ export default function OnboardingPortal() {
   const [activeSection, setActiveSection] = useState('checklist')
   const [saving, setSaving] = useState(false)
   const [uploadingFile, setUploadingFile] = useState(null)
+  const [uploadProgress, setUploadProgress] = useState(0)
   const [formData, setFormData] = useState({})
   const [uploadedFiles, setUploadedFiles] = useState({})
   const [submitted, setSubmitted] = useState(false)
+  const [fileSizeModal, setFileSizeModal] = useState(null) // { fileName, sizeMB }
 
   // Load session data
   useEffect(() => {
@@ -115,6 +120,28 @@ export default function OnboardingPortal() {
     }
   }
 
+  // Filter checklist based on session's checklist_config (if admin customized it)
+  const getFilteredChecklist = () => {
+    if (!session?.checklist_config) {
+      return checklistConfig // Show all items if no config
+    }
+
+    // Filter out disabled items
+    return checklistConfig.map(category => ({
+      ...category,
+      items: category.items.filter(item => {
+        const config = session.checklist_config[category.id]?.[item.id]
+        return config?.enabled !== false // Show if enabled or not specified
+      }).map(item => {
+        // Override priority if customized
+        const config = session.checklist_config[category.id]?.[item.id]
+        return config?.priority ? { ...item, priority: config.priority } : item
+      })
+    })).filter(category => category.items.length > 0) // Remove empty categories
+  }
+
+  const filteredChecklist = getFilteredChecklist()
+
   // Auto-save progress
   const saveProgress = useCallback(async (newData) => {
     if (!session || !token) return
@@ -131,10 +158,11 @@ export default function OnboardingPortal() {
     }
   }, [session, token])
 
-  // Calculate progress
+  // Calculate progress (use filtered checklist)
   const calculateProgress = (data) => {
     const progress = {}
-    checklistConfig.forEach(cat => {
+    const activeChecklist = getFilteredChecklist()
+    activeChecklist.forEach(cat => {
       cat.items.forEach(item => {
         const catData = data[cat.id] || {}
         const value = catData[item.id] || catData[`${item.id}_url`]
@@ -163,7 +191,7 @@ export default function OnboardingPortal() {
   // File size limit (20MB)
   const MAX_FILE_SIZE = 20 * 1024 * 1024
 
-  // Handle file upload
+  // Handle file upload with progress simulation
   const handleFileUpload = async (categoryId, itemId, files) => {
     if (!files || files.length === 0 || !session) return
     
@@ -171,22 +199,28 @@ export default function OnboardingPortal() {
     for (const file of files) {
       if (file.size > MAX_FILE_SIZE) {
         const sizeMB = (file.size / (1024 * 1024)).toFixed(1)
-        alert(
-          `📁 "${file.name}" is ${sizeMB}MB — too large for direct upload.\n\n` +
-          `For files over 20MB, please:\n` +
-          `1. Upload to Google Drive, Dropbox, or similar\n` +
-          `2. Paste the share link in the "Links to existing footage" field below\n\n` +
-          `This helps us keep the system fast and reliable! 🚀`
-        )
+        setFileSizeModal({ fileName: file.name, sizeMB })
         return
       }
     }
     
     setUploadingFile(`${categoryId}.${itemId}`)
+    setUploadProgress(0)
     
     try {
       for (const file of files) {
+        // Simulate progress (since Supabase SDK doesn't expose real progress)
+        const progressInterval = setInterval(() => {
+          setUploadProgress(prev => {
+            if (prev >= 90) return prev // Cap at 90% until complete
+            return prev + Math.random() * 15
+          })
+        }, 200)
+        
         const result = await uploadOnboardingFile(session.id, categoryId, itemId, file)
+        
+        clearInterval(progressInterval)
+        setUploadProgress(100)
         
         // Update local state
         setUploadedFiles(prev => ({
@@ -210,9 +244,12 @@ export default function OnboardingPortal() {
       }
     } catch (err) {
       console.error('Upload error:', err)
-      alert('Upload failed: ' + err.message)
+      setFileSizeModal({ fileName: 'Upload', sizeMB: null, error: err.message })
     } finally {
-      setUploadingFile(null)
+      setTimeout(() => {
+        setUploadingFile(null)
+        setUploadProgress(0)
+      }, 500)
     }
   }
 
@@ -223,19 +260,23 @@ export default function OnboardingPortal() {
     try {
       await submitOnboardingSession(session.id)
       setSubmitted(true)
-      setActiveSection('submitted')
+      
+      // Drive sync happens automatically via scheduler (every 10 min)
+      // No need to trigger manually - avoids local network permission prompts
+      
+      setActiveSection('checklist')
     } catch (err) {
       console.error('Submit error:', err)
       alert('Submission failed: ' + err.message)
     }
   }
 
-  // Get completion stats
+  // Get completion stats (use filtered checklist)
   const getCompletionStats = () => {
     let completed = 0
     let total = 0
     
-    checklistConfig.forEach(cat => {
+    filteredChecklist.forEach(cat => {
       cat.items.forEach(item => {
         total++
         const catData = formData[cat.id] || {}
@@ -293,29 +334,64 @@ export default function OnboardingPortal() {
     )
   }
 
-  // Submitted state
-  if (submitted) {
-    return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
-        <div className="bg-gray-800 rounded-2xl p-10 max-w-lg text-center border border-gray-700">
-          <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-            <span className="text-4xl">✅</span>
-          </div>
-          <h1 className="text-2xl font-bold text-white mb-4">Thank You! 🎉</h1>
-          <p className="text-gray-400 mb-6">
-            Your onboarding information has been submitted successfully. 
-            The Fit Focus Media team will review everything and be in touch shortly.
-          </p>
-          <p className="text-gray-500 text-sm">
-            Questions? Contact <a href="mailto:brandon@fitfocusmedia.com.au" className="text-orange-500 hover:underline">brandon@fitfocusmedia.com.au</a>
-          </p>
-        </div>
-      </div>
-    )
-  }
+  // Note: Submitted state no longer locks out - users can still edit after submitting
 
   return (
     <div className="min-h-screen bg-gray-900">
+      {/* File Size / Error Modal */}
+      {fileSizeModal && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-800 rounded-2xl p-6 max-w-md w-full border border-gray-700 shadow-xl">
+            {fileSizeModal.error ? (
+              // Error modal
+              <>
+                <div className="w-16 h-16 bg-red-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <span className="text-3xl">❌</span>
+                </div>
+                <h3 className="text-xl font-bold text-white text-center mb-2">Upload Failed</h3>
+                <p className="text-gray-400 text-center mb-6">{fileSizeModal.error}</p>
+                <button
+                  onClick={() => setFileSizeModal(null)}
+                  className="w-full bg-gray-700 hover:bg-gray-600 text-white font-semibold py-3 rounded-xl transition-colors"
+                >
+                  Close
+                </button>
+              </>
+            ) : (
+              // File too large modal
+              <>
+                <div className="w-16 h-16 bg-orange-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <span className="text-3xl">📁</span>
+                </div>
+                <h3 className="text-xl font-bold text-white text-center mb-2">File Too Large</h3>
+                <p className="text-gray-400 text-center mb-4">
+                  <span className="text-white font-medium">"{fileSizeModal.fileName}"</span> is {fileSizeModal.sizeMB}MB — our upload limit is 20MB.
+                </p>
+                <div className="bg-gray-900 rounded-xl p-4 mb-6">
+                  <p className="text-orange-500 font-medium mb-2">📎 Here's what to do:</p>
+                  <ol className="text-gray-400 text-sm space-y-2">
+                    <li className="flex gap-2">
+                      <span className="text-orange-500">1.</span>
+                      Upload to Google Drive, Dropbox, or similar
+                    </li>
+                    <li className="flex gap-2">
+                      <span className="text-orange-500">2.</span>
+                      Paste the share link in the "Links to existing footage" field
+                    </li>
+                  </ol>
+                </div>
+                <button
+                  onClick={() => setFileSizeModal(null)}
+                  className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 rounded-xl transition-colors"
+                >
+                  Got It 👍
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Welcome Modal */}
       {showWelcome && session && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -429,7 +505,7 @@ export default function OnboardingPortal() {
 
             {/* Categories */}
             <div className="space-y-3">
-              {checklistConfig.map((category) => {
+              {filteredChecklist.map((category) => {
                 const catData = formData[category.id] || {}
                 const categoryCompleted = category.items.filter(item => {
                   const value = catData[item.id] || catData[`${item.id}_url`]
@@ -472,6 +548,8 @@ export default function OnboardingPortal() {
                           const isComplete = value !== ''
                           const isUploading = uploadingFile === `${category.id}.${item.id}`
                           const files = uploadedFiles[`${category.id}.${item.id}`] || []
+                          const itemConfig = session?.checklist_config?.[category.id]?.[item.id]
+                          const isAlreadyHave = itemConfig?.alreadyHave || false
                           
                           return (
                             <div
@@ -481,11 +559,16 @@ export default function OnboardingPortal() {
                               <div className="flex items-center justify-between mb-3">
                                 <div className="flex items-center gap-2">
                                   <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center text-xs ${
-                                    isComplete ? 'bg-orange-500 border-orange-500 text-white' : 'border-gray-600'
+                                    isComplete || isAlreadyHave ? 'bg-orange-500 border-orange-500 text-white' : 'border-gray-600'
                                   }`}>
-                                    {isComplete && '✓'}
+                                    {(isComplete || isAlreadyHave) && '✓'}
                                   </div>
                                   <span className="font-medium text-white">{item.label}</span>
+                                  {isAlreadyHave && !isComplete && (
+                                    <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full border border-blue-500/30">
+                                      Already Provided
+                                    </span>
+                                  )}
                                 </div>
                                 {getPriorityBadge(item.priority)}
                               </div>
@@ -493,23 +576,35 @@ export default function OnboardingPortal() {
                               {/* Input based on type */}
                               {item.type === 'file' && (
                                 <div>
-                                  <label className="flex items-center justify-center gap-2 p-4 border-2 border-dashed border-gray-600 rounded-xl cursor-pointer hover:border-orange-500/50 transition-colors">
-                                    {isUploading ? (
-                                      <span className="animate-spin">⏳</span>
-                                    ) : (
+                                  {isUploading ? (
+                                    // Upload progress state
+                                    <div className="p-4 border-2 border-orange-500/50 rounded-xl bg-orange-500/5">
+                                      <div className="flex items-center gap-3 mb-3">
+                                        <div className="animate-spin text-orange-500">⏳</div>
+                                        <span className="text-white font-medium">
+                                          Uploading... {Math.round(uploadProgress)}%
+                                        </span>
+                                      </div>
+                                      <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                                        <div 
+                                          className="h-full bg-gradient-to-r from-orange-500 to-orange-400 transition-all duration-300 ease-out"
+                                          style={{ width: `${uploadProgress}%` }}
+                                        />
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    // Normal upload state
+                                    <label className="flex items-center justify-center gap-2 p-4 border-2 border-dashed border-gray-600 rounded-xl cursor-pointer hover:border-orange-500/50 transition-colors">
                                       <span className="text-orange-500">📁</span>
-                                    )}
-                                    <span className="text-gray-400">
-                                      {isUploading ? 'Uploading...' : 'Click to upload'}
-                                    </span>
-                                    <input
-                                      type="file"
-                                      accept={item.accept}
-                                      onChange={(e) => handleFileUpload(category.id, item.id, e.target.files)}
-                                      className="hidden"
-                                      disabled={isUploading}
-                                    />
-                                  </label>
+                                      <span className="text-gray-400">Click to upload</span>
+                                      <input
+                                        type="file"
+                                        accept={item.accept}
+                                        onChange={(e) => handleFileUpload(category.id, item.id, e.target.files)}
+                                        className="hidden"
+                                      />
+                                    </label>
+                                  )}
                                   {(files.length > 0 || value) && (
                                     <div className="mt-2 space-y-1">
                                       {files.map((f, i) => (
@@ -598,15 +693,20 @@ export default function OnboardingPortal() {
 
             {/* Submit Button */}
             <div className="mt-8 text-center">
+              {submitted && (
+                <div className="mb-4 p-4 bg-green-500/20 border border-green-500/30 rounded-xl inline-block">
+                  <p className="text-green-400 font-medium">✅ Already submitted — you can still make changes below</p>
+                </div>
+              )}
               <button
                 onClick={handleSubmit}
                 disabled={stats.completed === 0}
                 className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-semibold px-8 py-4 rounded-full transition-colors inline-flex items-center gap-2"
               >
-                <span>📨</span> Submit Onboarding Information
+                <span>📨</span> {submitted ? 'Update Submission' : 'Submit Onboarding Information'}
               </button>
               <p className="text-gray-500 text-sm mt-3">
-                You can submit anytime — we'll reach out if we need anything else
+                {submitted ? 'Changes are auto-saved — click to notify us of updates' : "You can submit anytime — we'll reach out if we need anything else"}
               </p>
             </div>
           </div>
