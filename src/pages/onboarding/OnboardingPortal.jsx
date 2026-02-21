@@ -87,12 +87,14 @@ export default function OnboardingPortal() {
   const [showWelcome, setShowWelcome] = useState(true)
   const [activeSection, setActiveSection] = useState('checklist')
   const [saving, setSaving] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [uploadingFile, setUploadingFile] = useState(null)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [formData, setFormData] = useState({})
   const [uploadedFiles, setUploadedFiles] = useState({})
   const [submitted, setSubmitted] = useState(false)
-  const [fileSizeModal, setFileSizeModal] = useState(null) // { fileName, sizeMB }
+  const [fileSizeModal, setFileSizeModal] = useState(null) // { fileName, sizeMB, categoryId, itemId }
+  const [driveLink, setDriveLink] = useState('') // For large file Drive link input
 
   // Load session data
   useEffect(() => {
@@ -126,18 +128,50 @@ export default function OnboardingPortal() {
       return checklistConfig // Show all items if no config
     }
 
-    // Filter out disabled items
-    return checklistConfig.map(category => ({
-      ...category,
-      items: category.items.filter(item => {
-        const config = session.checklist_config[category.id]?.[item.id]
-        return config?.enabled !== false // Show if enabled or not specified
-      }).map(item => {
-        // Override priority if customized
-        const config = session.checklist_config[category.id]?.[item.id]
-        return config?.priority ? { ...item, priority: config.priority } : item
+    // Process each category
+    return checklistConfig.map(category => {
+      const categoryConfig = session.checklist_config[category.id] || {}
+      
+      // Start with existing items (filtered and updated)
+      let items = category.items
+        .filter(item => {
+          const config = categoryConfig[item.id]
+          return config?.enabled !== false // Show if enabled or not specified
+        })
+        .map(item => {
+          const config = categoryConfig[item.id]
+          return {
+            ...item,
+            priority: config?.priority || item.priority,
+            alreadyHave: config?.alreadyHave || false
+          }
+        })
+      
+      // Add custom fields from config
+      Object.entries(categoryConfig).forEach(([itemId, config]) => {
+        if (config.isCustom && config.enabled !== false) {
+          // Check if this custom field is not already in the default checklist
+          const existsInDefault = category.items.some(i => i.id === itemId)
+          if (!existsInDefault) {
+            items.push({
+              id: itemId,
+              label: config.label,
+              type: config.type,
+              priority: config.priority,
+              isCustom: true,
+              alreadyHave: config.alreadyHave || false,
+              accept: config.type === 'file' ? 'image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.zip,.svg,.ai,.eps' : undefined,
+              placeholder: config.placeholder || ''
+            })
+          }
+        }
       })
-    })).filter(category => category.items.length > 0) // Remove empty categories
+      
+      return {
+        ...category,
+        items
+      }
+    }).filter(category => category.items.length > 0) // Remove empty categories
   }
 
   const filteredChecklist = getFilteredChecklist()
@@ -199,7 +233,8 @@ export default function OnboardingPortal() {
     for (const file of files) {
       if (file.size > MAX_FILE_SIZE) {
         const sizeMB = (file.size / (1024 * 1024)).toFixed(1)
-        setFileSizeModal({ fileName: file.name, sizeMB })
+        setFileSizeModal({ fileName: file.name, sizeMB, categoryId, itemId })
+        setDriveLink('')
         return
       }
     }
@@ -255,10 +290,11 @@ export default function OnboardingPortal() {
 
   // Submit onboarding
   const handleSubmit = async () => {
-    if (!session) return
+    if (!session || !token || submitting) return
     
+    setSubmitting(true)
     try {
-      await submitOnboardingSession(session.id)
+      await submitOnboardingSession(token)
       setSubmitted(true)
       
       // Drive sync happens automatically via scheduler (every 10 min)
@@ -268,7 +304,37 @@ export default function OnboardingPortal() {
     } catch (err) {
       console.error('Submit error:', err)
       alert('Submission failed: ' + err.message)
+    } finally {
+      setSubmitting(false)
     }
+  }
+  
+  // Handle saving Drive link from large file modal
+  // Saves to [itemId]_links array to prevent overwrite by file uploads
+  const handleSaveDriveLink = () => {
+    if (!driveLink.trim() || !fileSizeModal) return
+    
+    const { categoryId, itemId } = fileSizeModal
+    const linksKey = `${itemId}_links`
+    const existingLinks = formData[categoryId]?.[linksKey] || []
+    
+    // Add new link to array (avoid duplicates)
+    const newLink = driveLink.trim()
+    const updatedLinks = existingLinks.includes(newLink) 
+      ? existingLinks 
+      : [...existingLinks, newLink]
+    
+    const newData = {
+      ...formData,
+      [categoryId]: {
+        ...(formData[categoryId] || {}),
+        [linksKey]: updatedLinks
+      }
+    }
+    setFormData(newData)
+    saveProgress(newData)
+    setFileSizeModal(null)
+    setDriveLink('')
   }
 
   // Get completion stats (use filtered checklist)
@@ -367,25 +433,34 @@ export default function OnboardingPortal() {
                 <p className="text-gray-400 text-center mb-4">
                   <span className="text-white font-medium">"{fileSizeModal.fileName}"</span> is {fileSizeModal.sizeMB}MB — our upload limit is 20MB.
                 </p>
-                <div className="bg-gray-900 rounded-xl p-4 mb-6">
-                  <p className="text-orange-500 font-medium mb-2">📎 Here's what to do:</p>
-                  <ol className="text-gray-400 text-sm space-y-2">
-                    <li className="flex gap-2">
-                      <span className="text-orange-500">1.</span>
-                      Upload to Google Drive, Dropbox, or similar
-                    </li>
-                    <li className="flex gap-2">
-                      <span className="text-orange-500">2.</span>
-                      Paste the share link in the "Links to existing footage" field
-                    </li>
-                  </ol>
+                <div className="bg-gray-900 rounded-xl p-4 mb-4">
+                  <p className="text-orange-500 font-medium mb-3">📎 Paste a share link instead:</p>
+                  <input
+                    type="url"
+                    value={driveLink}
+                    onChange={(e) => setDriveLink(e.target.value)}
+                    placeholder="https://drive.google.com/... or Dropbox link"
+                    className="w-full p-3 bg-gray-800 border border-gray-600 rounded-xl text-white placeholder-gray-500 focus:border-orange-500 focus:outline-none mb-3"
+                  />
+                  <p className="text-gray-500 text-xs">
+                    Upload to Google Drive or Dropbox, then paste the share link above
+                  </p>
                 </div>
-                <button
-                  onClick={() => setFileSizeModal(null)}
-                  className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 rounded-xl transition-colors"
-                >
-                  Got It 👍
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => { setFileSizeModal(null); setDriveLink(''); }}
+                    className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-3 rounded-xl transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveDriveLink}
+                    disabled={!driveLink.trim()}
+                    className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors"
+                  >
+                    Save Link ✓
+                  </button>
+                </div>
               </>
             )}
           </div>
@@ -605,6 +680,7 @@ export default function OnboardingPortal() {
                                       />
                                     </label>
                                   )}
+                                  {/* Show uploaded files */}
                                   {(files.length > 0 || value) && (
                                     <div className="mt-2 space-y-1">
                                       {files.map((f, i) => (
@@ -621,6 +697,18 @@ export default function OnboardingPortal() {
                                           <a href={value} target="_blank" rel="noopener noreferrer" className="text-orange-500 hover:underline ml-auto">View</a>
                                         </div>
                                       )}
+                                    </div>
+                                  )}
+                                  {/* Show external links (Drive/Dropbox) */}
+                                  {catData[`${item.id}_links`]?.length > 0 && (
+                                    <div className="mt-2 space-y-1">
+                                      {catData[`${item.id}_links`].map((link, i) => (
+                                        <div key={`link-${i}`} className="flex items-center gap-2 p-2 bg-blue-500/10 rounded-lg text-sm">
+                                          <span className="text-blue-400">🔗</span>
+                                          <span className="flex-1 text-white truncate">{link.includes('drive.google') ? 'Google Drive' : link.includes('dropbox') ? 'Dropbox' : 'External'} link</span>
+                                          <a href={link} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Open</a>
+                                        </div>
+                                      ))}
                                     </div>
                                   )}
                                 </div>
@@ -700,13 +788,22 @@ export default function OnboardingPortal() {
               )}
               <button
                 onClick={handleSubmit}
-                disabled={stats.completed === 0}
-                className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-semibold px-8 py-4 rounded-full transition-colors inline-flex items-center gap-2"
+                disabled={stats.completed === 0 || submitting}
+                className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-semibold px-8 py-4 rounded-full transition-all inline-flex items-center gap-2"
               >
-                <span>📨</span> {submitted ? 'Update Submission' : 'Submit Onboarding Information'}
+                {submitting ? (
+                  <>
+                    <span className="animate-spin">⏳</span> Submitting...
+                  </>
+                ) : (
+                  <>
+                    <span>📨</span> {submitted ? 'Update Submission' : 'Submit Onboarding Information'}
+                  </>
+                )}
               </button>
-              <p className="text-gray-500 text-sm mt-3">
-                {submitted ? 'Changes are auto-saved — click to notify us of updates' : "You can submit anytime — we'll reach out if we need anything else"}
+              <p className="text-gray-500 text-sm mt-3 flex items-center justify-center gap-2">
+                {saving && <span className="text-orange-500 animate-pulse">💾 Saving...</span>}
+                {!saving && (submitted ? 'Changes are auto-saved — click to notify us of updates' : "You can submit anytime — we'll reach out if we need anything else")}
               </p>
             </div>
           </div>

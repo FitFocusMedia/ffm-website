@@ -8,6 +8,7 @@ import {
   deleteOnboardingSession,
   getContracts
 } from '../../lib/supabase'
+import OnboardingWizard from './OnboardingWizard'
 
 export default function OnboardingDashboard() {
   const navigate = useNavigate()
@@ -18,20 +19,7 @@ export default function OnboardingDashboard() {
   const [selectedSession, setSelectedSession] = useState(null)
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [showContractModal, setShowContractModal] = useState(false)
-  const [creating, setCreating] = useState(false)
-  
-  // New session form
-  const [newSession, setNewSession] = useState({
-    org_name: '',
-    contact_name: '',
-    contact_email: '',
-    contact_phone: '',
-    event_name: '',
-    event_date: '',
-    event_location: ''
-  })
+  const [showWizard, setShowWizard] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -52,33 +40,9 @@ export default function OnboardingDashboard() {
     }
   }
 
-  const handleCreateSession = async (e) => {
-    e.preventDefault()
-    setCreating(true)
-    try {
-      const data = await createOnboardingSession(newSession)
-      setSessions(prev => [data, ...prev])
-      setShowCreateModal(false)
-      setNewSession({
-        org_name: '', contact_name: '', contact_email: '', contact_phone: '',
-        event_name: '', event_date: '', event_location: ''
-      })
-    } catch (err) {
-      alert('Error: ' + err.message)
-    } finally {
-      setCreating(false)
-    }
-  }
-
-  const handleCreateFromContract = async (contractId) => {
-    try {
-      const data = await createOnboardingFromContract(contractId)
-      setSessions(prev => [data, ...prev])
-      setShowContractModal(false)
-      alert('Onboarding session created!')
-    } catch (err) {
-      alert('Error: ' + err.message)
-    }
+  const handleWizardComplete = (newSession) => {
+    setSessions(prev => [newSession, ...prev])
+    loadData() // Reload to ensure we have fresh data
   }
 
   const handleMarkReviewed = async (sessionId) => {
@@ -143,8 +107,6 @@ export default function OnboardingDashboard() {
     return `${base}/#/onboarding/${token}`
   }
 
-  const signedContracts = contracts.filter(c => c.status === 'signed')
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
@@ -169,16 +131,10 @@ export default function OnboardingDashboard() {
           </div>
           <div className="flex gap-2">
             <button 
-              onClick={() => setShowContractModal(true)}
-              className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2"
-            >
-              📄 From Contract
-            </button>
-            <button 
-              onClick={() => setShowCreateModal(true)}
+              onClick={() => setShowWizard(true)}
               className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2"
             >
-              ➕ New Session
+              ➕ New Onboarding Session
             </button>
           </div>
         </div>
@@ -232,7 +188,7 @@ export default function OnboardingDashboard() {
             <div className="text-4xl mb-4">📋</div>
             <p className="text-gray-400">No onboarding sessions found</p>
             <button 
-              onClick={() => setShowCreateModal(true)}
+              onClick={() => setShowWizard(true)}
               className="mt-4 bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg text-sm"
             >
               Create First Session
@@ -375,146 +331,12 @@ export default function OnboardingDashboard() {
         </div>
       )}
 
-      {/* Create Session Modal */}
-      {showCreateModal && (
-        <div 
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => setShowCreateModal(false)}
-        >
-          <div
-            className="bg-gray-800 rounded-2xl max-w-md w-full border border-gray-700"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-6 border-b border-gray-700">
-              <h2 className="text-lg font-bold">Create Onboarding Session</h2>
-            </div>
-            <form onSubmit={handleCreateSession} className="p-6">
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1">Organization Name *</label>
-                  <input
-                    required
-                    value={newSession.org_name}
-                    onChange={(e) => setNewSession({ ...newSession, org_name: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:border-orange-500 focus:outline-none"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-1">Contact Name</label>
-                    <input
-                      value={newSession.contact_name}
-                      onChange={(e) => setNewSession({ ...newSession, contact_name: e.target.value })}
-                      className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:border-orange-500 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-1">Contact Email</label>
-                    <input
-                      type="email"
-                      value={newSession.contact_email}
-                      onChange={(e) => setNewSession({ ...newSession, contact_email: e.target.value })}
-                      className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:border-orange-500 focus:outline-none"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1">Event Name</label>
-                  <input
-                    value={newSession.event_name}
-                    onChange={(e) => setNewSession({ ...newSession, event_name: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:border-orange-500 focus:outline-none"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-1">Event Date</label>
-                    <input
-                      type="date"
-                      value={newSession.event_date}
-                      onChange={(e) => setNewSession({ ...newSession, event_date: e.target.value })}
-                      className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:border-orange-500 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-1">Location</label>
-                    <input
-                      value={newSession.event_location}
-                      onChange={(e) => setNewSession({ ...newSession, event_location: e.target.value })}
-                      className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:border-orange-500 focus:outline-none"
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="flex gap-3 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="flex-1 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={creating}
-                  className="flex-1 py-2 bg-orange-500 hover:bg-orange-600 rounded-lg disabled:opacity-50"
-                >
-                  {creating ? 'Creating...' : 'Create'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Create From Contract Modal */}
-      {showContractModal && (
-        <div 
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => setShowContractModal(false)}
-        >
-          <div
-            className="bg-gray-800 rounded-2xl max-w-md w-full border border-gray-700"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-6 border-b border-gray-700">
-              <h2 className="text-lg font-bold">Create From Signed Contract</h2>
-            </div>
-            <div className="p-6">
-              {signedContracts.length === 0 ? (
-                <p className="text-gray-400 text-center py-8">No signed contracts available</p>
-              ) : (
-                <div className="space-y-2 max-h-80 overflow-auto">
-                  {signedContracts.map((contract) => {
-                    const hasSession = sessions.some(s => s.contract_id === contract.id)
-                    return (
-                      <button
-                        key={contract.id}
-                        onClick={() => !hasSession && handleCreateFromContract(contract.id)}
-                        disabled={hasSession}
-                        className={`w-full p-4 rounded-xl text-left transition-colors ${
-                          hasSession 
-                            ? 'bg-gray-700/50 cursor-not-allowed opacity-50' 
-                            : 'bg-gray-700 hover:bg-gray-600'
-                        }`}
-                      >
-                        <div className="font-medium">{contract.org_name}</div>
-                        <div className="text-sm text-gray-400">{contract.promoter_name}</div>
-                        {hasSession && <div className="text-xs text-orange-500 mt-1">Session already exists</div>}
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-              <button
-                onClick={() => setShowContractModal(false)}
-                className="w-full mt-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Onboarding Wizard */}
+      {showWizard && (
+        <OnboardingWizard
+          onClose={() => setShowWizard(false)}
+          onComplete={handleWizardComplete}
+        />
       )}
     </div>
   )

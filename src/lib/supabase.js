@@ -257,20 +257,24 @@ export async function getOnboardingSessionByToken(token) {
     .from('onboarding_sessions')
     .select('*')
     .eq('share_token', token)
-    .single()
   
   if (error) throw error
+  if (!data || data.length === 0) {
+    throw new Error('Onboarding session not found. Please check your link or contact Fit Focus Media.')
+  }
+  
+  const session = data[0]
   
   // If first access, update status to in_progress
-  if (data && data.status === 'pending') {
+  if (session && session.status === 'pending') {
     await supabase
       .from('onboarding_sessions')
       .update({ status: 'in_progress' })
-      .eq('id', data.id)
-    data.status = 'in_progress'
+      .eq('share_token', token)
+    session.status = 'in_progress'
   }
   
-  return data
+  return session
 }
 
 export async function createOnboardingSession(sessionData) {
@@ -410,25 +414,38 @@ export async function updateOnboardingByToken(token, updates) {
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq('share_token', token)
     .select()
-    .single()
   
   if (error) throw error
-  return data
+  if (!data || data.length === 0) {
+    throw new Error('Failed to save changes - session not found')
+  }
+  return data[0]
 }
 
-export async function submitOnboardingSession(id) {
+export async function submitOnboardingSession(sessionOrToken) {
+  // Accept either session object (with share_token) or raw token string
+  const token = typeof sessionOrToken === 'string' 
+    ? sessionOrToken 
+    : sessionOrToken?.share_token
+  
+  if (!token) {
+    throw new Error('No share token provided for submission')
+  }
+  
   const { data, error } = await supabase
     .from('onboarding_sessions')
     .update({ 
       status: 'submitted',
       submitted_at: new Date().toISOString()
     })
-    .eq('id', id)
+    .eq('share_token', token)
     .select()
-    .single()
   
   if (error) throw error
-  return data
+  if (!data || data.length === 0) {
+    throw new Error('Session not found or update blocked by permissions')
+  }
+  return data[0]
 }
 
 export async function markOnboardingReviewed(id, reviewedBy, adminNotes) {
@@ -474,10 +491,26 @@ const STORAGE_BUCKET = 'onboarding'
  * Files are synced to Google Drive automatically by background job
  */
 export async function uploadOnboardingFile(sessionId, category, fileType, file) {
-  // Generate unique path: sessionId/category/timestamp_filename
+  // Fetch session to get org name for human-readable folder
+  const { data: session } = await supabase
+    .from('onboarding_sessions')
+    .select('org_name, event_name')
+    .eq('id', sessionId)
+    .single()
+  
+  // Build nested folder structure: OrgName/EventName/category/file
+  // Sanitize for folder name (remove special chars except spaces and hyphens)
+  const sanitize = (str) => str?.replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 50) || ''
+  const orgPart = sanitize(session?.org_name) || sessionId.substring(0, 8)
+  const eventPart = session?.event_name ? sanitize(session.event_name) : null
+  
+  // Generate unique path: OrgName/EventName/category/timestamp_filename
+  // If no event, just: OrgName/category/timestamp_filename
   const timestamp = Date.now()
   const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
-  const storagePath = `${sessionId}/${category}/${timestamp}_${safeName}`
+  const storagePath = eventPart 
+    ? `${orgPart}/${eventPart}/${category}/${timestamp}_${safeName}`
+    : `${orgPart}/${category}/${timestamp}_${safeName}`
   
   // Upload to Supabase Storage
   const { data: uploadData, error: uploadError } = await supabase.storage
@@ -572,4 +605,238 @@ export async function deleteOnboardingFile(fileId) {
     .eq('id', fileId)
   
   if (deleteError) throw deleteError
+}
+
+// ============================================
+// LIVESTREAM FUNCTIONS
+// ============================================
+
+/**
+ * Get all published livestream events
+ */
+export async function getLivestreamEvents() {
+  const { data, error } = await supabase
+    .from('livestream_events')
+    .select('*')
+    .in('status', ['published', 'live', 'ended'])
+    .order('start_time', { ascending: true })
+  
+  if (error) throw error
+  return data
+}
+
+/**
+ * Get a single livestream event by ID
+ */
+export async function getLivestreamEvent(id) {
+  const { data, error } = await supabase
+    .from('livestream_events')
+    .select('*')
+    .eq('id', id)
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+/**
+ * Get all livestream events (admin - includes drafts)
+ */
+export async function getAllLivestreamEvents() {
+  const { data, error } = await supabase
+    .from('livestream_events')
+    .select('*')
+    .order('created_at', { ascending: false })
+  
+  if (error) throw error
+  return data
+}
+
+/**
+ * Create a livestream event
+ */
+export async function createLivestreamEvent(eventData) {
+  const { data, error } = await supabase
+    .from('livestream_events')
+    .insert([eventData])
+    .select()
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+/**
+ * Update a livestream event
+ */
+export async function updateLivestreamEvent(id, updates) {
+  const { data, error } = await supabase
+    .from('livestream_events')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+/**
+ * Delete a livestream event
+ */
+export async function deleteLivestreamEvent(id) {
+  const { error } = await supabase
+    .from('livestream_events')
+    .delete()
+    .eq('id', id)
+  
+  if (error) throw error
+}
+
+/**
+ * Get livestream settings
+ */
+export async function getLivestreamSettings() {
+  const { data, error } = await supabase
+    .from('livestream_settings')
+    .select('*')
+    .eq('id', 1)
+    .single()
+  
+  if (error && error.code !== 'PGRST116') throw error
+  return data || { demo_mode: false }
+}
+
+/**
+ * Update livestream settings
+ */
+export async function updateLivestreamSettings(settings) {
+  const { data, error } = await supabase
+    .from('livestream_settings')
+    .upsert({ id: 1, ...settings, updated_at: new Date().toISOString() })
+    .select()
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+/**
+ * Create a livestream order
+ */
+export async function createLivestreamOrder(orderData) {
+  const { data, error } = await supabase
+    .from('livestream_orders')
+    .insert([orderData])
+    .select()
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+/**
+ * Get order by email and event
+ */
+export async function getLivestreamOrderByEmail(eventId, email) {
+  const { data, error } = await supabase
+    .from('livestream_orders')
+    .select('*')
+    .eq('event_id', eventId)
+    .eq('email', email.toLowerCase())
+    .eq('status', 'completed')
+    .single()
+  
+  if (error && error.code !== 'PGRST116') throw error
+  return data
+}
+
+/**
+ * Get all orders for an event
+ */
+export async function getLivestreamOrders(eventId) {
+  let query = supabase
+    .from('livestream_orders')
+    .select('*, event:livestream_events(*)')
+    .order('created_at', { ascending: false })
+  
+  if (eventId) {
+    query = query.eq('event_id', eventId)
+  }
+  
+  const { data, error } = await query
+  if (error) throw error
+  return data
+}
+
+/**
+ * Update order status
+ */
+export async function updateLivestreamOrder(id, updates) {
+  const { data, error } = await supabase
+    .from('livestream_orders')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+/**
+ * Create viewing session
+ */
+export async function createLivestreamSession(sessionData) {
+  const { data, error } = await supabase
+    .from('livestream_sessions')
+    .insert([sessionData])
+    .select()
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+/**
+ * Get active session by token
+ */
+export async function getLivestreamSession(token) {
+  const { data, error } = await supabase
+    .from('livestream_sessions')
+    .select('*')
+    .eq('token', token)
+    .eq('active', true)
+    .single()
+  
+  if (error && error.code !== 'PGRST116') throw error
+  return data
+}
+
+/**
+ * Update session last seen
+ */
+export async function updateSessionHeartbeat(token) {
+  const { data, error } = await supabase
+    .from('livestream_sessions')
+    .update({ last_seen: new Date().toISOString() })
+    .eq('token', token)
+    .eq('active', true)
+    .select()
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+/**
+ * Invalidate session
+ */
+export async function invalidateLivestreamSession(token) {
+  const { error } = await supabase
+    .from('livestream_sessions')
+    .update({ active: false, invalidated_at: new Date().toISOString() })
+    .eq('token', token)
+  
+  if (error) throw error
 }
