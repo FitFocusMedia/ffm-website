@@ -11,6 +11,7 @@ import {
   getOnboardingSessions,
   getContracts
 } from '../../lib/supabase'
+import GeoBlockingMap from '../../components/GeoBlockingMap'
 
 export default function LivestreamAdmin() {
   const [events, setEvents] = useState([])
@@ -317,6 +318,8 @@ function EventModal({ event, onClose, onSave }) {
     status: event?.status || 'draft',
     mux_playback_id: event?.mux_playback_id || '',
     geo_blocking_enabled: event?.geo_blocking_enabled || false,
+    geo_lat: event?.geo_lat || null,
+    geo_lng: event?.geo_lng || null,
     geo_radius_km: event?.geo_radius_km || 50,
     geo_venue_address: event?.geo_venue_address || ''
   })
@@ -579,6 +582,48 @@ function EventModal({ event, onClose, onSave }) {
                 className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
               />
             </div>
+          </div>
+
+          {/* Geo-Blocking Section */}
+          <div className="pt-6 border-t border-dark-800">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-white">Geo-Blocking</h3>
+                <p className="text-sm text-gray-500">Block online streaming near the venue</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.geo_blocking_enabled}
+                  onChange={(e) => setFormData({ ...formData, geo_blocking_enabled: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-dark-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-red-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-500"></div>
+                <span className="ml-3 text-sm font-medium text-gray-400">
+                  {formData.geo_blocking_enabled ? 'Enabled' : 'Disabled'}
+                </span>
+              </label>
+            </div>
+
+            {formData.geo_blocking_enabled && (
+              <GeoBlockingMap
+                latitude={formData.geo_lat}
+                longitude={formData.geo_lng}
+                radius={formData.geo_radius_km}
+                address={formData.geo_venue_address || formData.venue}
+                onLocationChange={({ latitude, longitude, address }) => {
+                  setFormData({
+                    ...formData,
+                    geo_lat: latitude,
+                    geo_lng: longitude,
+                    geo_venue_address: address || formData.venue
+                  })
+                }}
+                onRadiusChange={(radius) => {
+                  setFormData({ ...formData, geo_radius_km: radius })
+                }}
+              />
+            )}
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-dark-800">
