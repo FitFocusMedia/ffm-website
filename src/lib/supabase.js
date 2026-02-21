@@ -606,3 +606,237 @@ export async function deleteOnboardingFile(fileId) {
   
   if (deleteError) throw deleteError
 }
+
+// ============================================
+// LIVESTREAM FUNCTIONS
+// ============================================
+
+/**
+ * Get all published livestream events
+ */
+export async function getLivestreamEvents() {
+  const { data, error } = await supabase
+    .from('livestream_events')
+    .select('*')
+    .in('status', ['published', 'live', 'ended'])
+    .order('start_time', { ascending: true })
+  
+  if (error) throw error
+  return data
+}
+
+/**
+ * Get a single livestream event by ID
+ */
+export async function getLivestreamEvent(id) {
+  const { data, error } = await supabase
+    .from('livestream_events')
+    .select('*')
+    .eq('id', id)
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+/**
+ * Get all livestream events (admin - includes drafts)
+ */
+export async function getAllLivestreamEvents() {
+  const { data, error } = await supabase
+    .from('livestream_events')
+    .select('*')
+    .order('created_at', { ascending: false })
+  
+  if (error) throw error
+  return data
+}
+
+/**
+ * Create a livestream event
+ */
+export async function createLivestreamEvent(eventData) {
+  const { data, error } = await supabase
+    .from('livestream_events')
+    .insert([eventData])
+    .select()
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+/**
+ * Update a livestream event
+ */
+export async function updateLivestreamEvent(id, updates) {
+  const { data, error } = await supabase
+    .from('livestream_events')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+/**
+ * Delete a livestream event
+ */
+export async function deleteLivestreamEvent(id) {
+  const { error } = await supabase
+    .from('livestream_events')
+    .delete()
+    .eq('id', id)
+  
+  if (error) throw error
+}
+
+/**
+ * Get livestream settings
+ */
+export async function getLivestreamSettings() {
+  const { data, error } = await supabase
+    .from('livestream_settings')
+    .select('*')
+    .eq('id', 1)
+    .single()
+  
+  if (error && error.code !== 'PGRST116') throw error
+  return data || { demo_mode: false }
+}
+
+/**
+ * Update livestream settings
+ */
+export async function updateLivestreamSettings(settings) {
+  const { data, error } = await supabase
+    .from('livestream_settings')
+    .upsert({ id: 1, ...settings, updated_at: new Date().toISOString() })
+    .select()
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+/**
+ * Create a livestream order
+ */
+export async function createLivestreamOrder(orderData) {
+  const { data, error } = await supabase
+    .from('livestream_orders')
+    .insert([orderData])
+    .select()
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+/**
+ * Get order by email and event
+ */
+export async function getLivestreamOrderByEmail(eventId, email) {
+  const { data, error } = await supabase
+    .from('livestream_orders')
+    .select('*')
+    .eq('event_id', eventId)
+    .eq('email', email.toLowerCase())
+    .eq('status', 'completed')
+    .single()
+  
+  if (error && error.code !== 'PGRST116') throw error
+  return data
+}
+
+/**
+ * Get all orders for an event
+ */
+export async function getLivestreamOrders(eventId) {
+  let query = supabase
+    .from('livestream_orders')
+    .select('*, event:livestream_events(*)')
+    .order('created_at', { ascending: false })
+  
+  if (eventId) {
+    query = query.eq('event_id', eventId)
+  }
+  
+  const { data, error } = await query
+  if (error) throw error
+  return data
+}
+
+/**
+ * Update order status
+ */
+export async function updateLivestreamOrder(id, updates) {
+  const { data, error } = await supabase
+    .from('livestream_orders')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+/**
+ * Create viewing session
+ */
+export async function createLivestreamSession(sessionData) {
+  const { data, error } = await supabase
+    .from('livestream_sessions')
+    .insert([sessionData])
+    .select()
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+/**
+ * Get active session by token
+ */
+export async function getLivestreamSession(token) {
+  const { data, error } = await supabase
+    .from('livestream_sessions')
+    .select('*')
+    .eq('token', token)
+    .eq('active', true)
+    .single()
+  
+  if (error && error.code !== 'PGRST116') throw error
+  return data
+}
+
+/**
+ * Update session last seen
+ */
+export async function updateSessionHeartbeat(token) {
+  const { data, error } = await supabase
+    .from('livestream_sessions')
+    .update({ last_seen: new Date().toISOString() })
+    .eq('token', token)
+    .eq('active', true)
+    .select()
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+/**
+ * Invalidate session
+ */
+export async function invalidateLivestreamSession(token) {
+  const { error } = await supabase
+    .from('livestream_sessions')
+    .update({ active: false, invalidated_at: new Date().toISOString() })
+    .eq('token', token)
+  
+  if (error) throw error
+}

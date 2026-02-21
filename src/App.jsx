@@ -44,6 +44,12 @@ import ContentAdmin from './pages/portal/ContentAdmin'
 import OrderManagement from './pages/portal/OrderManagement'
 import PricingCalculator from './pages/portal/PricingCalculator'
 import CrewManagement from './pages/portal/CrewManagement'
+import LivestreamAdmin from './pages/portal/LivestreamAdmin'
+
+// Livestream imports
+import EventsPage from './pages/livestream/EventsPage'
+import EventPage from './pages/livestream/EventPage'
+import WatchPage from './pages/livestream/WatchPage'
 
 function ScrollToTop() {
   const { pathname } = useLocation()
@@ -80,6 +86,13 @@ function App() {
         <Route path="/order" element={<PublicLayout><OrderPage /></PublicLayout>} />
         <Route path="/content" element={<PublicLayout><ContentLandingPage /></PublicLayout>} />
         <Route path="/order/:orgSlug" element={<PublicLayout><OrgOrderPage /></PublicLayout>} />
+
+        {/* Livestream Routes - Public */}
+        <Route path="/live" element={<PublicLayout><EventsPage /></PublicLayout>} />
+        <Route path="/live/:eventId" element={<PublicLayout><EventPage /></PublicLayout>} />
+        
+        {/* Watch Page - NO Navbar/Footer for fullscreen experience */}
+        <Route path="/watch/:eventId" element={<WatchPage />} />
 
         {/* Public Contract View - NO AUTH REQUIRED, NO Navbar/Footer */}
         <Route path="/contract/:shareToken" element={<ContractPublicView />} />
@@ -257,6 +270,18 @@ function App() {
             <ProtectedRoute>
               <PortalLayout>
                 <CrewManagement />
+              </PortalLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Livestream Admin */}
+        <Route
+          path="/portal/livestream"
+          element={
+            <ProtectedRoute>
+              <PortalLayout>
+                <LivestreamAdmin />
               </PortalLayout>
             </ProtectedRoute>
           }
