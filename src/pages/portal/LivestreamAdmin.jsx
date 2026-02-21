@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit, Trash2, Eye, DollarSign, Users, Calendar, ToggleLeft, ToggleRight } from 'lucide-react'
+import { Plus, Edit, Trash2, Eye, DollarSign, Users, Calendar, ToggleLeft, ToggleRight, Download } from 'lucide-react'
 import { 
   getAllLivestreamEvents, 
   createLivestreamEvent, 
@@ -7,7 +7,9 @@ import {
   deleteLivestreamEvent,
   getLivestreamOrders,
   getLivestreamSettings,
-  updateLivestreamSettings
+  updateLivestreamSettings,
+  getOnboardingSessions,
+  getContracts
 } from '../../lib/supabase'
 
 export default function LivestreamAdmin() {
@@ -319,6 +321,100 @@ function EventModal({ event, onClose, onSave }) {
     geo_venue_address: event?.geo_venue_address || ''
   })
   const [saving, setSaving] = useState(false)
+  const [existingEvents, setExistingEvents] = useState([])
+  const [loadingEvents, setLoadingEvents] = useState(true)
+
+  // Load existing events from onboarding and contracts
+  useEffect(() => {
+    const loadExistingEvents = async () => {
+      try {
+        const [onboardingSessions, contracts] = await Promise.all([
+          getOnboardingSessions(),
+          getContracts()
+        ])
+        
+        const events = []
+        
+        // Add onboarding sessions
+        if (onboardingSessions) {
+          onboardingSessions.forEach(session => {
+            if (session.event_name) {
+              events.push({
+                id: `onboarding-${session.id}`,
+                source: 'Onboarding',
+                title: session.event_name,
+                organization: session.org_name,
+                venue: session.event_location || '',
+                date: session.event_date,
+                contact: session.contact_name
+              })
+            }
+          })
+        }
+        
+        // Add contracts
+        if (contracts) {
+          contracts.forEach(contract => {
+            const data = contract.contract_data || {}
+            if (data.event_name) {
+              events.push({
+                id: `contract-${contract.id}`,
+                source: 'Contract',
+                title: data.event_name,
+                organization: contract.org_name,
+                venue: data.event_location || '',
+                date: data.event_date,
+                contact: contract.promoter_name
+              })
+            }
+          })
+        }
+        
+        setExistingEvents(events)
+      } catch (err) {
+        console.error('Failed to load existing events:', err)
+      } finally {
+        setLoadingEvents(false)
+      }
+    }
+    
+    if (!event) {
+      loadExistingEvents()
+    } else {
+      setLoadingEvents(false)
+    }
+  }, [event])
+
+  const handleImportEvent = (selectedId) => {
+    if (!selectedId) return
+    
+    const selected = existingEvents.find(e => e.id === selectedId)
+    if (!selected) return
+    
+    // Format date for datetime-local input
+    let startTime = ''
+    let endTime = ''
+    if (selected.date) {
+      const date = new Date(selected.date)
+      if (!isNaN(date.getTime())) {
+        // Set default start time to 6pm
+        date.setHours(18, 0, 0)
+        startTime = date.toISOString().slice(0, 16)
+        // Set end time to 4 hours later
+        date.setHours(22, 0, 0)
+        endTime = date.toISOString().slice(0, 16)
+      }
+    }
+    
+    setFormData(prev => ({
+      ...prev,
+      title: selected.title || prev.title,
+      organization: selected.organization || prev.organization,
+      venue: selected.venue || prev.venue,
+      start_time: startTime || prev.start_time,
+      end_time: endTime || prev.end_time
+    }))
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -337,6 +433,28 @@ function EventModal({ event, onClose, onSave }) {
         </div>
         
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {/* Import from existing event */}
+          {!event && existingEvents.length > 0 && (
+            <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+              <label className="block text-sm font-medium text-blue-400 mb-2 flex items-center gap-2">
+                <Download className="w-4 h-4" />
+                Import from existing event
+              </label>
+              <select
+                onChange={(e) => handleImportEvent(e.target.value)}
+                className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
+                defaultValue=""
+              >
+                <option value="">— Select to auto-fill —</option>
+                {existingEvents.map(ev => (
+                  <option key={ev.id} value={ev.id}>
+                    [{ev.source}] {ev.title} — {ev.organization}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div className="grid md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-400 mb-1">Title *</label>
