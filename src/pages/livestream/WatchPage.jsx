@@ -332,9 +332,10 @@ export default function WatchPage() {
   // Has access - show player
   const eventDate = new Date(event.start_time)
   const isLive = event.is_live || event.status === 'live'
-  const eventNotStarted = !isLive && new Date() < eventDate
+  const previewMode = searchParams.get('preview') === 'player'
+  const eventNotStarted = !isLive && new Date() < eventDate && !previewMode
 
-  // Waiting Room - event hasn't started yet
+  // Waiting Room - event hasn't started yet (skip if preview=player)
   if (eventNotStarted) {
     return (
       <div className="min-h-screen bg-dark-950">
@@ -413,6 +414,12 @@ export default function WatchPage() {
 
   return (
     <div className="min-h-screen bg-dark-950">
+      {/* Preview Mode Banner */}
+      {previewMode && (
+        <div className="bg-yellow-500 text-black px-4 py-2 text-center text-sm font-medium">
+          🎨 Preview Mode — This is how the player page will look. No stream is playing.
+        </div>
+      )}
       {/* Player */}
       <div className="w-full bg-black">
         <div className="max-w-6xl mx-auto">
