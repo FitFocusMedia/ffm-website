@@ -392,9 +392,18 @@ export default function EventPage() {
     )
   }
 
-  const eventDate = new Date(event.start_time)
+  // Parse datetime as AEST (UTC+10) - the admin saves local Brisbane time
+  const parseAsAEST = (dateStr) => {
+    if (!dateStr) return new Date()
+    // If already has timezone, parse directly
+    if (dateStr.includes('+') || dateStr.includes('Z')) return new Date(dateStr)
+    // Otherwise append AEST offset
+    return new Date(dateStr + '+10:00')
+  }
+  
+  const eventDate = parseAsAEST(event.start_time)
   const isLive = event.is_live || event.status === 'live'
-  const isPast = event.status === 'ended' || new Date(event.end_time) < new Date()
+  const isPast = event.status === 'ended' || parseAsAEST(event.end_time) < new Date()
 
   return (
     <>

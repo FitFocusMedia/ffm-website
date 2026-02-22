@@ -6,10 +6,17 @@ import { useState, useEffect } from 'react'
  * Used on event pages to create urgency and anticipation
  */
 export default function CountdownTimer({ targetDate, onComplete, className = '' }) {
+  // Parse datetime as AEST (UTC+10) if no timezone specified
+  const parseAsAEST = (dateStr) => {
+    if (!dateStr) return new Date()
+    if (dateStr.includes('+') || dateStr.includes('Z')) return new Date(dateStr)
+    return new Date(dateStr + '+10:00')
+  }
+
   const [timeLeft, setTimeLeft] = useState(calculateTimeLeft())
 
   function calculateTimeLeft() {
-    const difference = new Date(targetDate) - new Date()
+    const difference = parseAsAEST(targetDate) - new Date()
     
     if (difference <= 0) {
       return null // Event has started/passed
