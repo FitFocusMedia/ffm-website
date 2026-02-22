@@ -953,20 +953,65 @@ export async function updateUserProfile(profileId, updates) {
 /**
  * Link auth user to profile (after magic link login)
  */
-export async function linkAuthToProfile(authId, email) {
-  const { data, error } = await supabase
+/**
+ * Get or create user profile, and link to Supabase Auth
+ * Called on every sign-in to ensure profile exists and is linked
+ */
+export async function syncUserProfile(authId, email) {
+  const normalizedEmail = email.toLowerCase()
+  
+  // First, try to find existing profile
+  const { data: existing } = await supabase
     .from('user_profiles')
-    .update({ 
-      auth_id: authId, 
-      last_login_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+    .select('*')
+    .eq('email', normalizedEmail)
+    .single()
+  
+  if (existing) {
+    // Update with auth link and last login
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .update({ 
+        auth_id: authId, 
+        last_login_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', existing.id)
+      .select()
+      .single()
+    
+    if (error) throw error
+    return data
+  }
+  
+  // Create new profile
+  const { data: newProfile, error: createError } = await supabase
+    .from('user_profiles')
+    .insert({
+      email: normalizedEmail,
+      auth_id: authId,
+      last_login_at: new Date().toISOString()
     })
-    .eq('email', email.toLowerCase())
     .select()
     .single()
   
-  if (error) throw error
-  return data
+  if (createError) throw createError
+  
+  // Link any existing orders to this new profile
+  await supabase
+    .from('livestream_orders')
+    .update({ user_id: newProfile.id })
+    .eq('email', normalizedEmail)
+    .is('user_id', null)
+  
+  return newProfile
+}
+
+/**
+ * Legacy: Link auth to existing profile (use syncUserProfile instead)
+ */
+export async function linkAuthToProfile(authId, email) {
+  return syncUserProfile(authId, email)
 }
 
 /**

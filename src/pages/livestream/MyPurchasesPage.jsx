@@ -7,7 +7,8 @@ import {
   signOut, 
   sendMagicLink,
   getUserPurchaseHistory,
-  onAuthStateChange
+  onAuthStateChange,
+  syncUserProfile
 } from '../../lib/supabase'
 
 export default function MyPurchasesPage() {
@@ -26,9 +27,15 @@ export default function MyPurchasesPage() {
     checkAuth()
     
     // Listen for auth changes (magic link callback)
-    const { data: { subscription } } = onAuthStateChange((event, session) => {
+    const { data: { subscription } } = onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
         setUser(session.user)
+        // Sync user profile (creates if needed, links auth, links past orders)
+        try {
+          await syncUserProfile(session.user.id, session.user.email)
+        } catch (err) {
+          console.error('Failed to sync profile:', err)
+        }
         loadPurchases(session.user.email)
       } else if (event === 'SIGNED_OUT') {
         setUser(null)
@@ -44,6 +51,12 @@ export default function MyPurchasesPage() {
       const session = await getSession()
       if (session?.user) {
         setUser(session.user)
+        // Ensure profile is synced
+        try {
+          await syncUserProfile(session.user.id, session.user.email)
+        } catch (err) {
+          console.error('Failed to sync profile:', err)
+        }
         await loadPurchases(session.user.email)
       }
     } catch (err) {
