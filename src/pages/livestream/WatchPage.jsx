@@ -37,13 +37,15 @@ export default function WatchPage() {
     }
   }, [eventId])
 
-  // Check geo-blocking after event loads
+  // Check geo-blocking and bypass token after event loads
   useEffect(() => {
     if (event) {
-      if (event.geo_blocking_enabled) {
+      const bypassToken = searchParams.get('bypass')
+      // Always call server check if there's a bypass token OR geo-blocking is enabled
+      if (bypassToken || event.geo_blocking_enabled) {
         checkGeoBlocking()
       } else {
-        setCheckingAccess(false) // No geo blocking, done checking
+        setCheckingAccess(false) // No geo blocking and no bypass, done checking
       }
     }
   }, [event])

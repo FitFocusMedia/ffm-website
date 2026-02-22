@@ -1018,8 +1018,8 @@ function EventModal({ event, onClose, onSave }) {
               />
             )}
 
-            {/* Crew Bypass Access - only show when geo-blocking is enabled */}
-            {formData.geo_blocking_enabled && event?.id && (
+            {/* Crew Bypass Access - for admin/crew monitoring */}
+            {event?.id && (
               <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
                 <div className="flex items-center gap-2 mb-3">
                   <Shield className="w-5 h-5 text-blue-500" />
