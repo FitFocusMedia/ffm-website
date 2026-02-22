@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
-import { Calendar, MapPin, AlertCircle, RefreshCw, Clock, Bell } from 'lucide-react'
-import MuxPlayer from '@mux/mux-player-react'
+import { Calendar, MapPin, AlertCircle, RefreshCw, Clock, Bell, Play, Sparkles, Lock, Mail, Users } from 'lucide-react'
 import { 
   getLivestreamEvent, 
   getLivestreamOrderByEmail,
@@ -9,7 +8,9 @@ import {
   updateSessionHeartbeat 
 } from '../../lib/supabase'
 import { trackPurchaseComplete } from '../../lib/analytics'
-import CountdownTimer from '../../components/CountdownTimer'
+import PremiumCountdown from '../../components/PremiumCountdown'
+import PremiumPlayer from '../../components/PremiumPlayer'
+import LiveIndicator, { SocialProofBanner } from '../../components/LiveIndicator'
 import ViewerCount from '../../components/ViewerCount'
 
 export default function WatchPage() {
@@ -27,6 +28,7 @@ export default function WatchPage() {
   const [geoInfo, setGeoInfo] = useState(null)
   const [checkingAccess, setCheckingAccess] = useState(true)
   const [startingSoon, setStartingSoon] = useState(false)
+  const [viewerCount, setViewerCount] = useState(0)
   const heartbeatRef = useRef(null)
   const startingSoonRef = useRef(null)
 
@@ -43,18 +45,16 @@ export default function WatchPage() {
   useEffect(() => {
     if (event) {
       const bypassToken = searchParams.get('bypass')
-      // Always call server check if there's a bypass token OR geo-blocking is enabled
       if (bypassToken || event.geo_blocking_enabled) {
         checkGeoBlocking()
       } else {
-        setCheckingAccess(false) // No geo blocking and no bypass, done checking
+        setCheckingAccess(false)
       }
     }
   }, [event])
 
   const checkGeoBlocking = async () => {
     try {
-      // Check for crew bypass token in URL
       const bypassToken = searchParams.get('bypass')
       
       const response = await fetch('https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/geo-check', {
@@ -70,11 +70,10 @@ export default function WatchPage() {
       })
       const data = await response.json()
       
-      // If bypass was used, grant full access (skip purchase check too)
       if (data.bypass) {
         setGeoBlocked(false)
         setGeoInfo({ ...data, crew_bypass: true })
-        setHasAccess(true) // Crew bypass grants viewing access
+        setHasAccess(true)
         setEmail('crew@bypass')
       } else {
         setGeoBlocked(data.blocked)
@@ -82,7 +81,7 @@ export default function WatchPage() {
       }
     } catch (err) {
       console.error('Geo check failed:', err)
-      setGeoBlocked(false) // Allow access if geo check fails
+      setGeoBlocked(false)
     } finally {
       setCheckingAccess(false)
     }
@@ -123,7 +122,6 @@ export default function WatchPage() {
   useEffect(() => {
     if (!event) return
     
-    // Parse the event start time
     const parseTime = (dateStr) => {
       if (!dateStr) return new Date()
       const stripped = dateStr.replace(/[Z+].*$/, '').replace(/\.000$/, '')
@@ -138,13 +136,12 @@ export default function WatchPage() {
     if (eventTimeHasPassed && !isLive && !previewMode) {
       setStartingSoon(true)
       
-      // Poll every 15 seconds to check if event went live
       startingSoonRef.current = setInterval(async () => {
         try {
           const freshEvent = await getLivestreamEvent(eventId)
           if (freshEvent?.is_live || freshEvent?.status === 'live') {
             clearInterval(startingSoonRef.current)
-            setEvent(freshEvent) // Update event state, React will re-render
+            setEvent(freshEvent)
             setStartingSoon(false)
           }
         } catch (err) {
@@ -184,10 +181,8 @@ export default function WatchPage() {
     setSessionEnded(false)
 
     try {
-      // Check for Stripe session_id in URL (redirect from checkout)
       const stripeSessionId = searchParams.get('session_id')
       
-      // Verify payment via Edge Function
       const verifyResponse = await fetch('https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/verify-payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -200,7 +195,6 @@ export default function WatchPage() {
       const verifyData = await verifyResponse.json()
       
       if (!verifyData.verified) {
-        // Fallback to direct order check
         const order = await getLivestreamOrderByEmail(eventId, emailToVerify)
         if (!order) {
           setError('No purchase found for this email. Please check your email or purchase access.')
@@ -209,7 +203,6 @@ export default function WatchPage() {
         }
       }
 
-      // Create viewing session
       const session = await createLivestreamSession({
         event_id: eventId,
         order_id: order.id,
@@ -220,12 +213,10 @@ export default function WatchPage() {
       setHasAccess(true)
       setEmail(emailToVerify)
       
-      // Track purchase complete if this is from Stripe redirect (new purchase)
       if (stripeSessionId) {
         trackPurchaseComplete(eventId, emailToVerify)
       }
       
-      // Store in localStorage for page refresh
       localStorage.setItem(`livestream_session_${eventId}`, session.token)
       localStorage.setItem(`livestream_email_${eventId}`, emailToVerify)
     } catch (err) {
@@ -237,18 +228,29 @@ export default function WatchPage() {
     }
   }
 
+  // Loading State
   if (loading) {
     return (
       <div className="min-h-screen bg-dark-950 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-500"></div>
+        <div className="text-center">
+          <div className="relative">
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-dark-700 border-t-red-500 mx-auto"></div>
+            <Play className="absolute inset-0 m-auto w-6 h-6 text-red-500" />
+          </div>
+          <p className="text-gray-400 mt-4">Loading stream...</p>
+        </div>
       </div>
     )
   }
 
   if (error && !event) {
     return (
-      <div className="min-h-screen bg-dark-950 flex items-center justify-center">
-        <p className="text-red-500">{error}</p>
+      <div className="min-h-screen bg-dark-950 flex items-center justify-center p-4">
+        <div className="text-center">
+          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">Event Not Found</h2>
+          <p className="text-gray-400">{error}</p>
+        </div>
       </div>
     )
   }
@@ -257,32 +259,41 @@ export default function WatchPage() {
   if (geoBlocked) {
     return (
       <div className="min-h-screen bg-dark-950 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-dark-900 rounded-xl p-8 text-center">
-          <MapPin className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-white mb-2">Location Restricted</h2>
-          <p className="text-gray-400 mb-4">
-            Online streaming is not available within {event.geo_radius_km || 50}km of the venue.
-          </p>
-          {geoInfo?.user_location && (
-            <p className="text-gray-500 text-sm mb-4">
-              Your location: {geoInfo.user_location.city}, {geoInfo.user_location.country}<br/>
-              Distance from venue: {geoInfo.distance_km}km
+        <div className="max-w-md w-full relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 blur-2xl rounded-3xl"></div>
+          
+          <div className="relative bg-dark-900/95 backdrop-blur-xl rounded-2xl border border-dark-700/50 p-8 text-center">
+            <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-yellow-500/20 to-orange-500/20 flex items-center justify-center">
+              <MapPin className="w-10 h-10 text-yellow-500" />
+            </div>
+            
+            <h2 className="text-2xl font-bold text-white mb-2">Location Restricted</h2>
+            <p className="text-gray-400 mb-4">
+              Online streaming is not available within {event.geo_radius_km || 50}km of the venue.
             </p>
-          )}
-          <p className="text-gray-400 mb-6">
-            This event is available to watch in person at:
-          </p>
-          <p className="text-white font-semibold mb-6">{event.venue}</p>
-          {event.ticket_url && (
-            <a
-              href={event.ticket_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-block px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-lg transition-colors"
-            >
-              Get Tickets
-            </a>
-          )}
+            {geoInfo?.user_location && (
+              <p className="text-gray-500 text-sm mb-4">
+                Distance from venue: <span className="text-white font-semibold">{geoInfo.distance_km}km</span>
+              </p>
+            )}
+            
+            <div className="bg-dark-800/50 rounded-xl p-4 mb-6 border border-dark-700/50">
+              <p className="text-gray-400 text-sm mb-2">Watch live in person at:</p>
+              <p className="text-white font-semibold">{event.venue}</p>
+            </div>
+            
+            {event.ticket_url && (
+              <a
+                href={event.ticket_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold rounded-xl transition-all duration-300 shadow-lg shadow-red-500/25"
+              >
+                <Play className="w-5 h-5" />
+                Get Tickets
+              </a>
+            )}
+          </div>
         </div>
       </div>
     )
@@ -292,19 +303,27 @@ export default function WatchPage() {
   if (sessionEnded) {
     return (
       <div className="min-h-screen bg-dark-950 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-dark-900 rounded-xl p-8 text-center">
-          <AlertCircle className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-white mb-2">Session Ended</h2>
-          <p className="text-gray-400 mb-6">
-            This stream is now playing on another device. Only one active viewing session is allowed per purchase.
-          </p>
-          <button
-            onClick={() => verifyAccess(email)}
-            className="px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-2 mx-auto"
-          >
-            <RefreshCw className="w-5 h-5" />
-            Watch Here Instead
-          </button>
+        <div className="max-w-md w-full relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 blur-2xl rounded-3xl"></div>
+          
+          <div className="relative bg-dark-900/95 backdrop-blur-xl rounded-2xl border border-dark-700/50 p-8 text-center">
+            <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-yellow-500/20 to-orange-500/20 flex items-center justify-center">
+              <AlertCircle className="w-10 h-10 text-yellow-500" />
+            </div>
+            
+            <h2 className="text-2xl font-bold text-white mb-2">Session Ended</h2>
+            <p className="text-gray-400 mb-6">
+              This stream is now playing on another device. Only one active viewing session is allowed per purchase.
+            </p>
+            
+            <button
+              onClick={() => verifyAccess(email)}
+              className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold rounded-xl transition-all duration-300 shadow-lg shadow-red-500/25"
+            >
+              <RefreshCw className="w-5 h-5" />
+              Watch Here Instead
+            </button>
+          </div>
         </div>
       </div>
     )
@@ -315,58 +334,97 @@ export default function WatchPage() {
     return (
       <div className="min-h-screen bg-dark-950 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-500 mx-auto mb-4"></div>
-          <p className="text-gray-400">Checking access...</p>
+          <div className="relative">
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-dark-700 border-t-red-500 mx-auto"></div>
+            <Lock className="absolute inset-0 m-auto w-6 h-6 text-red-500" />
+          </div>
+          <p className="text-gray-400 mt-4">Checking access...</p>
         </div>
       </div>
     )
   }
 
-  // Need to verify access
+  // Need to verify access - Premium Login Form
   if (!hasAccess) {
     return (
       <div className="min-h-screen bg-dark-950 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-dark-900 rounded-xl p-8">
-          <h2 className="text-2xl font-bold text-white mb-2 text-center">{event.title}</h2>
-          <p className="text-gray-400 text-center mb-6">{event.organization}</p>
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">
-                Enter Your Email
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="your@email.com"
-                className="w-full px-4 py-3 bg-dark-800 border border-dark-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-red-500"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Use the email address from your purchase
-              </p>
-            </div>
-
-            {error && (
-              <p className="text-red-500 text-sm">{error}</p>
+        <div className="max-w-md w-full relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-red-500/10 to-orange-500/10 blur-2xl rounded-3xl"></div>
+          
+          <div className="relative bg-dark-900/95 backdrop-blur-xl rounded-2xl border border-dark-700/50 overflow-hidden">
+            {/* Header with thumbnail */}
+            {event.thumbnail_url && (
+              <div className="relative h-32 overflow-hidden">
+                <img 
+                  src={event.thumbnail_url} 
+                  alt={event.title}
+                  className="w-full h-full object-cover opacity-50"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-dark-900 to-transparent"></div>
+              </div>
             )}
+            
+            <div className="p-8">
+              <div className="text-center mb-6">
+                <h2 className="text-2xl font-bold text-white mb-1">{event.title}</h2>
+                <p className="text-gray-400">{event.organization}</p>
+              </div>
 
-            <button
-              onClick={() => verifyAccess()}
-              disabled={verifying || !email}
-              className="w-full py-3 bg-red-500 hover:bg-red-600 disabled:bg-dark-700 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-colors"
-            >
-              {verifying ? 'Verifying...' : 'Watch Stream'}
-            </button>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    Enter Your Email
+                  </label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="your@email.com"
+                      className="w-full pl-12 pr-4 py-4 bg-dark-800/50 border border-dark-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20 transition-all duration-300"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
+                    <Lock className="w-3 h-3" />
+                    Use the email from your purchase
+                  </p>
+                </div>
 
-            <div className="text-center pt-4 border-t border-dark-800">
-              <p className="text-gray-500 text-sm mb-2">Don't have access?</p>
-              <Link 
-                to={`/live/${eventId}`}
-                className="text-red-500 hover:text-red-400 font-medium"
-              >
-                Purchase Access — ${event.price} AUD
-              </Link>
+                {error && (
+                  <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                    <p className="text-red-400 text-sm">{error}</p>
+                  </div>
+                )}
+
+                <button
+                  onClick={() => verifyAccess()}
+                  disabled={verifying || !email}
+                  className="w-full py-4 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 disabled:from-dark-700 disabled:to-dark-700 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 shadow-lg shadow-red-500/25 disabled:shadow-none"
+                >
+                  {verifying ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                      Verifying...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-5 h-5" />
+                      Watch Stream
+                    </>
+                  )}
+                </button>
+
+                <div className="text-center pt-4 border-t border-dark-800">
+                  <p className="text-gray-500 text-sm mb-2">Don't have access?</p>
+                  <Link 
+                    to={`/live/${eventId}`}
+                    className="text-red-500 hover:text-red-400 font-semibold transition-colors"
+                  >
+                    Purchase Access — ${event.price} AUD
+                  </Link>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -374,65 +432,63 @@ export default function WatchPage() {
     )
   }
 
-  // Parse datetime as local time (strip any timezone suffix)
+  // Parse datetime as local time
   const parseAsLocalTime = (dateStr) => {
     if (!dateStr) return new Date()
     const stripped = dateStr.replace(/[Z+].*$/, '').replace(/\.000$/, '')
     return new Date(stripped)
   }
 
-  // Has access - show player
   const eventDate = parseAsLocalTime(event.start_time)
   const isLive = event.is_live || event.status === 'live'
   const previewMode = searchParams.get('preview') === 'player'
   const eventTimeHasPassed = new Date() >= eventDate
   const eventNotStarted = !isLive && !eventTimeHasPassed && !previewMode
 
-  // Waiting Room - event hasn't started yet (skip if preview=player)
-  // Also skip if event time has passed (even if not marked live yet)
+  // Premium Waiting Room
   if (eventNotStarted) {
     return (
       <div className="min-h-screen bg-dark-950">
-        {/* Waiting Room Header */}
         <div className="w-full bg-gradient-to-b from-dark-900 to-dark-950">
           <div className="max-w-4xl mx-auto px-4 py-16 text-center">
-            {/* Thumbnail */}
+            {/* Thumbnail with overlay */}
             {event.thumbnail_url && (
-              <div className="relative max-w-2xl mx-auto mb-8 rounded-xl overflow-hidden shadow-2xl">
+              <div className="relative max-w-2xl mx-auto mb-8 rounded-2xl overflow-hidden shadow-2xl shadow-red-500/10 group">
                 <img 
                   src={event.thumbnail_url} 
                   alt={event.title}
-                  className="w-full aspect-video object-cover opacity-80"
+                  className="w-full aspect-video object-cover opacity-80 transition-transform duration-500 group-hover:scale-105"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-dark-950 via-transparent to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-dark-950 via-dark-950/50 to-transparent" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-20 h-20 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center border border-white/20">
+                    <Clock className="w-10 h-10 text-white" />
+                  </div>
+                </div>
               </div>
             )}
 
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-500/20 text-yellow-500 rounded-full text-sm font-medium mb-6">
-              <Clock className="w-4 h-4" />
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-500/20 text-yellow-500 rounded-full text-sm font-medium mb-6 border border-yellow-500/30">
+              <Sparkles className="w-4 h-4" />
               Waiting Room
             </div>
 
-            <h1 className="text-3xl md:text-4xl font-bold text-white mb-3">
+            <h1 className="text-3xl md:text-5xl font-bold text-white mb-3">
               {event.title}
             </h1>
             <p className="text-xl text-gray-400 mb-8">{event.organization}</p>
 
-            {/* Countdown */}
-            <div className="bg-dark-800/50 rounded-2xl p-8 max-w-xl mx-auto mb-8 border border-dark-700">
-              <CountdownTimer 
+            {/* Premium Countdown */}
+            <div className="bg-dark-800/30 backdrop-blur-sm rounded-2xl p-8 max-w-xl mx-auto mb-8 border border-dark-700/50">
+              <PremiumCountdown 
                 targetDate={event.start_time}
-                onComplete={() => {
-                  // Don't reload - just update event state, React will re-render to "Starting Soon" screen
-                  // The polling useEffect will handle checking for live status
-                  loadEvent()
-                }}
+                onComplete={() => loadEvent()}
               />
             </div>
 
             {/* Event Info */}
             <div className="flex flex-wrap justify-center gap-6 text-gray-400 mb-8">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 bg-dark-800/30 px-4 py-2 rounded-xl border border-dark-700/30">
                 <Calendar className="w-5 h-5 text-red-500" />
                 {eventDate.toLocaleDateString('en-AU', {
                   weekday: 'long',
@@ -440,27 +496,28 @@ export default function WatchPage() {
                   month: 'long'
                 })}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 bg-dark-800/30 px-4 py-2 rounded-xl border border-dark-700/30">
                 <Clock className="w-5 h-5 text-red-500" />
                 {eventDate.toLocaleTimeString('en-AU', {
                   hour: '2-digit',
                   minute: '2-digit'
                 })} AEST
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 bg-dark-800/30 px-4 py-2 rounded-xl border border-dark-700/30">
                 <MapPin className="w-5 h-5 text-red-500" />
                 {event.venue}
               </div>
             </div>
 
             {/* Notification prompt */}
-            <div className="bg-dark-800 rounded-xl p-6 max-w-md mx-auto border border-dark-700">
-              <Bell className="w-8 h-8 text-red-500 mx-auto mb-3" />
-              <p className="text-white font-medium mb-2">Don't miss the start!</p>
+            <div className="bg-dark-800/30 backdrop-blur-sm rounded-2xl p-6 max-w-md mx-auto border border-dark-700/50">
+              <Bell className="w-10 h-10 text-red-500 mx-auto mb-3" />
+              <p className="text-white font-semibold mb-2">Don't miss the start!</p>
               <p className="text-gray-400 text-sm mb-4">
                 Keep this tab open — it will automatically refresh when the event goes live.
               </p>
-              <p className="text-gray-500 text-xs">
+              <p className="text-gray-600 text-xs flex items-center justify-center gap-1">
+                <Users className="w-3 h-3" />
                 Logged in as: {email}
               </p>
             </div>
@@ -470,93 +527,110 @@ export default function WatchPage() {
     )
   }
 
-  // Starting Soon - event time has passed but not marked live yet
+  // Starting Soon - Premium
   const eventStartingSoon = eventTimeHasPassed && !isLive && !previewMode
   
   if (eventStartingSoon) {
     return (
       <div className="min-h-screen bg-dark-950 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-dark-900 rounded-xl p-8 text-center">
-          {event.thumbnail_url && (
-            <div className="relative max-w-sm mx-auto mb-6 rounded-lg overflow-hidden">
-              <img 
-                src={event.thumbnail_url} 
-                alt={event.title}
-                className="w-full aspect-video object-cover opacity-70"
-              />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-500"></div>
+        <div className="max-w-md w-full relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 blur-2xl rounded-3xl animate-pulse"></div>
+          
+          <div className="relative bg-dark-900/95 backdrop-blur-xl rounded-2xl border border-dark-700/50 p-8 text-center">
+            {event.thumbnail_url && (
+              <div className="relative max-w-sm mx-auto mb-6 rounded-xl overflow-hidden">
+                <img 
+                  src={event.thumbnail_url} 
+                  alt={event.title}
+                  className="w-full aspect-video object-cover opacity-60"
+                />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-4 border-dark-700 border-t-red-500"></div>
+                </div>
               </div>
+            )}
+            
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-500/20 text-yellow-500 rounded-full text-sm font-medium mb-4 border border-yellow-500/30 animate-pulse">
+              <Sparkles className="w-4 h-4" />
+              Starting Soon
             </div>
-          )}
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-500/20 text-yellow-500 rounded-full text-sm font-medium mb-4">
-            <Clock className="w-4 h-4" />
-            Starting Soon
+            
+            <h2 className="text-2xl font-bold text-white mb-2">{event.title}</h2>
+            <p className="text-gray-400 mb-6">
+              The event is about to begin. The stream will start momentarily.
+            </p>
+            <p className="text-gray-500 text-sm">
+              This page will automatically refresh when the stream goes live.
+            </p>
+            <p className="text-gray-600 text-xs mt-4 flex items-center justify-center gap-1">
+              <Users className="w-3 h-3" />
+              Logged in as: {email}
+            </p>
           </div>
-          <h2 className="text-2xl font-bold text-white mb-2">{event.title}</h2>
-          <p className="text-gray-400 mb-6">
-            The event is about to begin. The stream will start momentarily.
-          </p>
-          <p className="text-gray-500 text-sm">
-            This page will automatically refresh when the stream goes live.
-          </p>
-          <p className="text-gray-600 text-xs mt-4">
-            Logged in as: {email}
-          </p>
         </div>
       </div>
     )
   }
 
+  // Has access - Show Premium Player
   return (
     <div className="min-h-screen bg-dark-950">
       {/* Preview Mode Banner */}
       {previewMode && (
-        <div className="bg-yellow-500 text-black px-4 py-2 text-center text-sm font-medium">
+        <div className="bg-gradient-to-r from-yellow-500 to-orange-500 text-black px-4 py-2 text-center text-sm font-medium">
           🎨 Preview Mode — This is how the player page will look. No stream is playing.
         </div>
       )}
-      {/* Player */}
+      
+      {/* Premium Player */}
       <div className="w-full bg-black">
         <div className="max-w-6xl mx-auto">
-          <MuxPlayer
+          <PremiumPlayer
             playbackId={event.mux_playback_id || 'demo-playback-id'}
-            metadata={{
-              video_title: event.title,
-              viewer_user_id: email
+            title={event.title}
+            poster={event.thumbnail_url || event.player_poster_url}
+            isLive={isLive}
+            viewerEmail={email}
+            onShare={() => {
+              if (navigator.share) {
+                navigator.share({
+                  title: event.title,
+                  text: `Watch ${event.title} live!`,
+                  url: window.location.href
+                })
+              }
             }}
-            streamType={isLive ? 'live' : 'on-demand'}
-            autoPlay
-            poster={event.thumbnail_url || event.player_poster_url || 'https://fitfocusmedia.com.au/livestream-poster.jpg'}
-            className="w-full aspect-video"
           />
         </div>
       </div>
 
-      {/* Event Info */}
+      {/* Event Info - Premium Layout */}
       <div className="max-w-6xl mx-auto px-4 py-8">
+        {/* Title and Live Indicator */}
         <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
           <div>
-            <div className="flex items-center gap-3 mb-2">
+            <div className="flex flex-wrap items-center gap-3 mb-2">
               <h1 className="text-2xl md:text-3xl font-bold text-white">
                 {event.title}
               </h1>
-              {isLive && (
-                <span className="px-3 py-1 bg-red-500 text-white text-sm font-bold rounded-full flex items-center gap-1">
-                  <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
-                  LIVE
+              <LiveIndicator isLive={isLive} viewerCount={viewerCount} />
+              {geoInfo?.crew_bypass && (
+                <span className="px-3 py-1 bg-green-500/20 text-green-400 text-sm font-medium rounded-full border border-green-500/30">
+                  Crew Access
                 </span>
               )}
             </div>
             <p className="text-gray-400">{event.organization}</p>
           </div>
+          
           {/* Viewer Count - shows when live */}
           {isLive && <ViewerCount eventId={eventId} />}
         </div>
 
-        <div className="flex flex-wrap gap-6 text-sm text-gray-400">
-          <div className="flex items-center gap-2">
-            <Calendar className="w-4 h-4" />
+        {/* Event Details */}
+        <div className="flex flex-wrap gap-4 text-sm text-gray-400 mb-8">
+          <div className="flex items-center gap-2 bg-dark-800/30 px-4 py-2 rounded-xl border border-dark-700/30">
+            <Calendar className="w-4 h-4 text-red-500" />
             {eventDate.toLocaleDateString('en-AU', {
               weekday: 'long',
               day: 'numeric',
@@ -564,16 +638,17 @@ export default function WatchPage() {
               year: 'numeric'
             })}
           </div>
-          <div className="flex items-center gap-2">
-            <MapPin className="w-4 h-4" />
+          <div className="flex items-center gap-2 bg-dark-800/30 px-4 py-2 rounded-xl border border-dark-700/30">
+            <MapPin className="w-4 h-4 text-red-500" />
             {event.venue}
           </div>
         </div>
 
+        {/* Description */}
         {event.description && (
-          <div className="mt-8 pt-8 border-t border-dark-800">
+          <div className="bg-dark-800/20 rounded-2xl p-6 border border-dark-700/30">
             <h3 className="text-lg font-semibold text-white mb-3">About This Event</h3>
-            <p className="text-gray-400">{event.description}</p>
+            <p className="text-gray-400 leading-relaxed">{event.description}</p>
           </div>
         )}
       </div>
