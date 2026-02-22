@@ -431,6 +431,7 @@ export default function WatchPage() {
             }}
             streamType={isLive ? 'live' : 'on-demand'}
             autoPlay
+            poster={event.thumbnail_url || event.player_poster_url || 'https://fitfocusmedia.com.au/livestream-poster.jpg'}
             className="w-full aspect-video"
           />
         </div>

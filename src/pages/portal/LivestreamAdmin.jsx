@@ -632,6 +632,7 @@ function EventModal({ event, onClose, onSave }) {
     price: event?.price || 29.99,
     description: event?.description || '',
     thumbnail_url: event?.thumbnail_url || '',
+    player_poster_url: event?.player_poster_url || '',
     ticket_url: event?.ticket_url || '',
     status: event?.status || 'draft',
     mux_playback_id: event?.mux_playback_id || '',
@@ -962,19 +963,32 @@ function EventModal({ event, onClose, onSave }) {
                 value={formData.thumbnail_url}
                 onChange={(e) => setFormData({ ...formData, thumbnail_url: e.target.value })}
                 className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
-                placeholder="https://example.com/image.jpg"
+                placeholder="For event cards"
               />
+              <p className="text-xs text-gray-500 mt-1">Used on event listing cards</p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1">Ticket URL</label>
+              <label className="block text-sm font-medium text-gray-400 mb-1">Player Poster URL</label>
               <input
                 type="text"
-                value={formData.ticket_url}
-                onChange={(e) => setFormData({ ...formData, ticket_url: e.target.value })}
+                value={formData.player_poster_url}
+                onChange={(e) => setFormData({ ...formData, player_poster_url: e.target.value })}
                 className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
-                placeholder="www.instagram.com/fitfocusmedia"
+                placeholder="For video player (optional)"
               />
+              <p className="text-xs text-gray-500 mt-1">Shows before/after stream. Falls back to thumbnail if empty.</p>
             </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-400 mb-1">Ticket URL</label>
+            <input
+              type="text"
+              value={formData.ticket_url}
+              onChange={(e) => setFormData({ ...formData, ticket_url: e.target.value })}
+              className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
+              placeholder="www.instagram.com/fitfocusmedia"
+            />
           </div>
 
           {/* Geo-Blocking Section */}
