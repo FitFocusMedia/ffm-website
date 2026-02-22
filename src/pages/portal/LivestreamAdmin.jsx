@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit, Trash2, Eye, DollarSign, Users, Calendar, ToggleLeft, ToggleRight, Download, Radio, Copy, ExternalLink, BarChart3, MapPin, TrendingUp, Shield, RefreshCw } from 'lucide-react'
+import { Plus, Edit, Trash2, Eye, DollarSign, Users, Calendar, ToggleLeft, ToggleRight, Download, Radio, Copy, ExternalLink, BarChart3, MapPin, TrendingUp, Shield, RefreshCw, Film, Tag, Archive, Play, StopCircle } from 'lucide-react'
 import { 
   getAllLivestreamEvents, 
   createLivestreamEvent, 
@@ -25,6 +25,9 @@ export default function LivestreamAdmin() {
   const [activeTab, setActiveTab] = useState('events')
   const [analytics, setAnalytics] = useState({ funnel: [], blockedLocations: [], recentEvents: [] })
   const [selectedEventForAnalytics, setSelectedEventForAnalytics] = useState('all')
+  const [recordings, setRecordings] = useState([])
+  const [loadingRecordings, setLoadingRecordings] = useState(false)
+  const [eventFilter, setEventFilter] = useState('all') // all, upcoming, live, ended
 
   useEffect(() => {
     loadData()
@@ -84,6 +87,44 @@ export default function LivestreamAdmin() {
       })
     } catch (err) {
       console.error('Failed to load analytics:', err)
+    }
+  }
+
+  const loadRecordings = async () => {
+    setLoadingRecordings(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('mux-assets', {
+        body: { action: 'list' }
+      })
+      if (error) throw error
+      setRecordings(data?.assets || [])
+    } catch (err) {
+      console.error('Failed to load recordings:', err)
+    } finally {
+      setLoadingRecordings(false)
+    }
+  }
+
+  const endStream = async (eventId) => {
+    if (!confirm('End this stream? This will finalize the recording.')) return
+    try {
+      // Update event status
+      await updateLivestreamEvent(eventId, { 
+        status: 'ended', 
+        is_live: false,
+        ended_at: new Date().toISOString()
+      })
+      // Optionally disable MUX stream
+      const event = events.find(e => e.id === eventId)
+      if (event?.mux_stream_id) {
+        await supabase.functions.invoke('mux-stream', {
+          body: { action: 'disable', stream_id: event.mux_stream_id }
+        })
+      }
+      loadData()
+    } catch (err) {
+      console.error('Failed to end stream:', err)
+      alert('Failed to end stream')
     }
   }
 
@@ -223,8 +264,37 @@ export default function LivestreamAdmin() {
           >
             <BarChart3 size={16} /> Analytics
           </button>
+          <button
+            onClick={() => { setActiveTab('recordings'); loadRecordings(); }}
+            className={`pb-3 px-1 font-medium transition-colors flex items-center gap-2 ${
+              activeTab === 'recordings' 
+                ? 'text-red-500 border-b-2 border-red-500' 
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <Film size={16} /> Recordings
+          </button>
         </div>
       </div>
+
+      {/* Event Filter */}
+      {activeTab === 'events' && (
+        <div className="flex gap-2">
+          {['all', 'upcoming', 'live', 'ended'].map(filter => (
+            <button
+              key={filter}
+              onClick={() => setEventFilter(filter)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                eventFilter === filter
+                  ? 'bg-red-500 text-white'
+                  : 'bg-dark-800 text-gray-400 hover:text-white'
+              }`}
+            >
+              {filter.charAt(0).toUpperCase() + filter.slice(1)}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Events Tab */}
       {activeTab === 'events' && (
@@ -234,7 +304,15 @@ export default function LivestreamAdmin() {
               No events yet. Create your first event!
             </div>
           ) : (
-            events.map(event => (
+            events
+              .filter(event => {
+                if (eventFilter === 'all') return true
+                if (eventFilter === 'live') return event.is_live || event.status === 'live'
+                if (eventFilter === 'ended') return event.status === 'ended'
+                if (eventFilter === 'upcoming') return !event.is_live && event.status !== 'ended' && new Date(event.start_time) > new Date()
+                return true
+              })
+              .map(event => (
               <div key={event.id} className="bg-dark-900 rounded-xl p-5 border border-dark-800">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="flex-1">
@@ -249,6 +327,17 @@ export default function LivestreamAdmin() {
                       }`}>
                         {event.status || 'draft'}
                       </span>
+                      {event.category && (
+                        <span className="px-2 py-0.5 text-xs font-medium rounded bg-purple-500/20 text-purple-400 flex items-center gap-1">
+                          <Tag className="w-3 h-3" />
+                          {event.category}
+                        </span>
+                      )}
+                      {event.vod_enabled && (
+                        <span className="px-2 py-0.5 text-xs font-medium rounded bg-blue-500/20 text-blue-400">
+                          VOD
+                        </span>
+                      )}
                     </div>
                     <p className="text-gray-400 mb-2">{event.organization}</p>
                     <div className="flex flex-wrap gap-4 text-sm text-gray-500">
@@ -259,24 +348,41 @@ export default function LivestreamAdmin() {
                   </div>
                   <div className="flex items-center gap-1">
                     {/* Go Live Toggle */}
-                    <button
-                      onClick={async () => {
-                        const newStatus = event.is_live ? false : true
-                        await updateLivestreamEvent(event.id, { 
-                          is_live: newStatus,
-                          status: newStatus ? 'live' : 'published'
-                        })
-                        loadData()
-                      }}
-                      className={`p-2 rounded-lg transition-colors ${
-                        event.is_live 
-                          ? 'text-red-500 bg-red-500/20 hover:bg-red-500/30' 
-                          : 'text-gray-400 hover:text-red-500 hover:bg-dark-800'
-                      }`}
-                      title={event.is_live ? 'Stop Live' : 'Go Live'}
-                    >
-                      <Radio className="w-5 h-5" />
-                    </button>
+                    {/* Go Live / End Stream */}
+                    {event.status !== 'ended' ? (
+                      <button
+                        onClick={async () => {
+                          const newStatus = event.is_live ? false : true
+                          await updateLivestreamEvent(event.id, { 
+                            is_live: newStatus,
+                            status: newStatus ? 'live' : 'published'
+                          })
+                          loadData()
+                        }}
+                        className={`p-2 rounded-lg transition-colors ${
+                          event.is_live 
+                            ? 'text-red-500 bg-red-500/20 hover:bg-red-500/30' 
+                            : 'text-gray-400 hover:text-red-500 hover:bg-dark-800'
+                        }`}
+                        title={event.is_live ? 'Stop Live' : 'Go Live'}
+                      >
+                        <Radio className="w-5 h-5" />
+                      </button>
+                    ) : (
+                      <span className="p-2 text-gray-600" title="Event Ended">
+                        <Archive className="w-5 h-5" />
+                      </span>
+                    )}
+                    {/* End Stream (archive) */}
+                    {(event.is_live || event.status === 'live' || event.status === 'published') && (
+                      <button
+                        onClick={() => endStream(event.id)}
+                        className="p-2 text-gray-400 hover:text-orange-500 hover:bg-dark-800 rounded-lg transition-colors"
+                        title="End & Archive Stream"
+                      >
+                        <StopCircle className="w-5 h-5" />
+                      </button>
+                    )}
                     {/* Copy Link */}
                     <button
                       onClick={() => {
@@ -571,6 +677,90 @@ export default function LivestreamAdmin() {
         </div>
       )}
 
+      {/* Recordings Tab */}
+      {activeTab === 'recordings' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <p className="text-gray-400">Video recordings from your livestreams</p>
+            <button
+              onClick={loadRecordings}
+              className="flex items-center gap-2 px-3 py-1.5 bg-dark-800 hover:bg-dark-700 text-gray-300 rounded-lg text-sm transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Refresh
+            </button>
+          </div>
+
+          {loadingRecordings ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-red-500"></div>
+            </div>
+          ) : recordings.length === 0 ? (
+            <div className="text-center py-12 text-gray-400">
+              <Film className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>No recordings yet.</p>
+              <p className="text-sm">Recordings appear here after streams end.</p>
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {recordings.map(rec => (
+                <div key={rec.id} className="bg-dark-900 rounded-xl p-5 border border-dark-800">
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      {rec.thumbnail_url ? (
+                        <img src={rec.thumbnail_url} alt="" className="w-32 h-20 object-cover rounded-lg" />
+                      ) : (
+                        <div className="w-32 h-20 bg-dark-800 rounded-lg flex items-center justify-center">
+                          <Film className="w-8 h-8 text-gray-600" />
+                        </div>
+                      )}
+                      <div>
+                        <h4 className="font-medium text-white">{rec.event_title || 'Untitled Recording'}</h4>
+                        <div className="flex flex-wrap gap-4 text-sm text-gray-400 mt-1">
+                          <span>{rec.duration ? `${Math.floor(rec.duration / 60)}m ${Math.round(rec.duration % 60)}s` : '—'}</span>
+                          <span>{rec.created_at ? new Date(rec.created_at * 1000).toLocaleDateString('en-AU') : '—'}</span>
+                          <span className={`px-2 py-0.5 text-xs font-medium rounded ${
+                            rec.status === 'ready' ? 'bg-green-500/20 text-green-500' :
+                            rec.status === 'preparing' ? 'bg-yellow-500/20 text-yellow-500' :
+                            'bg-gray-500/20 text-gray-400'
+                          }`}>
+                            {rec.status}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {rec.playback_id && rec.status === 'ready' && (
+                        <>
+                          <a
+                            href={`https://stream.mux.com/${rec.playback_id}.m3u8`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 px-3 py-2 bg-dark-800 hover:bg-dark-700 text-gray-300 rounded-lg text-sm transition-colors"
+                          >
+                            <Play className="w-4 h-4" />
+                            Preview
+                          </a>
+                          <a
+                            href={`https://stream.mux.com/${rec.playback_id}/high.mp4`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm transition-colors"
+                          >
+                            <Download className="w-4 h-4" />
+                            Download MP4
+                          </a>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Event Modal */}
       {showEventModal && (
         <EventModal
@@ -631,9 +821,11 @@ function EventModal({ event, onClose, onSave }) {
     end_time: event?.end_time?.slice(0, 16) || '',
     price: event?.price || 29.99,
     description: event?.description || '',
+    category: event?.category || '',
     thumbnail_url: event?.thumbnail_url || '',
     player_poster_url: event?.player_poster_url || '',
     ticket_url: event?.ticket_url || '',
+    vod_enabled: event?.vod_enabled || false,
     status: event?.status || 'draft',
     mux_playback_id: event?.mux_playback_id || '',
     mux_stream_key: event?.mux_stream_key || '',
@@ -875,6 +1067,41 @@ function EventModal({ event, onClose, onSave }) {
                 <option value="live">Live</option>
                 <option value="ended">Ended</option>
               </select>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-400 mb-1">Category</label>
+              <select
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
+              >
+                <option value="">Select Category</option>
+                <option value="boxing">Boxing</option>
+                <option value="mma">MMA</option>
+                <option value="kickboxing">Kickboxing</option>
+                <option value="muay-thai">Muay Thai</option>
+                <option value="bjj">BJJ / Grappling</option>
+                <option value="wrestling">Wrestling</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-3">
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.vod_enabled}
+                  onChange={(e) => setFormData({ ...formData, vod_enabled: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-dark-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-red-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-500"></div>
+              </label>
+              <div>
+                <span className="text-sm font-medium text-gray-300">VOD Replay</span>
+                <p className="text-xs text-gray-500">Allow replay after event ends</p>
+              </div>
             </div>
           </div>
 
