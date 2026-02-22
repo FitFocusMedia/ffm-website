@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 /**
  * Countdown Timer Component
@@ -14,6 +14,7 @@ export default function CountdownTimer({ targetDate, onComplete, className = '' 
   }
 
   const [timeLeft, setTimeLeft] = useState(calculateTimeLeft())
+  const hasCompletedRef = useRef(false) // Prevent firing onComplete multiple times
 
   function calculateTimeLeft() {
     const difference = parseAsLocalTime(targetDate) - new Date()
@@ -31,11 +32,16 @@ export default function CountdownTimer({ targetDate, onComplete, className = '' 
   }
 
   useEffect(() => {
+    // Reset completion flag when targetDate changes
+    hasCompletedRef.current = false
+    
     const timer = setInterval(() => {
       const newTimeLeft = calculateTimeLeft()
       setTimeLeft(newTimeLeft)
       
-      if (!newTimeLeft && onComplete) {
+      // Only fire onComplete once, and only if countdown was actually running
+      if (!newTimeLeft && onComplete && !hasCompletedRef.current) {
+        hasCompletedRef.current = true
         onComplete()
       }
     }, 1000)

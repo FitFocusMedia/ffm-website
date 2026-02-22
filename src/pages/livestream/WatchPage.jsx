@@ -26,7 +26,9 @@ export default function WatchPage() {
   const [geoBlocked, setGeoBlocked] = useState(null)
   const [geoInfo, setGeoInfo] = useState(null)
   const [checkingAccess, setCheckingAccess] = useState(true)
+  const [startingSoon, setStartingSoon] = useState(false)
   const heartbeatRef = useRef(null)
+  const startingSoonRef = useRef(null)
 
   useEffect(() => {
     loadEvent()
@@ -116,6 +118,49 @@ export default function WatchPage() {
       }
     }
   }, [sessionToken, hasAccess])
+
+  // Poll for live status when event time has passed but not marked live
+  useEffect(() => {
+    if (!event) return
+    
+    // Parse the event start time
+    const parseTime = (dateStr) => {
+      if (!dateStr) return new Date()
+      const stripped = dateStr.replace(/[Z+].*$/, '').replace(/\.000$/, '')
+      return new Date(stripped)
+    }
+    
+    const eventDate = parseTime(event.start_time)
+    const isLive = event.is_live || event.status === 'live'
+    const eventTimeHasPassed = new Date() >= eventDate
+    const previewMode = searchParams.get('preview') === 'player'
+    
+    if (eventTimeHasPassed && !isLive && !previewMode) {
+      setStartingSoon(true)
+      
+      // Poll every 15 seconds to check if event went live
+      startingSoonRef.current = setInterval(async () => {
+        try {
+          const freshEvent = await getLivestreamEvent(eventId)
+          if (freshEvent?.is_live || freshEvent?.status === 'live') {
+            clearInterval(startingSoonRef.current)
+            setEvent(freshEvent) // Update event state, React will re-render
+            setStartingSoon(false)
+          }
+        } catch (err) {
+          console.error('Failed to check event status:', err)
+        }
+      }, 15000)
+      
+      return () => {
+        if (startingSoonRef.current) {
+          clearInterval(startingSoonRef.current)
+        }
+      }
+    } else {
+      setStartingSoon(false)
+    }
+  }, [event, eventId, searchParams])
 
   const loadEvent = async () => {
     try {
@@ -340,9 +385,11 @@ export default function WatchPage() {
   const eventDate = parseAsLocalTime(event.start_time)
   const isLive = event.is_live || event.status === 'live'
   const previewMode = searchParams.get('preview') === 'player'
-  const eventNotStarted = !isLive && new Date() < eventDate && !previewMode
+  const eventTimeHasPassed = new Date() >= eventDate
+  const eventNotStarted = !isLive && !eventTimeHasPassed && !previewMode
 
   // Waiting Room - event hasn't started yet (skip if preview=player)
+  // Also skip if event time has passed (even if not marked live yet)
   if (eventNotStarted) {
     return (
       <div className="min-h-screen bg-dark-950">
@@ -375,7 +422,21 @@ export default function WatchPage() {
             <div className="bg-dark-800/50 rounded-2xl p-8 max-w-xl mx-auto mb-8 border border-dark-700">
               <CountdownTimer 
                 targetDate={event.start_time}
-                onComplete={() => window.location.reload()}
+                onComplete={async () => {
+                  // Don't just reload - check if event is actually live now
+                  try {
+                    const freshEvent = await getLivestreamEvent(eventId)
+                    if (freshEvent?.is_live || freshEvent?.status === 'live') {
+                      window.location.reload()
+                    } else {
+                      // Event not live yet - show message and check again in 30s
+                      console.log('Event start time reached but not live yet. Checking again in 30s...')
+                      setTimeout(() => window.location.reload(), 30000)
+                    }
+                  } catch (err) {
+                    console.error('Failed to check event status:', err)
+                  }
+                }}
               />
             </div>
 
@@ -414,6 +475,44 @@ export default function WatchPage() {
               </p>
             </div>
           </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Starting Soon - event time has passed but not marked live yet
+  const eventStartingSoon = eventTimeHasPassed && !isLive && !previewMode
+  
+  if (eventStartingSoon) {
+    return (
+      <div className="min-h-screen bg-dark-950 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-dark-900 rounded-xl p-8 text-center">
+          {event.thumbnail_url && (
+            <div className="relative max-w-sm mx-auto mb-6 rounded-lg overflow-hidden">
+              <img 
+                src={event.thumbnail_url} 
+                alt={event.title}
+                className="w-full aspect-video object-cover opacity-70"
+              />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-500"></div>
+              </div>
+            </div>
+          )}
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-500/20 text-yellow-500 rounded-full text-sm font-medium mb-4">
+            <Clock className="w-4 h-4" />
+            Starting Soon
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-2">{event.title}</h2>
+          <p className="text-gray-400 mb-6">
+            The event is about to begin. The stream will start momentarily.
+          </p>
+          <p className="text-gray-500 text-sm">
+            This page will automatically refresh when the stream goes live.
+          </p>
+          <p className="text-gray-600 text-xs mt-4">
+            Logged in as: {email}
+          </p>
         </div>
       </div>
     )
