@@ -422,20 +422,10 @@ export default function WatchPage() {
             <div className="bg-dark-800/50 rounded-2xl p-8 max-w-xl mx-auto mb-8 border border-dark-700">
               <CountdownTimer 
                 targetDate={event.start_time}
-                onComplete={async () => {
-                  // Don't just reload - check if event is actually live now
-                  try {
-                    const freshEvent = await getLivestreamEvent(eventId)
-                    if (freshEvent?.is_live || freshEvent?.status === 'live') {
-                      window.location.reload()
-                    } else {
-                      // Event not live yet - show message and check again in 30s
-                      console.log('Event start time reached but not live yet. Checking again in 30s...')
-                      setTimeout(() => window.location.reload(), 30000)
-                    }
-                  } catch (err) {
-                    console.error('Failed to check event status:', err)
-                  }
+                onComplete={() => {
+                  // Don't reload - just update event state, React will re-render to "Starting Soon" screen
+                  // The polling useEffect will handle checking for live status
+                  loadEvent()
                 }}
               />
             </div>
