@@ -745,10 +745,11 @@ export async function getLivestreamOrderByEmail(eventId, email) {
     .eq('event_id', eventId)
     .eq('email', email.toLowerCase())
     .eq('status', 'completed')
-    .single()
+    .order('created_at', { ascending: false })
+    .limit(1)
   
-  if (error && error.code !== 'PGRST116') throw error
-  return data
+  if (error) throw error
+  return data?.[0] || null
 }
 
 /**

@@ -770,11 +770,22 @@ export default function LivestreamAdmin() {
             try {
               let eventId = editingEvent?.id
               
+              // Remove fields that might not exist in database
+              const { 
+                category, 
+                crew_bypass_token, 
+                bypass_created_at, 
+                player_poster_url,
+                vod_enabled,
+                geo_venue_address,
+                ...cleanData 
+              } = data
+              
               if (editingEvent) {
-                await updateLivestreamEvent(editingEvent.id, data)
+                await updateLivestreamEvent(editingEvent.id, cleanData)
               } else {
                 // Create new event
-                const newEvent = await createLivestreamEvent(data)
+                const newEvent = await createLivestreamEvent(cleanData)
                 eventId = newEvent.id
                 
                 // Auto-create MUX stream for new events
@@ -803,7 +814,8 @@ export default function LivestreamAdmin() {
               setShowEventModal(false)
               setEditingEvent(null)
             } catch (err) {
-              alert('Failed to save event')
+              console.error('Save event error:', err)
+              alert(`Failed to save event: ${err.message || err}`)
             }
           }}
         />

@@ -196,6 +196,7 @@ export default function EventPage() {
           event_id: eventId,
           email: email.toLowerCase(),
           amount: event.price,
+          currency: 'AUD',
           status: 'completed',
           payment_method: 'demo',
           completed_at: new Date().toISOString(),
@@ -462,7 +463,7 @@ export default function EventPage() {
               <div className="mb-8 p-6 bg-dark-800/50 rounded-xl border border-dark-700">
                 <CountdownTimer 
                   targetDate={event.start_time}
-                  onComplete={() => window.location.reload()}
+                  onComplete={() => loadEvent()}
                 />
               </div>
             )}
