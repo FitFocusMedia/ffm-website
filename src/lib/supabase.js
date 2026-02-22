@@ -840,3 +840,146 @@ export async function invalidateLivestreamSession(token) {
   
   if (error) throw error
 }
+
+// ============================================
+// USER AUTHENTICATION (Magic Links)
+// ============================================
+
+/**
+ * Send magic link to user's email
+ */
+export async function sendMagicLink(email, redirectTo) {
+  const { data, error } = await supabase.auth.signInWithOtp({
+    email: email.toLowerCase(),
+    options: {
+      emailRedirectTo: redirectTo || window.location.origin
+    }
+  })
+  
+  if (error) throw error
+  return data
+}
+
+/**
+ * Get current authenticated user
+ */
+export async function getCurrentUser() {
+  const { data: { user }, error } = await supabase.auth.getUser()
+  if (error) throw error
+  return user
+}
+
+/**
+ * Get current session
+ */
+export async function getSession() {
+  const { data: { session }, error } = await supabase.auth.getSession()
+  if (error) throw error
+  return session
+}
+
+/**
+ * Sign out user
+ */
+export async function signOut() {
+  const { error } = await supabase.auth.signOut()
+  if (error) throw error
+}
+
+/**
+ * Listen for auth state changes
+ */
+export function onAuthStateChange(callback) {
+  return supabase.auth.onAuthStateChange(callback)
+}
+
+// ============================================
+// USER PROFILES
+// ============================================
+
+/**
+ * Get or create user profile by email
+ */
+export async function getOrCreateUserProfile(email) {
+  // First try to get existing profile
+  const { data: existing, error: fetchError } = await supabase
+    .from('user_profiles')
+    .select('*')
+    .eq('email', email.toLowerCase())
+    .single()
+  
+  if (existing) return existing
+  
+  // Create new profile if doesn't exist
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .insert([{ email: email.toLowerCase() }])
+    .select()
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+/**
+ * Get user profile by auth ID
+ */
+export async function getUserProfile(authId) {
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .select('*')
+    .eq('auth_id', authId)
+    .single()
+  
+  if (error && error.code !== 'PGRST116') throw error
+  return data
+}
+
+/**
+ * Update user profile
+ */
+export async function updateUserProfile(profileId, updates) {
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', profileId)
+    .select()
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+/**
+ * Link auth user to profile (after magic link login)
+ */
+export async function linkAuthToProfile(authId, email) {
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .update({ 
+      auth_id: authId, 
+      last_login_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    })
+    .eq('email', email.toLowerCase())
+    .select()
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+/**
+ * Get user's purchase history
+ */
+export async function getUserPurchaseHistory(email) {
+  const { data, error } = await supabase
+    .from('livestream_orders')
+    .select('*, event:livestream_events(*)')
+    .eq('email', email.toLowerCase())
+    .eq('status', 'completed')
+    .order('created_at', { ascending: false })
+  
+  if (error) throw error
+  return data
+}

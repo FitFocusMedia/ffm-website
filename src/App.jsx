@@ -50,6 +50,7 @@ import LivestreamAdmin from './pages/portal/LivestreamAdmin'
 import EventsPage from './pages/livestream/EventsPage'
 import EventPage from './pages/livestream/EventPage'
 import WatchPage from './pages/livestream/WatchPage'
+import MyPurchasesPage from './pages/livestream/MyPurchasesPage'
 
 // Legal pages
 import PrivacyPage from './pages/PrivacyPage'
@@ -101,6 +102,7 @@ function App() {
         
         {/* Watch Page - NO Navbar/Footer for fullscreen experience */}
         <Route path="/watch/:eventId" element={<WatchPage />} />
+        <Route path="/my-purchases" element={<MyPurchasesPage />} />
 
         {/* Public Contract View - NO AUTH REQUIRED, NO Navbar/Footer */}
         <Route path="/contract/:shareToken" element={<ContractPublicView />} />

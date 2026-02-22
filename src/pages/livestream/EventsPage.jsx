@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Calendar, MapPin, Clock, Play } from 'lucide-react'
+import { Calendar, MapPin, Clock, Play, Ticket } from 'lucide-react'
 import { getLivestreamEvents } from '../../lib/supabase'
 
 export default function EventsPage() {
@@ -53,9 +53,16 @@ export default function EventsPage() {
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
             Live Events
           </h1>
-          <p className="text-xl text-gray-400 max-w-2xl mx-auto">
+          <p className="text-xl text-gray-400 max-w-2xl mx-auto mb-6">
             Watch live combat sports events from anywhere. Professional production, HD quality streaming.
           </p>
+          <Link
+            to="/my-purchases"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-dark-800 hover:bg-dark-700 text-white rounded-lg transition-colors"
+          >
+            <Ticket className="w-5 h-5" />
+            My Purchases
+          </Link>
         </div>
 
         {/* Live Now */}

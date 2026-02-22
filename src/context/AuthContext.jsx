@@ -42,6 +42,17 @@ export const AuthProvider = ({ children }) => {
     return data
   }
 
+  const signInWithMagicLink = async (email, redirectTo) => {
+    const { data, error } = await supabase.auth.signInWithOtp({
+      email: email.toLowerCase(),
+      options: {
+        emailRedirectTo: redirectTo || window.location.origin
+      }
+    })
+    if (error) throw error
+    return data
+  }
+
   const signOut = async () => {
     const { error } = await supabase.auth.signOut()
     if (error) throw error
@@ -52,6 +63,7 @@ export const AuthProvider = ({ children }) => {
     session,
     loading,
     signIn,
+    signInWithMagicLink,
     signOut,
   }
 
