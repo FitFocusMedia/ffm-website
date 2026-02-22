@@ -25,6 +25,7 @@ export default function WatchPage() {
   const [sessionEnded, setSessionEnded] = useState(false)
   const [geoBlocked, setGeoBlocked] = useState(null)
   const [geoInfo, setGeoInfo] = useState(null)
+  const [checkingAccess, setCheckingAccess] = useState(true)
   const heartbeatRef = useRef(null)
 
   useEffect(() => {
@@ -38,8 +39,12 @@ export default function WatchPage() {
 
   // Check geo-blocking after event loads
   useEffect(() => {
-    if (event && event.geo_blocking_enabled) {
-      checkGeoBlocking()
+    if (event) {
+      if (event.geo_blocking_enabled) {
+        checkGeoBlocking()
+      } else {
+        setCheckingAccess(false) // No geo blocking, done checking
+      }
     }
   }, [event])
 
@@ -74,6 +79,8 @@ export default function WatchPage() {
     } catch (err) {
       console.error('Geo check failed:', err)
       setGeoBlocked(false) // Allow access if geo check fails
+    } finally {
+      setCheckingAccess(false)
     }
   }
 
@@ -251,6 +258,18 @@ export default function WatchPage() {
             <RefreshCw className="w-5 h-5" />
             Watch Here Instead
           </button>
+        </div>
+      </div>
+    )
+  }
+
+  // Still checking for bypass token
+  if (checkingAccess) {
+    return (
+      <div className="min-h-screen bg-dark-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-500 mx-auto mb-4"></div>
+          <p className="text-gray-400">Checking access...</p>
         </div>
       </div>
     )
