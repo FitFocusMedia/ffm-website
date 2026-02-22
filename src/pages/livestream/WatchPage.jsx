@@ -329,15 +329,15 @@ export default function WatchPage() {
     )
   }
 
-  // Parse datetime as AEST (UTC+10) if no timezone specified
-  const parseAsAEST = (dateStr) => {
+  // Parse datetime as local time (strip any timezone suffix)
+  const parseAsLocalTime = (dateStr) => {
     if (!dateStr) return new Date()
-    if (dateStr.includes('+') || dateStr.includes('Z')) return new Date(dateStr)
-    return new Date(dateStr + '+10:00')
+    const stripped = dateStr.replace(/[Z+].*$/, '').replace(/\.000$/, '')
+    return new Date(stripped)
   }
 
   // Has access - show player
-  const eventDate = parseAsAEST(event.start_time)
+  const eventDate = parseAsLocalTime(event.start_time)
   const isLive = event.is_live || event.status === 'live'
   const previewMode = searchParams.get('preview') === 'player'
   const eventNotStarted = !isLive && new Date() < eventDate && !previewMode
