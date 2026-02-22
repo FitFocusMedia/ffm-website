@@ -51,6 +51,10 @@ import EventsPage from './pages/livestream/EventsPage'
 import EventPage from './pages/livestream/EventPage'
 import WatchPage from './pages/livestream/WatchPage'
 
+// Legal pages
+import PrivacyPage from './pages/PrivacyPage'
+import TermsPage from './pages/TermsPage'
+
 function ScrollToTop() {
   const { pathname } = useLocation()
   useEffect(() => {
@@ -86,6 +90,10 @@ function App() {
         <Route path="/order" element={<PublicLayout><OrderPage /></PublicLayout>} />
         <Route path="/content" element={<PublicLayout><ContentLandingPage /></PublicLayout>} />
         <Route path="/order/:orgSlug" element={<PublicLayout><OrgOrderPage /></PublicLayout>} />
+
+        {/* Legal Pages */}
+        <Route path="/privacy" element={<PublicLayout><PrivacyPage /></PublicLayout>} />
+        <Route path="/terms" element={<PublicLayout><TermsPage /></PublicLayout>} />
 
         {/* Livestream Routes - Public */}
         <Route path="/live" element={<PublicLayout><EventsPage /></PublicLayout>} />

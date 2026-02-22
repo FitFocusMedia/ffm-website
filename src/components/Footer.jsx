@@ -40,6 +40,8 @@ const Footer = () => {
                 { to: '/work', label: 'Our Work' },
                 { to: '/proposal', label: 'Free Analysis' },
                 { to: '/contact', label: 'Contact' },
+                { to: '/privacy', label: 'Privacy Policy' },
+                { to: '/terms', label: 'Terms of Service' },
               ].map((link) => (
                 <li key={link.to}>
                   <Link to={link.to} className="text-gray-400 hover:text-primary-400 text-sm transition-colors">

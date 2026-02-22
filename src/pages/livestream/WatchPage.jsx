@@ -8,6 +8,7 @@ import {
   createLivestreamSession,
   updateSessionHeartbeat 
 } from '../../lib/supabase'
+import { trackPurchaseComplete } from '../../lib/analytics'
 import CountdownTimer from '../../components/CountdownTimer'
 import ViewerCount from '../../components/ViewerCount'
 
@@ -44,18 +45,30 @@ export default function WatchPage() {
 
   const checkGeoBlocking = async () => {
     try {
+      // Check for crew bypass token in URL
+      const bypassToken = searchParams.get('bypass')
+      
       const response = await fetch('https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/geo-check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           venue_lat: event.geo_lat,
           venue_lng: event.geo_lng,
-          radius_km: event.geo_radius_km || 50
+          radius_km: event.geo_radius_km || 50,
+          event_id: eventId,
+          bypass_token: bypassToken
         })
       })
       const data = await response.json()
-      setGeoBlocked(data.blocked)
-      setGeoInfo(data)
+      
+      // If bypass was used, don't show as blocked
+      if (data.bypass) {
+        setGeoBlocked(false)
+        setGeoInfo({ ...data, crew_bypass: true })
+      } else {
+        setGeoBlocked(data.blocked)
+        setGeoInfo(data)
+      }
     } catch (err) {
       console.error('Geo check failed:', err)
       setGeoBlocked(false) // Allow access if geo check fails
@@ -150,6 +163,11 @@ export default function WatchPage() {
       setSessionToken(session.token)
       setHasAccess(true)
       setEmail(emailToVerify)
+      
+      // Track purchase complete if this is from Stripe redirect (new purchase)
+      if (stripeSessionId) {
+        trackPurchaseComplete(eventId, emailToVerify)
+      }
       
       // Store in localStorage for page refresh
       localStorage.setItem(`livestream_session_${eventId}`, session.token)

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit, Trash2, Eye, DollarSign, Users, Calendar, ToggleLeft, ToggleRight, Download, Radio, Copy, ExternalLink } from 'lucide-react'
+import { Plus, Edit, Trash2, Eye, DollarSign, Users, Calendar, ToggleLeft, ToggleRight, Download, Radio, Copy, ExternalLink, BarChart3, MapPin, TrendingUp, Shield, RefreshCw } from 'lucide-react'
 import { 
   getAllLivestreamEvents, 
   createLivestreamEvent, 
@@ -23,6 +23,8 @@ export default function LivestreamAdmin() {
   const [showEventModal, setShowEventModal] = useState(false)
   const [editingEvent, setEditingEvent] = useState(null)
   const [activeTab, setActiveTab] = useState('events')
+  const [analytics, setAnalytics] = useState({ funnel: [], blockedLocations: [], recentEvents: [] })
+  const [selectedEventForAnalytics, setSelectedEventForAnalytics] = useState('all')
 
   useEffect(() => {
     loadData()
@@ -38,10 +40,50 @@ export default function LivestreamAdmin() {
       setEvents(eventsData || [])
       setOrders(ordersData || [])
       setSettings(settingsData || { demo_mode: false })
+      
+      // Load analytics data
+      await loadAnalytics()
     } catch (err) {
       console.error('Failed to load data:', err)
     } finally {
       setLoading(false)
+    }
+  }
+  
+  const loadAnalytics = async (eventId = null) => {
+    try {
+      // Get funnel summary
+      let funnelQuery = supabase.from('livestream_funnel_summary').select('*')
+      if (eventId && eventId !== 'all') {
+        funnelQuery = funnelQuery.eq('event_id', eventId)
+      }
+      const { data: funnelData } = await funnelQuery
+      
+      // Get blocked locations
+      let blockedQuery = supabase.from('livestream_blocked_locations').select('*').limit(50)
+      if (eventId && eventId !== 'all') {
+        blockedQuery = blockedQuery.eq('event_id', eventId)
+      }
+      const { data: blockedData } = await blockedQuery
+      
+      // Get recent events
+      let recentQuery = supabase
+        .from('livestream_analytics')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100)
+      if (eventId && eventId !== 'all') {
+        recentQuery = recentQuery.eq('event_id', eventId)
+      }
+      const { data: recentData } = await recentQuery
+      
+      setAnalytics({
+        funnel: funnelData || [],
+        blockedLocations: blockedData || [],
+        recentEvents: recentData || []
+      })
+    } catch (err) {
+      console.error('Failed to load analytics:', err)
     }
   }
 
@@ -170,6 +212,16 @@ export default function LivestreamAdmin() {
             }`}
           >
             Orders ({orders.length})
+          </button>
+          <button
+            onClick={() => { setActiveTab('analytics'); loadAnalytics(selectedEventForAnalytics); }}
+            className={`pb-3 px-1 font-medium transition-colors flex items-center gap-2 ${
+              activeTab === 'analytics' 
+                ? 'text-red-500 border-b-2 border-red-500' 
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <BarChart3 size={16} /> Analytics
           </button>
         </div>
       </div>
@@ -356,6 +408,169 @@ export default function LivestreamAdmin() {
         </div>
       )}
 
+      {/* Analytics Tab */}
+      {activeTab === 'analytics' && (
+        <div className="space-y-6">
+          {/* Event Filter */}
+          <div className="flex items-center gap-4">
+            <label className="text-gray-400">Filter by Event:</label>
+            <select
+              value={selectedEventForAnalytics}
+              onChange={(e) => { setSelectedEventForAnalytics(e.target.value); loadAnalytics(e.target.value); }}
+              className="bg-dark-800 border border-dark-700 rounded-lg px-3 py-2 text-white"
+            >
+              <option value="all">All Events</option>
+              {events.map(e => (
+                <option key={e.id} value={e.id}>{e.title}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Funnel Overview */}
+          <div className="bg-dark-900 rounded-xl border border-dark-800 p-6">
+            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+              <TrendingUp className="text-red-500" /> Conversion Funnel
+            </h3>
+            {analytics.funnel.length === 0 ? (
+              <p className="text-gray-400">No analytics data yet. Data will appear after users visit event pages.</p>
+            ) : (
+              <div className="space-y-4">
+                {analytics.funnel.map((f, i) => {
+                  const eventTitle = events.find(e => e.id === f.event_id)?.title || 'Unknown Event'
+                  return (
+                    <div key={i} className="bg-dark-800 rounded-lg p-4">
+                      <h4 className="font-medium text-white mb-3">{eventTitle}</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 text-center">
+                        <div>
+                          <p className="text-2xl font-bold text-white">{f.page_views || 0}</p>
+                          <p className="text-xs text-gray-400">Page Views</p>
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-yellow-500">{f.geo_blocked || 0}</p>
+                          <p className="text-xs text-gray-400">Geo Blocked</p>
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-green-500">{f.geo_passed || 0}</p>
+                          <p className="text-xs text-gray-400">Geo Passed</p>
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-blue-500">{f.purchase_views || 0}</p>
+                          <p className="text-xs text-gray-400">Saw Checkout</p>
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-purple-500">{f.checkout_starts || 0}</p>
+                          <p className="text-xs text-gray-400">Started Checkout</p>
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-green-400">{f.purchases || 0}</p>
+                          <p className="text-xs text-gray-400">Purchased</p>
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-red-500">{f.checkout_conversion_pct || 0}%</p>
+                          <p className="text-xs text-gray-400">Conversion</p>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Blocked Locations */}
+          <div className="bg-dark-900 rounded-xl border border-dark-800 p-6">
+            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+              <MapPin className="text-yellow-500" /> Blocked User Locations
+            </h3>
+            {analytics.blockedLocations.length === 0 ? (
+              <p className="text-gray-400">No blocked users yet.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-dark-800">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-400">City</th>
+                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-400">Region</th>
+                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-400">Country</th>
+                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-400">Blocked Count</th>
+                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-400">Avg Distance</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-dark-800">
+                    {analytics.blockedLocations.map((loc, i) => (
+                      <tr key={i} className="hover:bg-dark-800/50">
+                        <td className="px-4 py-2 text-white">{loc.city || '—'}</td>
+                        <td className="px-4 py-2 text-gray-400">{loc.region || '—'}</td>
+                        <td className="px-4 py-2 text-gray-400">{loc.country || '—'}</td>
+                        <td className="px-4 py-2 text-yellow-500 font-medium">{loc.blocked_count}</td>
+                        <td className="px-4 py-2 text-gray-400">{loc.avg_distance_km ? `${loc.avg_distance_km}km` : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Recent Events Log */}
+          <div className="bg-dark-900 rounded-xl border border-dark-800 p-6">
+            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+              <BarChart3 className="text-blue-500" /> Recent Activity (Last 100)
+            </h3>
+            {analytics.recentEvents.length === 0 ? (
+              <p className="text-gray-400">No recent activity.</p>
+            ) : (
+              <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-dark-800 sticky top-0">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-400">Time</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-400">Event Type</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-400">Device</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-400">Location</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-400">Accuracy</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-400">Email</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-dark-800">
+                    {analytics.recentEvents.map((evt, i) => (
+                      <tr key={i} className="hover:bg-dark-800/50">
+                        <td className="px-3 py-2 text-gray-400 whitespace-nowrap">
+                          {new Date(evt.created_at).toLocaleString('en-AU', { 
+                            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+                          })}
+                        </td>
+                        <td className="px-3 py-2">
+                          <span className={`px-2 py-0.5 text-xs font-medium rounded ${
+                            evt.event_type === 'purchase_complete' ? 'bg-green-500/20 text-green-500' :
+                            evt.event_type === 'geo_blocked' ? 'bg-yellow-500/20 text-yellow-500' :
+                            evt.event_type === 'geo_passed' ? 'bg-blue-500/20 text-blue-500' :
+                            evt.event_type === 'checkout_start' ? 'bg-purple-500/20 text-purple-500' :
+                            'bg-gray-500/20 text-gray-400'
+                          }`}>
+                            {evt.event_type}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-gray-400">{evt.device_type || '—'}</td>
+                        <td className="px-3 py-2 text-gray-400">
+                          {evt.latitude && evt.longitude 
+                            ? `${evt.latitude.toFixed(4)}, ${evt.longitude.toFixed(4)}`
+                            : '—'}
+                        </td>
+                        <td className="px-3 py-2 text-gray-400">
+                          {evt.accuracy_meters ? `±${Math.round(evt.accuracy_meters)}m` : '—'}
+                        </td>
+                        <td className="px-3 py-2 text-gray-400">{evt.customer_email || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Event Modal */}
       {showEventModal && (
         <EventModal
@@ -425,7 +640,9 @@ function EventModal({ event, onClose, onSave }) {
     geo_lat: event?.geo_lat || null,
     geo_lng: event?.geo_lng || null,
     geo_radius_km: event?.geo_radius_km || 50,
-    geo_venue_address: event?.geo_venue_address || ''
+    geo_venue_address: event?.geo_venue_address || '',
+    crew_bypass_token: event?.crew_bypass_token || null,
+    bypass_created_at: event?.bypass_created_at || null
   })
   const [saving, setSaving] = useState(false)
   const [existingEvents, setExistingEvents] = useState([])
@@ -783,6 +1000,94 @@ function EventModal({ event, onClose, onSave }) {
                   setFormData({ ...formData, geo_radius_km: radius })
                 }}
               />
+            )}
+
+            {/* Crew Bypass Access - only show when geo-blocking is enabled */}
+            {formData.geo_blocking_enabled && event?.id && (
+              <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                <div className="flex items-center gap-2 mb-3">
+                  <Shield className="w-5 h-5 text-blue-500" />
+                  <h4 className="font-semibold text-white">Crew Access</h4>
+                </div>
+                <p className="text-sm text-gray-400 mb-4">
+                  Generate a bypass link for crew members at the venue who need to access the stream.
+                </p>
+                
+                {formData.crew_bypass_token ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={`https://fitfocusmedia.com.au/#/watch/${event.id}?bypass=${formData.crew_bypass_token}`}
+                        className="flex-1 px-3 py-2 bg-dark-900 border border-dark-700 rounded-lg text-gray-400 font-mono text-xs"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(`https://fitfocusmedia.com.au/#/watch/${event.id}?bypass=${formData.crew_bypass_token}`)
+                          alert('Crew bypass link copied!')
+                        }}
+                        className="px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
+                        title="Copy Link"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-gray-500">
+                        Created: {formData.bypass_created_at ? new Date(formData.bypass_created_at).toLocaleString('en-AU') : 'Unknown'}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!confirm('Regenerate bypass token? The old link will stop working immediately.')) return
+                          const newToken = crypto.randomUUID()
+                          const now = new Date().toISOString()
+                          await updateLivestreamEvent(event.id, { 
+                            crew_bypass_token: newToken,
+                            bypass_created_at: now
+                          })
+                          setFormData(prev => ({ 
+                            ...prev, 
+                            crew_bypass_token: newToken,
+                            bypass_created_at: now
+                          }))
+                          alert('New bypass token generated!')
+                        }}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-yellow-600 hover:bg-yellow-500 text-white text-sm rounded-lg transition-colors"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        Regenerate
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const newToken = crypto.randomUUID()
+                      const now = new Date().toISOString()
+                      await updateLivestreamEvent(event.id, { 
+                        crew_bypass_token: newToken,
+                        bypass_created_at: now
+                      })
+                      setFormData(prev => ({ 
+                        ...prev, 
+                        crew_bypass_token: newToken,
+                        bypass_created_at: now
+                      }))
+                      // Auto-copy to clipboard
+                      navigator.clipboard.writeText(`https://fitfocusmedia.com.au/#/watch/${event.id}?bypass=${newToken}`)
+                      alert('Crew bypass link generated and copied to clipboard!')
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
+                  >
+                    <Shield className="w-4 h-4" />
+                    Generate Crew Bypass Link
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
