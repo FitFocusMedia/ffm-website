@@ -740,10 +740,24 @@ function EventModal({ event, onClose, onSave }) {
     }))
   }
 
+  const normalizeUrl = (url) => {
+    if (!url || url.trim() === '') return ''
+    const trimmed = url.trim()
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed
+    }
+    return 'https://' + trimmed
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setSaving(true)
-    await onSave(formData)
+    const normalizedData = {
+      ...formData,
+      thumbnail_url: normalizeUrl(formData.thumbnail_url),
+      ticket_url: normalizeUrl(formData.ticket_url)
+    }
+    await onSave(normalizedData)
     setSaving(false)
   }
 
@@ -944,19 +958,21 @@ function EventModal({ event, onClose, onSave }) {
             <div>
               <label className="block text-sm font-medium text-gray-400 mb-1">Thumbnail URL</label>
               <input
-                type="url"
+                type="text"
                 value={formData.thumbnail_url}
                 onChange={(e) => setFormData({ ...formData, thumbnail_url: e.target.value })}
                 className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
+                placeholder="https://example.com/image.jpg"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-400 mb-1">Ticket URL</label>
               <input
-                type="url"
+                type="text"
                 value={formData.ticket_url}
                 onChange={(e) => setFormData({ ...formData, ticket_url: e.target.value })}
                 className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
+                placeholder="www.instagram.com/fitfocusmedia"
               />
             </div>
           </div>
