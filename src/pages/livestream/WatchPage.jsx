@@ -61,10 +61,12 @@ export default function WatchPage() {
       })
       const data = await response.json()
       
-      // If bypass was used, don't show as blocked
+      // If bypass was used, grant full access (skip purchase check too)
       if (data.bypass) {
         setGeoBlocked(false)
         setGeoInfo({ ...data, crew_bypass: true })
+        setHasAccess(true) // Crew bypass grants viewing access
+        setEmail('crew@bypass')
       } else {
         setGeoBlocked(data.blocked)
         setGeoInfo(data)
