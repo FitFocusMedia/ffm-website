@@ -111,7 +111,7 @@ export default function GeoBlockingMap({
 
   // Handle radius change
   const handleRadiusChange = (e) => {
-    const newRadius = parseInt(e.target.value)
+    const newRadius = parseInt(e.target.value) || 50 // Default to 50 if NaN
     setCurrentRadius(newRadius)
     if (onRadiusChange) {
       onRadiusChange(newRadius)
@@ -127,7 +127,7 @@ export default function GeoBlockingMap({
   }, [latitude, longitude])
 
   useEffect(() => {
-    setCurrentRadius(radius)
+    setCurrentRadius(radius || 50)
   }, [radius])
 
   return (
@@ -218,7 +218,7 @@ export default function GeoBlockingMap({
               </Marker>
               <Circle
                 center={markerPosition}
-                radius={currentRadius * 1000} // Convert km to meters
+                radius={(currentRadius || 50) * 1000} // Convert km to meters, default 50km
                 pathOptions={{
                   color: '#e63946',
                   fillColor: '#e63946',

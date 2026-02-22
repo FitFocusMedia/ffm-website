@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit, Trash2, Eye, DollarSign, Users, Calendar, ToggleLeft, ToggleRight, Download } from 'lucide-react'
+import { Plus, Edit, Trash2, Eye, DollarSign, Users, Calendar, ToggleLeft, ToggleRight, Download, Radio, Copy, ExternalLink } from 'lucide-react'
 import { 
   getAllLivestreamEvents, 
   createLivestreamEvent, 
@@ -9,9 +9,11 @@ import {
   getLivestreamSettings,
   updateLivestreamSettings,
   getOnboardingSessions,
-  getContracts
+  getContracts,
+  supabase
 } from '../../lib/supabase'
 import GeoBlockingMap from '../../components/GeoBlockingMap'
+import StreamStatusBadge from '../../components/StreamStatusBadge'
 
 export default function LivestreamAdmin() {
   const [events, setEvents] = useState([])
@@ -45,10 +47,14 @@ export default function LivestreamAdmin() {
 
   const toggleDemoMode = async () => {
     try {
-      const newSettings = await updateLivestreamSettings({ demo_mode: !settings.demo_mode })
-      setSettings(newSettings)
+      const newMode = !settings.demo_mode
+      const data = await updateLivestreamSettings({ demo_mode: newMode })
+      if (data) {
+        setSettings(data)
+      }
     } catch (err) {
       console.error('Failed to toggle demo mode:', err)
+      alert('Failed to toggle demo mode: ' + err.message)
     }
   }
 
@@ -180,8 +186,9 @@ export default function LivestreamAdmin() {
               <div key={event.id} className="bg-dark-900 rounded-xl p-5 border border-dark-800">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
+                    <div className="flex items-center gap-3 mb-2 flex-wrap">
                       <h3 className="text-lg font-bold text-white">{event.title}</h3>
+                      <StreamStatusBadge event={event} compact />
                       <span className={`px-2 py-0.5 text-xs font-medium rounded ${
                         event.status === 'live' ? 'bg-red-500 text-white' :
                         event.status === 'published' ? 'bg-green-500/20 text-green-500' :
@@ -198,15 +205,47 @@ export default function LivestreamAdmin() {
                       <span className="font-medium text-green-500">${event.price} AUD</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
+                    {/* Go Live Toggle */}
+                    <button
+                      onClick={async () => {
+                        const newStatus = event.is_live ? false : true
+                        await updateLivestreamEvent(event.id, { 
+                          is_live: newStatus,
+                          status: newStatus ? 'live' : 'published'
+                        })
+                        loadData()
+                      }}
+                      className={`p-2 rounded-lg transition-colors ${
+                        event.is_live 
+                          ? 'text-red-500 bg-red-500/20 hover:bg-red-500/30' 
+                          : 'text-gray-400 hover:text-red-500 hover:bg-dark-800'
+                      }`}
+                      title={event.is_live ? 'Stop Live' : 'Go Live'}
+                    >
+                      <Radio className="w-5 h-5" />
+                    </button>
+                    {/* Copy Link */}
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(`https://fitfocusmedia.com.au/#/live/${event.id}`)
+                        alert('Event link copied!')
+                      }}
+                      className="p-2 text-gray-400 hover:text-white hover:bg-dark-800 rounded-lg transition-colors"
+                      title="Copy Link"
+                    >
+                      <Copy className="w-5 h-5" />
+                    </button>
+                    {/* View */}
                     <a
-                      href={`/live/${event.id}`}
+                      href={`#/live/${event.id}`}
                       target="_blank"
                       className="p-2 text-gray-400 hover:text-white hover:bg-dark-800 rounded-lg transition-colors"
-                      title="View"
+                      title="View Event Page"
                     >
                       <Eye className="w-5 h-5" />
                     </a>
+                    {/* Edit */}
                     <button
                       onClick={() => { setEditingEvent(event); setShowEventModal(true) }}
                       className="p-2 text-gray-400 hover:text-white hover:bg-dark-800 rounded-lg transition-colors"
@@ -214,6 +253,7 @@ export default function LivestreamAdmin() {
                     >
                       <Edit className="w-5 h-5" />
                     </button>
+                    {/* Delete */}
                     <button
                       onClick={() => handleDeleteEvent(event.id)}
                       className="p-2 text-gray-400 hover:text-red-500 hover:bg-dark-800 rounded-lg transition-colors"
@@ -232,6 +272,43 @@ export default function LivestreamAdmin() {
       {/* Orders Tab */}
       {activeTab === 'orders' && (
         <div className="bg-dark-900 rounded-xl border border-dark-800 overflow-hidden">
+          {/* Orders Header with Export */}
+          {orders.length > 0 && (
+            <div className="flex items-center justify-between px-4 py-3 border-b border-dark-800">
+              <p className="text-sm text-gray-400">
+                {orders.filter(o => o.status === 'completed').length} completed orders
+                <span className="text-green-500 ml-2">
+                  ${orders.filter(o => o.status === 'completed').reduce((sum, o) => sum + parseFloat(o.amount || 0), 0).toFixed(2)} total
+                </span>
+              </p>
+              <button
+                onClick={() => {
+                  const headers = ['Order ID', 'Email', 'Event', 'Amount', 'Status', 'Date', 'Payment Method']
+                  const rows = orders.map(o => [
+                    o.id,
+                    o.email,
+                    o.event?.title || '',
+                    o.amount,
+                    o.status,
+                    new Date(o.created_at).toLocaleString('en-AU'),
+                    o.payment_method || 'stripe'
+                  ])
+                  const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n')
+                  const blob = new Blob([csv], { type: 'text/csv' })
+                  const url = URL.createObjectURL(blob)
+                  const a = document.createElement('a')
+                  a.href = url
+                  a.download = `livestream-orders-${new Date().toISOString().slice(0, 10)}.csv`
+                  a.click()
+                  URL.revokeObjectURL(url)
+                }}
+                className="flex items-center gap-2 px-3 py-1.5 bg-dark-800 hover:bg-dark-700 text-gray-300 hover:text-white rounded-lg text-sm transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                Export CSV
+              </button>
+            </div>
+          )}
           {orders.length === 0 ? (
             <div className="text-center py-12 text-gray-400">
               No orders yet.
@@ -286,11 +363,37 @@ export default function LivestreamAdmin() {
           onClose={() => { setShowEventModal(false); setEditingEvent(null) }}
           onSave={async (data) => {
             try {
+              let eventId = editingEvent?.id
+              
               if (editingEvent) {
                 await updateLivestreamEvent(editingEvent.id, data)
               } else {
-                await createLivestreamEvent(data)
+                // Create new event
+                const newEvent = await createLivestreamEvent(data)
+                eventId = newEvent.id
+                
+                // Auto-create MUX stream for new events
+                try {
+                  const { data: muxData, error: muxErr } = await supabase.functions.invoke('mux-stream', {
+                    body: { action: 'create', event_id: eventId }
+                  })
+                  if (muxErr) {
+                    console.error('MUX stream creation failed:', muxErr)
+                  } else if (muxData?.stream_key) {
+                    // Copy stream key to clipboard
+                    const obsConfig = `Server: ${muxData.rtmp_url}\nStream Key: ${muxData.stream_key}`
+                    navigator.clipboard.writeText(muxData.stream_key).then(() => {
+                      alert(`MUX Stream Created! ✅\n\nStream Key copied to clipboard!\n\nFor OBS:\n• Server: ${muxData.rtmp_url}\n• Stream Key: (already copied)\n\nJust paste (Cmd+V) in OBS Stream Key field.`)
+                    }).catch(() => {
+                      // Fallback: use prompt so they can copy
+                      prompt('MUX Stream Created! Copy this Stream Key:', muxData.stream_key)
+                    })
+                  }
+                } catch (muxErr) {
+                  console.error('MUX stream creation failed:', muxErr)
+                }
               }
+              
               await loadData()
               setShowEventModal(false)
               setEditingEvent(null)
@@ -317,6 +420,7 @@ function EventModal({ event, onClose, onSave }) {
     ticket_url: event?.ticket_url || '',
     status: event?.status || 'draft',
     mux_playback_id: event?.mux_playback_id || '',
+    mux_stream_key: event?.mux_stream_key || '',
     geo_blocking_enabled: event?.geo_blocking_enabled || false,
     geo_lat: event?.geo_lat || null,
     geo_lng: event?.geo_lng || null,
@@ -542,15 +646,71 @@ function EventModal({ event, onClose, onSave }) {
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">MUX Playback ID</label>
-            <input
-              type="text"
-              value={formData.mux_playback_id}
-              onChange={(e) => setFormData({ ...formData, mux_playback_id: e.target.value })}
-              className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
-              placeholder="Leave empty for demo"
-            />
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-400 mb-1">MUX Playback ID</label>
+              <input
+                type="text"
+                value={formData.mux_playback_id}
+                onChange={(e) => setFormData({ ...formData, mux_playback_id: e.target.value })}
+                className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
+                placeholder="Auto-generated on create"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-400 mb-1">MUX Stream Key (for OBS)</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={formData.mux_stream_key}
+                  readOnly
+                  className="flex-1 px-3 py-2 bg-dark-900 border border-dark-700 rounded-lg text-gray-400 font-mono text-sm"
+                  placeholder={formData.mux_stream_key ? '' : 'Click Generate to create'}
+                />
+                {formData.mux_stream_key ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(formData.mux_stream_key)
+                      alert('Stream Key copied!')
+                    }}
+                    className="px-3 py-2 bg-dark-700 hover:bg-dark-600 text-white rounded-lg transition-colors"
+                  >
+                    Copy
+                  </button>
+                ) : event?.id && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const { data: muxData, error } = await supabase.functions.invoke('mux-stream', {
+                          body: { action: 'create', event_id: event.id }
+                        })
+                        if (error) {
+                          alert('Failed to create stream: ' + error.message)
+                          return
+                        }
+                        if (muxData?.stream_key) {
+                          setFormData(prev => ({
+                            ...prev,
+                            mux_stream_key: muxData.stream_key,
+                            mux_playback_id: muxData.playback_id
+                          }))
+                          navigator.clipboard.writeText(muxData.stream_key)
+                          alert('MUX Stream created! Stream Key copied to clipboard.')
+                        }
+                      } catch (err) {
+                        alert('Failed to create stream: ' + err.message)
+                      }
+                    }}
+                    className="px-3 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors whitespace-nowrap"
+                  >
+                    Generate
+                  </button>
+                )}
+              </div>
+              <p className="text-sm text-amber-400 mt-1 font-medium">📡 RTMP Server: rtmps://global-live.mux.com:443/app</p>
+            </div>
           </div>
 
           <div>

@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Calendar, MapPin, Clock, CreditCard, Check, Shield } from 'lucide-react'
+import { Calendar, MapPin, Clock, CreditCard, Check, Shield, AlertTriangle, Users } from 'lucide-react'
 import { getLivestreamEvent, getLivestreamSettings, createLivestreamOrder } from '../../lib/supabase'
+import CountdownTimer from '../../components/CountdownTimer'
+import SocialShare from '../../components/SocialShare'
+import MetaTags from '../../components/MetaTags'
+import AddToCalendar from '../../components/AddToCalendar'
 
 export default function EventPage() {
   const { eventId } = useParams()
@@ -12,10 +16,43 @@ export default function EventPage() {
   const [loading, setLoading] = useState(true)
   const [purchasing, setPurchasing] = useState(false)
   const [error, setError] = useState(null)
+  const [geoBlocked, setGeoBlocked] = useState(null)
+  const [geoInfo, setGeoInfo] = useState(null)
+  const [checkingGeo, setCheckingGeo] = useState(false)
 
   useEffect(() => {
     loadData()
   }, [eventId])
+
+  // Check geo-blocking after event loads
+  useEffect(() => {
+    if (event && event.geo_blocking_enabled) {
+      checkGeoBlocking()
+    }
+  }, [event])
+
+  const checkGeoBlocking = async () => {
+    setCheckingGeo(true)
+    try {
+      const response = await fetch('https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/geo-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          venue_lat: event.geo_lat,
+          venue_lng: event.geo_lng,
+          radius_km: event.geo_radius_km || 50
+        })
+      })
+      const data = await response.json()
+      setGeoBlocked(data.blocked)
+      setGeoInfo(data)
+    } catch (err) {
+      console.error('Geo check failed:', err)
+      setGeoBlocked(false)
+    } finally {
+      setCheckingGeo(false)
+    }
+  }
 
   const loadData = async () => {
     try {
@@ -58,17 +95,20 @@ export default function EventPage() {
         // Redirect to watch page
         navigate(`/watch/${eventId}?email=${encodeURIComponent(email)}`)
       } else {
-        // Live mode - redirect to Stripe
-        // TODO: Implement Stripe checkout via API
-        const response = await fetch('/api/livestream/checkout', {
+        // Live mode - redirect to Stripe via Supabase Edge Function
+        const response = await fetch('https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/livestream-checkout', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ eventId, email })
+          body: JSON.stringify({ event_id: eventId, email })
         })
         
         const data = await response.json()
-        if (data.checkoutUrl) {
-          window.location.href = data.checkoutUrl
+        if (data.demo && data.redirect) {
+          // Demo mode - direct redirect
+          window.location.href = data.redirect
+        } else if (data.url) {
+          // Stripe checkout URL
+          window.location.href = data.url
         } else {
           throw new Error(data.error || 'Checkout failed')
         }
@@ -96,11 +136,67 @@ export default function EventPage() {
     )
   }
 
+  // Checking geo-location
+  if (checkingGeo) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-500 mx-auto mb-4"></div>
+          <p className="text-gray-400">Checking your location...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Geo-blocked - show tickets instead
+  if (geoBlocked) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-dark-900 rounded-xl p-8 text-center">
+          <AlertTriangle className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">You're Close to the Venue!</h2>
+          <p className="text-gray-400 mb-4">
+            Online streaming is not available within {event.geo_radius_km || 50}km of the venue.
+          </p>
+          {geoInfo?.user_location && (
+            <p className="text-gray-500 text-sm mb-4">
+              Your location: {geoInfo.user_location.city}, {geoInfo.user_location.country}<br/>
+              Distance from venue: {geoInfo.distance_km}km
+            </p>
+          )}
+          <p className="text-gray-400 mb-6">
+            Great news — you can watch this event live in person!
+          </p>
+          <p className="text-white font-semibold mb-6">{event.venue}</p>
+          {event.ticket_url ? (
+            <a
+              href={event.ticket_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-lg transition-colors"
+            >
+              Get Tickets
+            </a>
+          ) : (
+            <p className="text-gray-500">Contact the venue for ticket information.</p>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   const eventDate = new Date(event.start_time)
   const isLive = event.is_live || event.status === 'live'
   const isPast = event.status === 'ended' || new Date(event.end_time) < new Date()
 
   return (
+    <>
+      <MetaTags 
+        title={`${event.title} - ${event.organization}`}
+        description={`Watch ${event.title} live! ${eventDate.toLocaleDateString('en-AU')} at ${event.venue}. Stream access $${event.price} AUD.`}
+        image={event.thumbnail_url}
+        type="video.other"
+      />
     <div className="py-16 px-4">
       <div className="max-w-5xl mx-auto">
         <div className="grid lg:grid-cols-5 gap-8">
@@ -129,10 +225,31 @@ export default function EventPage() {
             </div>
 
             {/* Title & Org */}
-            <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
-              {event.title}
-            </h1>
-            <p className="text-xl text-gray-400 mb-6">{event.organization}</p>
+            <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
+              <div>
+                <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
+                  {event.title}
+                </h1>
+                <p className="text-xl text-gray-400">{event.organization}</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <AddToCalendar event={event} />
+                <SocialShare 
+                  title={`Watch ${event.title} Live!`}
+                  description={`${event.organization} - ${eventDate.toLocaleDateString('en-AU')}`}
+                />
+              </div>
+            </div>
+
+            {/* Countdown Timer - show if event hasn't started */}
+            {!isLive && !isPast && (
+              <div className="mb-8 p-6 bg-dark-800/50 rounded-xl border border-dark-700">
+                <CountdownTimer 
+                  targetDate={event.start_time}
+                  onComplete={() => window.location.reload()}
+                />
+              </div>
+            )}
 
             {/* Event Info */}
             <div className="grid sm:grid-cols-2 gap-4 mb-8">
@@ -248,5 +365,6 @@ export default function EventPage() {
         </div>
       </div>
     </div>
+    </>
   )
 }

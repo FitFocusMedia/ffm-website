@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
-import { Calendar, MapPin, AlertCircle, RefreshCw } from 'lucide-react'
+import { Calendar, MapPin, AlertCircle, RefreshCw, Clock, Bell } from 'lucide-react'
 import MuxPlayer from '@mux/mux-player-react'
 import { 
   getLivestreamEvent, 
@@ -8,6 +8,8 @@ import {
   createLivestreamSession,
   updateSessionHeartbeat 
 } from '../../lib/supabase'
+import CountdownTimer from '../../components/CountdownTimer'
+import ViewerCount from '../../components/ViewerCount'
 
 export default function WatchPage() {
   const { eventId } = useParams()
@@ -20,6 +22,8 @@ export default function WatchPage() {
   const [verifying, setVerifying] = useState(false)
   const [error, setError] = useState(null)
   const [sessionEnded, setSessionEnded] = useState(false)
+  const [geoBlocked, setGeoBlocked] = useState(null)
+  const [geoInfo, setGeoInfo] = useState(null)
   const heartbeatRef = useRef(null)
 
   useEffect(() => {
@@ -30,6 +34,33 @@ export default function WatchPage() {
       }
     }
   }, [eventId])
+
+  // Check geo-blocking after event loads
+  useEffect(() => {
+    if (event && event.geo_blocking_enabled) {
+      checkGeoBlocking()
+    }
+  }, [event])
+
+  const checkGeoBlocking = async () => {
+    try {
+      const response = await fetch('https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/geo-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          venue_lat: event.geo_lat,
+          venue_lng: event.geo_lng,
+          radius_km: event.geo_radius_km || 50
+        })
+      })
+      const data = await response.json()
+      setGeoBlocked(data.blocked)
+      setGeoInfo(data)
+    } catch (err) {
+      console.error('Geo check failed:', err)
+      setGeoBlocked(false) // Allow access if geo check fails
+    }
+  }
 
   // Auto-verify if email in URL
   useEffect(() => {
@@ -84,13 +115,29 @@ export default function WatchPage() {
     setSessionEnded(false)
 
     try {
-      // Check for valid order
-      const order = await getLivestreamOrderByEmail(eventId, emailToVerify)
+      // Check for Stripe session_id in URL (redirect from checkout)
+      const stripeSessionId = searchParams.get('session_id')
       
-      if (!order) {
-        setError('No purchase found for this email. Please check your email or purchase access.')
-        setHasAccess(false)
-        return
+      // Verify payment via Edge Function
+      const verifyResponse = await fetch('https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/verify-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          session_id: stripeSessionId, 
+          event_id: eventId, 
+          email: emailToVerify 
+        })
+      })
+      const verifyData = await verifyResponse.json()
+      
+      if (!verifyData.verified) {
+        // Fallback to direct order check
+        const order = await getLivestreamOrderByEmail(eventId, emailToVerify)
+        if (!order) {
+          setError('No purchase found for this email. Please check your email or purchase access.')
+          setHasAccess(false)
+          return
+        }
       }
 
       // Create viewing session
@@ -128,6 +175,41 @@ export default function WatchPage() {
     return (
       <div className="min-h-screen bg-dark-950 flex items-center justify-center">
         <p className="text-red-500">{error}</p>
+      </div>
+    )
+  }
+
+  // Geo-blocked
+  if (geoBlocked) {
+    return (
+      <div className="min-h-screen bg-dark-950 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-dark-900 rounded-xl p-8 text-center">
+          <MapPin className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">Location Restricted</h2>
+          <p className="text-gray-400 mb-4">
+            Online streaming is not available within {event.geo_radius_km || 50}km of the venue.
+          </p>
+          {geoInfo?.user_location && (
+            <p className="text-gray-500 text-sm mb-4">
+              Your location: {geoInfo.user_location.city}, {geoInfo.user_location.country}<br/>
+              Distance from venue: {geoInfo.distance_km}km
+            </p>
+          )}
+          <p className="text-gray-400 mb-6">
+            This event is available to watch in person at:
+          </p>
+          <p className="text-white font-semibold mb-6">{event.venue}</p>
+          {event.ticket_url && (
+            <a
+              href={event.ticket_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-lg transition-colors"
+            >
+              Get Tickets
+            </a>
+          )}
+        </div>
       </div>
     )
   }
@@ -209,6 +291,84 @@ export default function WatchPage() {
   // Has access - show player
   const eventDate = new Date(event.start_time)
   const isLive = event.is_live || event.status === 'live'
+  const eventNotStarted = !isLive && new Date() < eventDate
+
+  // Waiting Room - event hasn't started yet
+  if (eventNotStarted) {
+    return (
+      <div className="min-h-screen bg-dark-950">
+        {/* Waiting Room Header */}
+        <div className="w-full bg-gradient-to-b from-dark-900 to-dark-950">
+          <div className="max-w-4xl mx-auto px-4 py-16 text-center">
+            {/* Thumbnail */}
+            {event.thumbnail_url && (
+              <div className="relative max-w-2xl mx-auto mb-8 rounded-xl overflow-hidden shadow-2xl">
+                <img 
+                  src={event.thumbnail_url} 
+                  alt={event.title}
+                  className="w-full aspect-video object-cover opacity-80"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-dark-950 via-transparent to-transparent" />
+              </div>
+            )}
+
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-500/20 text-yellow-500 rounded-full text-sm font-medium mb-6">
+              <Clock className="w-4 h-4" />
+              Waiting Room
+            </div>
+
+            <h1 className="text-3xl md:text-4xl font-bold text-white mb-3">
+              {event.title}
+            </h1>
+            <p className="text-xl text-gray-400 mb-8">{event.organization}</p>
+
+            {/* Countdown */}
+            <div className="bg-dark-800/50 rounded-2xl p-8 max-w-xl mx-auto mb-8 border border-dark-700">
+              <CountdownTimer 
+                targetDate={event.start_time}
+                onComplete={() => window.location.reload()}
+              />
+            </div>
+
+            {/* Event Info */}
+            <div className="flex flex-wrap justify-center gap-6 text-gray-400 mb-8">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-red-500" />
+                {eventDate.toLocaleDateString('en-AU', {
+                  weekday: 'long',
+                  day: 'numeric',
+                  month: 'long'
+                })}
+              </div>
+              <div className="flex items-center gap-2">
+                <Clock className="w-5 h-5 text-red-500" />
+                {eventDate.toLocaleTimeString('en-AU', {
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })} AEST
+              </div>
+              <div className="flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-red-500" />
+                {event.venue}
+              </div>
+            </div>
+
+            {/* Notification prompt */}
+            <div className="bg-dark-800 rounded-xl p-6 max-w-md mx-auto border border-dark-700">
+              <Bell className="w-8 h-8 text-red-500 mx-auto mb-3" />
+              <p className="text-white font-medium mb-2">Don't miss the start!</p>
+              <p className="text-gray-400 text-sm mb-4">
+                Keep this tab open — it will automatically refresh when the event goes live.
+              </p>
+              <p className="text-gray-500 text-xs">
+                Logged in as: {email}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-dark-950">
@@ -245,6 +405,8 @@ export default function WatchPage() {
             </div>
             <p className="text-gray-400">{event.organization}</p>
           </div>
+          {/* Viewer Count - shows when live */}
+          {isLive && <ViewerCount eventId={eventId} />}
         </div>
 
         <div className="flex flex-wrap gap-6 text-sm text-gray-400">
