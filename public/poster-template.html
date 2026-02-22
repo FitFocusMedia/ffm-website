@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      overflow: hidden;
+    }
+    .poster {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      background: url('livestream-bg.jpg') center center / cover no-repeat;
+    }
+    .overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        180deg,
+        rgba(0,0,0,0.6) 0%,
+        rgba(0,0,0,0.4) 40%,
+        rgba(0,0,0,0.5) 70%,
+        rgba(0,0,0,0.8) 100%
+      );
+    }
+    .content {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+    .play-button {
+      width: 140px;
+      height: 140px;
+      border: 4px solid rgba(239, 68, 68, 0.8);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 40px;
+      box-shadow: 0 0 60px rgba(239, 68, 68, 0.4);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.05); opacity: 0.8; }
+    }
+    .play-icon {
+      width: 0;
+      height: 0;
+      border-left: 50px solid #ef4444;
+      border-top: 30px solid transparent;
+      border-bottom: 30px solid transparent;
+      margin-left: 12px;
+    }
+    .title {
+      font-size: 56px;
+      font-weight: 800;
+      color: white;
+      text-transform: uppercase;
+      letter-spacing: 8px;
+      text-shadow: 0 4px 20px rgba(0,0,0,0.8);
+      margin-bottom: 16px;
+    }
+    .subtitle {
+      font-size: 22px;
+      color: rgba(255,255,255,0.7);
+      letter-spacing: 3px;
+    }
+    .bottom-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 60px;
+      background: linear-gradient(90deg, #dc2626, #ef4444, #dc2626);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .bottom-text {
+      font-size: 18px;
+      font-weight: 700;
+      color: white;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+    }
+    .logo-container {
+      position: absolute;
+      top: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+    .logo {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 3px solid rgba(255,255,255,0.3);
+    }
+    .corner-accent {
+      position: absolute;
+      width: 150px;
+      height: 150px;
+      border: 3px solid rgba(239, 68, 68, 0.3);
+    }
+    .corner-tl { top: 30px; left: 30px; border-right: none; border-bottom: none; }
+    .corner-tr { top: 30px; right: 30px; border-left: none; border-bottom: none; }
+    .corner-bl { bottom: 90px; left: 30px; border-right: none; border-top: none; }
+    .corner-br { bottom: 90px; right: 30px; border-left: none; border-top: none; }
+  </style>
+</head>
+<body>
+  <div class="poster">
+    <div class="overlay"></div>
+    <div class="corner-accent corner-tl"></div>
+    <div class="corner-accent corner-tr"></div>
+    <div class="corner-accent corner-bl"></div>
+    <div class="corner-accent corner-br"></div>
+    <div class="logo-container">
+      <img src="ffm-logo.jpg" class="logo" alt="FFM">
+    </div>
+    <div class="content">
+      <div class="play-button">
+        <div class="play-icon"></div>
+      </div>
+      <div class="title">Stream Starting Soon</div>
+      <div class="subtitle">Get ready for live combat sports action</div>
+    </div>
+    <div class="bottom-bar">
+      <span class="bottom-text">FitFocus Media • Live Combat Sports</span>
+    </div>
+  </div>
+</body>
+</html>
