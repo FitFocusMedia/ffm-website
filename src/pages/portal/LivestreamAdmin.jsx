@@ -1030,34 +1030,63 @@ function EventModal({ event, onClose, onSave }) {
                 </p>
                 
                 {formData.crew_bypass_token ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        readOnly
-                        value={`https://fitfocusmedia.com.au/#/watch/${event.id}?bypass=${formData.crew_bypass_token}`}
-                        className="flex-1 px-3 py-2 bg-dark-900 border border-dark-700 rounded-lg text-gray-400 font-mono text-xs"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(`https://fitfocusmedia.com.au/#/watch/${event.id}?bypass=${formData.crew_bypass_token}`)
-                          alert('Crew bypass link copied!')
-                        }}
-                        className="px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
-                        title="Copy Link"
-                      >
-                        <Copy className="w-4 h-4" />
-                      </button>
+                  <div className="space-y-4">
+                    {/* Live Stream Link */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-400 mb-1">📡 Live Stream (for monitoring during event)</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          readOnly
+                          value={`https://fitfocusmedia.com.au/#/watch/${event.id}?bypass=${formData.crew_bypass_token}`}
+                          className="flex-1 px-3 py-2 bg-dark-900 border border-dark-700 rounded-lg text-gray-400 font-mono text-xs"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(`https://fitfocusmedia.com.au/#/watch/${event.id}?bypass=${formData.crew_bypass_token}`)
+                            alert('Live stream link copied!')
+                          }}
+                          className="px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
+                          title="Copy Link"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between">
+                    
+                    {/* Preview Player Link */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-400 mb-1">🎨 Preview Player (for design testing before event)</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          readOnly
+                          value={`https://fitfocusmedia.com.au/#/watch/${event.id}?bypass=${formData.crew_bypass_token}&preview=player`}
+                          className="flex-1 px-3 py-2 bg-dark-900 border border-dark-700 rounded-lg text-gray-400 font-mono text-xs"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(`https://fitfocusmedia.com.au/#/watch/${event.id}?bypass=${formData.crew_bypass_token}&preview=player`)
+                            alert('Preview player link copied!')
+                          }}
+                          className="px-3 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors"
+                          title="Copy Link"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-between pt-2 border-t border-dark-700">
                       <p className="text-xs text-gray-500">
                         Created: {formData.bypass_created_at ? new Date(formData.bypass_created_at).toLocaleString('en-AU') : 'Unknown'}
                       </p>
                       <button
                         type="button"
                         onClick={async () => {
-                          if (!confirm('Regenerate bypass token? The old link will stop working immediately.')) return
+                          if (!confirm('Regenerate bypass token? Both links will stop working immediately.')) return
                           const newToken = crypto.randomUUID()
                           const now = new Date().toISOString()
                           await updateLivestreamEvent(event.id, { 
