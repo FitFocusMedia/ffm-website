@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { Calendar, MapPin, AlertCircle, RefreshCw, Clock, Bell, Play, Sparkles, Lock, Mail, Users } from 'lucide-react'
 import { 
+  supabase,
   getLivestreamEvent, 
   getLivestreamOrderByEmail,
   createLivestreamSession,
@@ -183,24 +184,34 @@ export default function WatchPage() {
     try {
       const stripeSessionId = searchParams.get('session_id')
       
-      const verifyResponse = await fetch('https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/verify-payment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          session_id: stripeSessionId, 
-          event_id: eventId, 
-          email: emailToVerify 
-        })
-      })
-      const verifyData = await verifyResponse.json()
+      // Try to find order directly first (works for demo mode + completed Stripe orders)
+      let order = await getLivestreamOrderByEmail(eventId, emailToVerify)
       
-      if (!verifyData.verified) {
-        const order = await getLivestreamOrderByEmail(eventId, emailToVerify)
-        if (!order) {
-          setError('No purchase found for this email. Please check your email or purchase access.')
-          setHasAccess(false)
-          return
+      // If no order found and we have a Stripe session, try to verify via edge function
+      if (!order && stripeSessionId) {
+        try {
+          const { data: verifyData } = await supabase.functions.invoke('verify-payment', {
+            body: { 
+              session_id: stripeSessionId, 
+              event_id: eventId, 
+              email: emailToVerify 
+            }
+          })
+          
+          if (verifyData?.verified) {
+            // Refetch order after verification
+            order = await getLivestreamOrderByEmail(eventId, emailToVerify)
+          }
+        } catch (verifyErr) {
+          console.warn('Payment verification edge function failed:', verifyErr)
+          // Continue - we'll check order below
         }
+      }
+      
+      if (!order) {
+        setError('No purchase found for this email. Please check your email or purchase access.')
+        setHasAccess(false)
+        return
       }
 
       const session = await createLivestreamSession({
