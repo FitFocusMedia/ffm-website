@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { Calendar, MapPin, Clock, AlertTriangle, Navigation, Play, Users, Star, Sparkles } from 'lucide-react'
-import { getLivestreamEvent, getLivestreamSettings, createLivestreamOrder } from '../../lib/supabase'
+import { supabase, getLivestreamEvent, getLivestreamSettings, createLivestreamOrder } from '../../lib/supabase'
 import { trackPageView, trackGeoCheck, trackGeoBlocked, trackGeoPassed, trackPurchaseView, trackCheckoutStart } from '../../lib/analytics'
 import PremiumCountdown from '../../components/PremiumCountdown'
 import PremiumPurchaseCard from '../../components/PremiumPurchaseCard'
@@ -188,19 +188,18 @@ export default function EventPage() {
         })
         navigate(`/watch/${eventId}?email=${encodeURIComponent(email)}`)
       } else {
-        const response = await fetch('https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/livestream_checkout', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
+        // Use supabase client to invoke edge function (handles auth automatically)
+        const { data, error: invokeError } = await supabase.functions.invoke('livestream_checkout', {
+          body: { 
             event_id: eventId, 
             email,
             buyer_lat: userLocation?.lat,
             buyer_lng: userLocation?.lng,
             distance_from_venue_km: userLocation?.distance_km
-          })
+          }
         })
         
-        const data = await response.json()
+        if (invokeError) throw invokeError
         if (data.demo && data.redirect) {
           window.location.href = data.redirect
         } else if (data.url) {
