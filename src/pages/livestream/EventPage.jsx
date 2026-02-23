@@ -173,7 +173,7 @@ export default function EventPage() {
 
     try {
       // Direct fetch to edge function (sb_publishable key doesn't work with supabase.functions.invoke)
-      const response = await fetch('https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/livestream-checkout', {
+      const response = await fetch('https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/livestream_checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
