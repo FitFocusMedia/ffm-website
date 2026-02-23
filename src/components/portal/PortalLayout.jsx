@@ -22,6 +22,7 @@ export default function PortalLayout({ children }) {
   const tabs = [
     { name: 'Contracts', path: '/portal/contracts' },
     { name: 'Pipeline', path: '/portal/pipeline' },
+    { name: 'Proposals', path: '/portal/proposals' },
     { name: 'Outreach', path: '/portal/outreach' },
     { name: 'Onboarding', path: '/portal/onboarding' },
     { name: 'Content', path: '/portal/content-admin' },

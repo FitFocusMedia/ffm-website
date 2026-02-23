@@ -46,6 +46,8 @@ import OrderManagement from './pages/portal/OrderManagement'
 import PricingCalculator from './pages/portal/PricingCalculator'
 import CrewManagement from './pages/portal/CrewManagement'
 import LivestreamAdmin from './pages/portal/LivestreamAdmin'
+import ProposalAdmin from './pages/portal/ProposalAdmin'
+import ProposalView from './pages/ProposalView'
 
 // Livestream imports
 import EventsPage from './pages/livestream/EventsPage'
@@ -108,6 +110,9 @@ function App() {
 
         {/* Public Contract View - NO AUTH REQUIRED, NO Navbar/Footer */}
         <Route path="/contract/:shareToken" element={<ContractPublicView />} />
+
+        {/* Public Proposal View - NO AUTH REQUIRED, NO Navbar/Footer */}
+        <Route path="/proposals/:slug" element={<ProposalView />} />
 
         {/* Public Onboarding Portal - NO AUTH REQUIRED, NO Navbar/Footer */}
         <Route path="/onboarding/:token" element={<OnboardingPortal />} />
@@ -294,6 +299,18 @@ function App() {
             <ProtectedRoute>
               <PortalLayout>
                 <LivestreamAdmin />
+              </PortalLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Proposal Generator Admin */}
+        <Route
+          path="/portal/proposals"
+          element={
+            <ProtectedRoute>
+              <PortalLayout>
+                <ProposalAdmin />
               </PortalLayout>
             </ProtectedRoute>
           }

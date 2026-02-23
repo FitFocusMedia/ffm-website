@@ -1029,3 +1029,186 @@ export async function getUserPurchaseHistory(email) {
   if (error) throw error
   return data
 }
+
+// ============================================
+// PROPOSAL GENERATOR
+// ============================================
+
+/**
+ * Generate URL-safe slug from org name
+ */
+function generateSlug(orgName, eventName) {
+  const base = eventName 
+    ? `${orgName}-${eventName}` 
+    : orgName
+  
+  return base
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .substring(0, 60)
+}
+
+/**
+ * Get all proposals (admin)
+ */
+export async function getProposals() {
+  const { data, error } = await supabase
+    .from('proposals')
+    .select('*')
+    .order('created_at', { ascending: false })
+  
+  if (error) throw error
+  return data
+}
+
+/**
+ * Get proposal by ID (admin)
+ */
+export async function getProposalById(id) {
+  const { data, error } = await supabase
+    .from('proposals')
+    .select('*')
+    .eq('id', id)
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+/**
+ * Get proposal by slug (public)
+ */
+export async function getProposalBySlug(slug) {
+  const { data, error } = await supabase
+    .from('proposals')
+    .select('*')
+    .eq('slug', slug)
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+/**
+ * Create a proposal
+ */
+export async function createProposal(proposalData) {
+  // Generate slug if not provided
+  const slug = proposalData.slug || generateSlug(
+    proposalData.org_name, 
+    proposalData.event_name
+  )
+  
+  // Add timestamp suffix if slug might conflict
+  const uniqueSlug = `${slug}-${Date.now().toString(36)}`
+  
+  const { data, error } = await supabase
+    .from('proposals')
+    .insert([{
+      ...proposalData,
+      slug: uniqueSlug,
+      status: proposalData.status || 'draft'
+    }])
+    .select()
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+/**
+ * Update a proposal
+ */
+export async function updateProposal(id, updates) {
+  const { data, error } = await supabase
+    .from('proposals')
+    .update({ 
+      ...updates, 
+      updated_at: new Date().toISOString() 
+    })
+    .eq('id', id)
+    .select()
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+/**
+ * Delete a proposal
+ */
+export async function deleteProposal(id) {
+  const { error } = await supabase
+    .from('proposals')
+    .delete()
+    .eq('id', id)
+  
+  if (error) throw error
+}
+
+/**
+ * Track proposal view (public)
+ */
+export async function trackProposalView(slug) {
+  // Use RPC function or direct update
+  const { data: proposal, error: fetchError } = await supabase
+    .from('proposals')
+    .select('id, views')
+    .eq('slug', slug)
+    .single()
+  
+  if (fetchError) throw fetchError
+  
+  const { error } = await supabase
+    .from('proposals')
+    .update({ 
+      views: (proposal.views || 0) + 1,
+      last_viewed_at: new Date().toISOString()
+    })
+    .eq('id', proposal.id)
+  
+  if (error) throw error
+}
+
+/**
+ * Update proposal status
+ */
+export async function updateProposalStatus(id, status) {
+  return updateProposal(id, { status })
+}
+
+/**
+ * Create lead from proposal
+ */
+export async function createLeadFromProposal(proposalId) {
+  // Get proposal data
+  const proposal = await getProposalById(proposalId)
+  if (!proposal) throw new Error('Proposal not found')
+  
+  // Check if lead already exists
+  if (proposal.lead_id) {
+    return { existing: true, lead_id: proposal.lead_id }
+  }
+  
+  // Create lead
+  const { data: lead, error: leadError } = await supabase
+    .from('leads')
+    .insert([{
+      name: proposal.contact_name,
+      email: proposal.contact_email,
+      phone: proposal.contact_phone,
+      org_name: proposal.org_name,
+      source: 'proposal',
+      completed_form: false
+    }])
+    .select()
+    .single()
+  
+  if (leadError) throw leadError
+  
+  // Link lead to proposal
+  await updateProposal(proposalId, { lead_id: lead.id })
+  
+  return { existing: false, lead_id: lead.id }
+}
