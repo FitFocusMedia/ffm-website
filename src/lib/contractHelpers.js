@@ -336,6 +336,17 @@ export function generateContractHTML(contract) {
       <h2 class="text-2xl font-bold mt-6 mb-4">22. NOTICES</h2>
       <p>All notices, demands, or other communications under this Agreement shall be in writing and delivered via email with read receipt, registered mail, or hand delivery to the addresses specified in this Agreement. Notices delivered by email shall be deemed received on the business day sent (or the next business day if sent after 5pm AEST). Mailed notices shall be deemed received three (3) business days after posting.</p>
       
+      ${d.custom_notes && d.custom_notes.length > 0 ? `
+      <h2 class="text-2xl font-bold mt-6 mb-4">ADDITIONAL TERMS & NOTES</h2>
+      <p>The following additional terms and event-specific provisions apply to this Agreement:</p>
+      ${d.custom_notes.map((note, index) => `
+        <div class="bg-gray-800/50 border border-gray-700 rounded-lg p-4 my-4">
+          <h3 class="text-lg font-bold mb-2">${note.title || `Custom Note ${index + 1}`}</h3>
+          <p class="whitespace-pre-wrap">${note.content || '[No content provided]'}</p>
+        </div>
+      `).join('')}
+      ` : ''}
+      
       <hr class="my-6 border-gray-700">
       
       <h2 class="text-2xl font-bold mt-6 mb-4">SIGNATURES</h2>

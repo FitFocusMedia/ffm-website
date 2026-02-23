@@ -77,6 +77,7 @@ export default function ContractBuilder({ editMode = false }) {
     { name: 'Season Pass', price: '899', description: 'Full season coverage across all events, priority processing, and exclusive content access.' }
   ])
   const [addOns, setAddOns] = useState([])
+  const [customNotes, setCustomNotes] = useState([])
   const [submitting, setSubmitting] = useState(false)
   const [savingDraft, setSavingDraft] = useState(false)
   const [existingContract, setExistingContract] = useState(null)
@@ -111,6 +112,7 @@ export default function ContractBuilder({ editMode = false }) {
       if (d.multi_events) setMultiEvents(d.multi_events)
       if (d.athlete_packages) setAthletePackages(d.athlete_packages)
       if (d.add_ons) setAddOns(d.add_ons)
+      if (d.custom_notes) setCustomNotes(d.custom_notes)
       
     } catch (error) {
       console.error('Error loading contract:', error)
@@ -132,6 +134,7 @@ export default function ContractBuilder({ editMode = false }) {
           setMultiEvents(data.multiEvents || [])
           if (data.athletePackages) setAthletePackages(data.athletePackages)
           if (data.addOns) setAddOns(data.addOns)
+          if (data.customNotes) setCustomNotes(data.customNotes)
           setCurrentStep(data.currentStep || 1)
         } catch (error) {
           console.error('Error loading saved data:', error)
@@ -147,9 +150,10 @@ export default function ContractBuilder({ editMode = false }) {
       multiEvents,
       athletePackages,
       addOns,
+      customNotes,
       currentStep
     }))
-  }, [formData, multiEvents, athletePackages, addOns, currentStep])
+  }, [formData, multiEvents, athletePackages, addOns, customNotes, currentStep])
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target
@@ -208,6 +212,20 @@ export default function ContractBuilder({ editMode = false }) {
     const updated = [...addOns]
     updated[index][field] = value
     setAddOns(updated)
+  }
+
+  const addCustomNote = () => {
+    setCustomNotes([...customNotes, { title: '', content: '' }])
+  }
+
+  const removeCustomNote = (index) => {
+    setCustomNotes(customNotes.filter((_, i) => i !== index))
+  }
+
+  const updateCustomNote = (index, field, value) => {
+    const updated = [...customNotes]
+    updated[index][field] = value
+    setCustomNotes(updated)
   }
 
   const validateStep = (step) => {
@@ -278,6 +296,7 @@ export default function ContractBuilder({ editMode = false }) {
         multi_events: multiEvents,
         athlete_packages: athletePackages,
         add_ons: addOns,
+        custom_notes: customNotes,
       }
 
       if (editMode && existingContract) {
@@ -339,6 +358,7 @@ export default function ContractBuilder({ editMode = false }) {
         multi_events: multiEvents,
         athlete_packages: athletePackages,
         add_ons: addOns,
+        custom_notes: customNotes,
       }
 
       if (editMode && existingContract) {
@@ -384,7 +404,7 @@ export default function ContractBuilder({ editMode = false }) {
 
   const mockContract = {
     status: 'draft',
-    contract_data: { ...formData, multi_events: multiEvents, athlete_packages: athletePackages, add_ons: addOns },
+    contract_data: { ...formData, multi_events: multiEvents, athlete_packages: athletePackages, add_ons: addOns, custom_notes: customNotes },
     ffm_signature: null,
     client_signature: null,
   }
@@ -1569,6 +1589,64 @@ export default function ContractBuilder({ editMode = false }) {
                     placeholder="e.g., 20000000"
                     className="w-full px-4 py-2 bg-dark-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+                </div>
+
+                {/* Custom Notes Section */}
+                <div className="mt-8 pt-6 border-t border-gray-700">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-lg font-bold text-white">Custom Contract Notes</h3>
+                      <p className="text-gray-400 text-sm">Add event-specific details like geo-blocking, special requirements, or custom terms.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={addCustomNote}
+                      className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm transition-colors"
+                    >
+                      + Add Note
+                    </button>
+                  </div>
+                  
+                  {customNotes.length === 0 && (
+                    <p className="text-gray-500 text-sm italic mb-4">No custom notes added. Click "+ Add Note" to include event-specific details.</p>
+                  )}
+                  
+                  {customNotes.map((note, index) => (
+                    <div key={index} className="bg-dark-800 p-4 rounded-lg mb-4 border border-purple-900">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-purple-400">Custom Note {index + 1}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeCustomNote(index)}
+                          className="text-red-500 hover:text-red-400 text-sm"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      
+                      <div className="mb-3">
+                        <label className="block text-xs font-medium text-gray-400 mb-1">Note Title</label>
+                        <input
+                          type="text"
+                          value={note.title}
+                          onChange={(e) => updateCustomNote(index, 'title', e.target.value)}
+                          placeholder="e.g., Geo-Blocking Requirements, Special Access, etc."
+                          className="w-full px-3 py-2 bg-dark-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-xs font-medium text-gray-400 mb-1">Note Content</label>
+                        <textarea
+                          value={note.content}
+                          onChange={(e) => updateCustomNote(index, 'content', e.target.value)}
+                          placeholder="Enter the details for this custom note..."
+                          rows={3}
+                          className="w-full px-3 py-2 bg-dark-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                        />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
