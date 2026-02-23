@@ -172,8 +172,8 @@ export default function EventPage() {
     trackCheckoutStart(eventId, email)
 
     try {
-      // Use local checkout API (Tailscale Funnel - publicly accessible)
-      const checkoutApiUrl = 'https://clawdbots-mini.tailcfdc1.ts.net/checkout'
+      // Use Supabase edge function (JWT verification disabled)
+      const checkoutApiUrl = 'https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/livestream_checkout'
       
       const response = await fetch(checkoutApiUrl, {
         method: 'POST',
