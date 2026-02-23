@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Plus, Search, Filter, Eye, Edit2, Trash2, Send, Copy, Check,
   FileText, Calendar, DollarSign, Building2, User, Mail, Phone,
-  ChevronDown, ExternalLink, Clock, TrendingUp, AlertCircle
+  ChevronDown, ExternalLink, Clock, TrendingUp, AlertCircle,
+  Video, Globe, Users, Award, Star, CheckCircle2, Zap
 } from 'lucide-react'
 import { 
   getProposals, createProposal, updateProposal, deleteProposal,
@@ -410,9 +411,10 @@ function ProposalCard({ proposal, onEdit, onDelete, onCopyLink, onStatusChange, 
   )
 }
 
-// Create/Edit Modal Component
+// Create/Edit Modal Component with Live Preview
 function ProposalModal({ proposal, onClose, onSave }) {
   const [saving, setSaving] = useState(false)
+  const [activeTab, setActiveTab] = useState('form') // 'form' or 'preview' for mobile
   const [form, setForm] = useState({
     org_name: proposal?.org_name || '',
     contact_name: proposal?.contact_name || '',
@@ -483,259 +485,501 @@ function ProposalModal({ proposal, onClose, onSave }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/90 flex items-stretch z-50"
       onClick={onClose}
     >
       <motion.div
-        initial={{ scale: 0.95, opacity: 0 }}
+        initial={{ scale: 0.98, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.95, opacity: 0 }}
+        exit={{ scale: 0.98, opacity: 0 }}
         onClick={e => e.stopPropagation()}
-        className="bg-[#12121a] border border-white/10 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto"
+        className="flex flex-col lg:flex-row w-full h-full"
       >
-        <form onSubmit={handleSubmit}>
-          {/* Header */}
-          <div className="sticky top-0 bg-[#12121a] border-b border-white/10 p-6">
-            <h2 className="text-2xl font-bold">
-              {proposal ? 'Edit Proposal' : 'Create New Proposal'}
-            </h2>
-          </div>
+        {/* Mobile Tab Switcher */}
+        <div className="lg:hidden flex border-b border-white/10 bg-[#12121a]">
+          <button
+            onClick={() => setActiveTab('form')}
+            className={`flex-1 py-3 text-center font-medium ${activeTab === 'form' ? 'text-red-400 border-b-2 border-red-400' : 'text-gray-400'}`}
+          >
+            Edit Form
+          </button>
+          <button
+            onClick={() => setActiveTab('preview')}
+            className={`flex-1 py-3 text-center font-medium ${activeTab === 'preview' ? 'text-red-400 border-b-2 border-red-400' : 'text-gray-400'}`}
+          >
+            Live Preview
+          </button>
+        </div>
 
-          <div className="p-6 space-y-6">
-            {/* Organization Details */}
-            <section>
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <Building2 size={20} className="text-red-400" />
-                Organization Details
-              </h3>
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1">Organization Name *</label>
-                  <input
-                    type="text"
-                    required
-                    value={form.org_name}
-                    onChange={e => setForm(prev => ({ ...prev, org_name: e.target.value }))}
-                    className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-red-500/50"
-                    placeholder="e.g., Inception Fight Series"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1">Event Type</label>
-                  <select
-                    value={form.event_type}
-                    onChange={e => setForm(prev => ({ ...prev, event_type: e.target.value }))}
-                    className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-red-500/50"
-                  >
-                    {EVENT_TYPES.map(type => (
-                      <option key={type} value={type}>{type}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </section>
+        {/* Left: Form */}
+        <div className={`lg:w-1/2 bg-[#12121a] flex flex-col overflow-hidden ${activeTab === 'form' ? 'flex' : 'hidden lg:flex'}`}>
+          <form onSubmit={handleSubmit} className="flex flex-col h-full">
+            {/* Header */}
+            <div className="shrink-0 border-b border-white/10 p-4 lg:p-6 flex items-center justify-between">
+              <h2 className="text-xl lg:text-2xl font-bold">
+                {proposal ? 'Edit Proposal' : 'Create New Proposal'}
+              </h2>
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+              >
+                ✕
+              </button>
+            </div>
 
-            {/* Contact Details */}
-            <section>
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <User size={20} className="text-red-400" />
-                Contact Details
-              </h3>
-              <div className="grid md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1">Contact Name</label>
-                  <input
-                    type="text"
-                    value={form.contact_name}
-                    onChange={e => setForm(prev => ({ ...prev, contact_name: e.target.value }))}
-                    className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-red-500/50"
-                    placeholder="John Smith"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1">Email</label>
-                  <input
-                    type="email"
-                    value={form.contact_email}
-                    onChange={e => setForm(prev => ({ ...prev, contact_email: e.target.value }))}
-                    className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-red-500/50"
-                    placeholder="john@example.com"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1">Phone</label>
-                  <input
-                    type="tel"
-                    value={form.contact_phone}
-                    onChange={e => setForm(prev => ({ ...prev, contact_phone: e.target.value }))}
-                    className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-red-500/50"
-                    placeholder="0400 000 000"
-                  />
-                </div>
-              </div>
-            </section>
-
-            {/* Event Details */}
-            <section>
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <Calendar size={20} className="text-red-400" />
-                Event Details
-              </h3>
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1">Event Name</label>
-                  <input
-                    type="text"
-                    value={form.event_name}
-                    onChange={e => setForm(prev => ({ ...prev, event_name: e.target.value }))}
-                    className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-red-500/50"
-                    placeholder="e.g., Fight Night 12"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1">Event Date</label>
-                  <input
-                    type="date"
-                    value={form.event_date}
-                    onChange={e => setForm(prev => ({ ...prev, event_date: e.target.value }))}
-                    className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-red-500/50"
-                  />
-                </div>
-              </div>
-            </section>
-
-            {/* Package & Pricing */}
-            <section>
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <DollarSign size={20} className="text-red-400" />
-                Package & Pricing
-              </h3>
-              
-              {/* Package Selection */}
-              <div className="grid md:grid-cols-3 gap-4 mb-4">
-                {PACKAGES.map(pkg => (
-                  <button
-                    key={pkg.id}
-                    type="button"
-                    onClick={() => handlePackageChange(pkg.id)}
-                    className={`p-4 rounded-xl border-2 text-left transition-all ${
-                      form.package === pkg.id
-                        ? 'border-red-500 bg-red-500/10'
-                        : 'border-white/10 hover:border-white/20'
-                    }`}
-                  >
-                    <p className="font-semibold">{pkg.name}</p>
-                    <p className="text-sm text-gray-400 mt-1">{pkg.description}</p>
-                  </button>
-                ))}
-              </div>
-
-              {/* Price */}
-              <div className="max-w-xs">
-                <label className="block text-sm text-gray-400 mb-1">Price (AUD)</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">$</span>
-                  <input
-                    type="number"
-                    value={form.price}
-                    onChange={e => setForm(prev => ({ ...prev, price: e.target.value }))}
-                    className="w-full pl-8 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-red-500/50"
-                    placeholder="0.00"
-                    step="0.01"
-                    min="0"
-                  />
-                </div>
-                <p className="text-xs text-gray-500 mt-1">Leave blank for "Contact for pricing"</p>
-              </div>
-            </section>
-
-            {/* Inclusions */}
-            <section>
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <Check size={20} className="text-red-400" />
-                What's Included
-              </h3>
-              <div className="space-y-2">
-                {(form.inclusions || []).map((inclusion, index) => (
-                  <div key={index} className="flex gap-2">
+            {/* Scrollable Form Content */}
+            <div className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-6">
+              {/* Organization Details */}
+              <section>
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <Building2 size={20} className="text-red-400" />
+                  Organization Details
+                </h3>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Organization Name *</label>
                     <input
                       type="text"
-                      value={inclusion}
-                      onChange={e => updateInclusion(index, e.target.value)}
-                      className="flex-1 px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-red-500/50"
-                      placeholder="Inclusion item..."
+                      required
+                      value={form.org_name}
+                      onChange={e => setForm(prev => ({ ...prev, org_name: e.target.value }))}
+                      className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-red-500/50"
+                      placeholder="e.g., Inception Fight Series"
                     />
-                    <button
-                      type="button"
-                      onClick={() => removeInclusion(index)}
-                      className="p-2 text-gray-400 hover:text-red-400"
-                    >
-                      <Trash2 size={18} />
-                    </button>
                   </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={addInclusion}
-                  className="text-sm text-red-400 hover:text-red-300 flex items-center gap-1"
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Event Type</label>
+                    <select
+                      value={form.event_type}
+                      onChange={e => setForm(prev => ({ ...prev, event_type: e.target.value }))}
+                      className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-red-500/50"
+                    >
+                      {EVENT_TYPES.map(type => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </section>
+
+              {/* Contact Details */}
+              <section>
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <User size={20} className="text-red-400" />
+                  Contact Details
+                </h3>
+                <div className="grid md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Contact Name</label>
+                    <input
+                      type="text"
+                      value={form.contact_name}
+                      onChange={e => setForm(prev => ({ ...prev, contact_name: e.target.value }))}
+                      className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-red-500/50"
+                      placeholder="John Smith"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Email</label>
+                    <input
+                      type="email"
+                      value={form.contact_email}
+                      onChange={e => setForm(prev => ({ ...prev, contact_email: e.target.value }))}
+                      className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-red-500/50"
+                      placeholder="john@example.com"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Phone</label>
+                    <input
+                      type="tel"
+                      value={form.contact_phone}
+                      onChange={e => setForm(prev => ({ ...prev, contact_phone: e.target.value }))}
+                      className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-red-500/50"
+                      placeholder="0400 000 000"
+                    />
+                  </div>
+                </div>
+              </section>
+
+              {/* Event Details */}
+              <section>
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <Calendar size={20} className="text-red-400" />
+                  Event Details
+                </h3>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Event Name</label>
+                    <input
+                      type="text"
+                      value={form.event_name}
+                      onChange={e => setForm(prev => ({ ...prev, event_name: e.target.value }))}
+                      className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-red-500/50"
+                      placeholder="e.g., Fight Night 12"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Event Date</label>
+                    <input
+                      type="date"
+                      value={form.event_date}
+                      onChange={e => setForm(prev => ({ ...prev, event_date: e.target.value }))}
+                      className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-red-500/50"
+                    />
+                  </div>
+                </div>
+              </section>
+
+              {/* Package & Pricing */}
+              <section>
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <DollarSign size={20} className="text-red-400" />
+                  Package & Pricing
+                </h3>
+                
+                {/* Package Selection */}
+                <div className="grid md:grid-cols-3 gap-3 mb-4">
+                  {PACKAGES.map(pkg => (
+                    <button
+                      key={pkg.id}
+                      type="button"
+                      onClick={() => handlePackageChange(pkg.id)}
+                      className={`p-3 rounded-xl border-2 text-left transition-all ${
+                        form.package === pkg.id
+                          ? 'border-red-500 bg-red-500/10'
+                          : 'border-white/10 hover:border-white/20'
+                      }`}
+                    >
+                      <p className="font-semibold text-sm">{pkg.name}</p>
+                      <p className="text-xs text-gray-400 mt-1">{pkg.description}</p>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Price */}
+                <div className="max-w-xs">
+                  <label className="block text-sm text-gray-400 mb-1">Price (AUD)</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                    <input
+                      type="number"
+                      value={form.price}
+                      onChange={e => setForm(prev => ({ ...prev, price: e.target.value }))}
+                      className="w-full pl-8 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-red-500/50"
+                      placeholder="0.00"
+                      step="0.01"
+                      min="0"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Leave blank for "Contact for pricing"</p>
+                </div>
+              </section>
+
+              {/* Inclusions */}
+              <section>
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <CheckCircle2 size={20} className="text-red-400" />
+                  What's Included
+                </h3>
+                <div className="space-y-2">
+                  {(form.inclusions || []).map((inclusion, index) => (
+                    <div key={index} className="flex gap-2">
+                      <input
+                        type="text"
+                        value={inclusion}
+                        onChange={e => updateInclusion(index, e.target.value)}
+                        className="flex-1 px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-red-500/50 text-sm"
+                        placeholder="Inclusion item..."
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeInclusion(index)}
+                        className="p-2 text-gray-400 hover:text-red-400"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={addInclusion}
+                    className="text-sm text-red-400 hover:text-red-300 flex items-center gap-1"
+                  >
+                    <Plus size={16} />
+                    Add inclusion
+                  </button>
+                </div>
+              </section>
+
+              {/* Custom Notes */}
+              <section>
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <FileText size={20} className="text-red-400" />
+                  Custom Notes
+                </h3>
+                <textarea
+                  value={form.custom_notes}
+                  onChange={e => setForm(prev => ({ ...prev, custom_notes: e.target.value }))}
+                  rows={3}
+                  className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-red-500/50 resize-none text-sm"
+                  placeholder="Any additional notes or custom terms..."
+                />
+              </section>
+
+              {/* Status */}
+              <section>
+                <label className="block text-sm text-gray-400 mb-1">Status</label>
+                <select
+                  value={form.status}
+                  onChange={e => setForm(prev => ({ ...prev, status: e.target.value }))}
+                  className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-red-500/50"
                 >
-                  <Plus size={16} />
-                  Add inclusion
-                </button>
-              </div>
-            </section>
+                  <option value="draft">Draft</option>
+                  <option value="sent">Sent</option>
+                  <option value="viewed">Viewed</option>
+                  <option value="accepted">Accepted</option>
+                  <option value="declined">Declined</option>
+                </select>
+              </section>
+            </div>
 
-            {/* Custom Notes */}
-            <section>
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <FileText size={20} className="text-red-400" />
-                Custom Notes
-              </h3>
-              <textarea
-                value={form.custom_notes}
-                onChange={e => setForm(prev => ({ ...prev, custom_notes: e.target.value }))}
-                rows={4}
-                className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-red-500/50 resize-none"
-                placeholder="Any additional notes or custom terms..."
-              />
-            </section>
-
-            {/* Status */}
-            <section>
-              <label className="block text-sm text-gray-400 mb-1">Status</label>
-              <select
-                value={form.status}
-                onChange={e => setForm(prev => ({ ...prev, status: e.target.value }))}
-                className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-red-500/50"
+            {/* Footer */}
+            <div className="shrink-0 border-t border-white/10 p-4 lg:p-6 flex justify-end gap-4 bg-[#12121a]">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-6 py-2 bg-white/5 rounded-lg hover:bg-white/10 transition-colors"
               >
-                <option value="draft">Draft</option>
-                <option value="sent">Sent</option>
-                <option value="viewed">Viewed</option>
-                <option value="accepted">Accepted</option>
-                <option value="declined">Declined</option>
-              </select>
-            </section>
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving || !form.org_name}
+                className="px-6 py-2 bg-gradient-to-r from-red-600 to-orange-600 rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {saving ? 'Saving...' : (proposal ? 'Update Proposal' : 'Create Proposal')}
+              </button>
+            </div>
+          </form>
+        </div>
+
+        {/* Right: Live Preview */}
+        <div className={`lg:w-1/2 bg-[#0a0a0f] flex flex-col overflow-hidden border-l border-white/10 ${activeTab === 'preview' ? 'flex' : 'hidden lg:flex'}`}>
+          {/* Preview Header */}
+          <div className="shrink-0 border-b border-white/10 p-4 lg:p-6 bg-[#0a0a0f]">
+            <div className="flex items-center gap-2 text-gray-400">
+              <Eye size={18} />
+              <span className="font-medium">Live Preview</span>
+              <span className="text-xs text-gray-500 ml-auto">Updates as you type</span>
+            </div>
           </div>
 
-          {/* Footer */}
-          <div className="sticky bottom-0 bg-[#12121a] border-t border-white/10 p-6 flex justify-end gap-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-6 py-2 bg-white/5 rounded-lg hover:bg-white/10 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saving || !form.org_name}
-              className="px-6 py-2 bg-gradient-to-r from-red-600 to-orange-600 rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
-            >
-              {saving ? 'Saving...' : (proposal ? 'Update Proposal' : 'Create Proposal')}
-            </button>
+          {/* Preview Content */}
+          <div className="flex-1 overflow-y-auto">
+            <ProposalPreview form={form} />
           </div>
-        </form>
+        </div>
       </motion.div>
     </motion.div>
+  )
+}
+
+// Live Preview Component (matches ProposalView)
+function ProposalPreview({ form }) {
+  const STATS = [
+    { value: '25+', label: 'Events', icon: Video },
+    { value: '4', label: 'Countries', icon: Globe },
+    { value: '50K+', label: 'Viewers', icon: Users },
+    { value: '100%', label: 'Satisfaction', icon: Award }
+  ]
+
+  return (
+    <div className="min-h-full bg-[#0a0a0f] text-white">
+      {/* Hero Section */}
+      <section className="relative py-12 px-6 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-red-600/10 via-transparent to-transparent" />
+        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-red-600/20 rounded-full blur-3xl" />
+        
+        <div className="max-w-2xl mx-auto text-center relative z-10">
+          <p className="text-red-400 font-medium mb-3 tracking-wide text-sm">
+            PREPARED FOR
+          </p>
+          <h1 className="text-2xl md:text-4xl font-bold mb-4 bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent">
+            {form.org_name || 'Organization Name'}
+          </h1>
+          
+          {(form.event_name || form.event_date) && (
+            <p className="text-lg text-gray-300 mb-6">
+              {form.event_name || 'Event Name'}
+              {form.event_date && (
+                <span className="text-gray-500"> • {new Date(form.event_date).toLocaleDateString('en-AU', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })}</span>
+              )}
+            </p>
+          )}
+
+          <p className="text-sm text-gray-400 max-w-xl mx-auto">
+            Professional livestream production that brings your events to audiences worldwide — 
+            at zero upfront cost to you.
+          </p>
+        </div>
+      </section>
+
+      {/* Stats Bar */}
+      <section className="py-4 border-y border-white/10 bg-white/5">
+        <div className="max-w-4xl mx-auto px-6">
+          <div className="grid grid-cols-4 gap-4">
+            {STATS.map((stat, i) => (
+              <div key={i} className="text-center">
+                <stat.icon className="w-4 h-4 mx-auto mb-1 text-red-400" />
+                <p className="text-lg font-bold">{stat.value}</p>
+                <p className="text-xs text-gray-400">{stat.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Package Details */}
+      <section className="py-8 px-6">
+        <div className="max-w-2xl mx-auto">
+          <div className="bg-gradient-to-br from-white/10 to-white/5 border border-white/20 rounded-2xl p-6">
+            {/* Package Header */}
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6 pb-6 border-b border-white/10">
+              <div>
+                <p className="text-red-400 font-medium mb-1 text-sm">YOUR PACKAGE</p>
+                <h2 className="text-xl font-bold capitalize">
+                  {form.package || 'Custom'} Package
+                </h2>
+                {form.event_type && (
+                  <p className="text-gray-400 text-sm mt-1">{form.event_type}</p>
+                )}
+              </div>
+              
+              {/* Price */}
+              <div className="text-right">
+                {form.price ? (
+                  <>
+                    <p className="text-2xl font-bold text-white">
+                      ${parseFloat(form.price).toLocaleString()}
+                    </p>
+                    <p className="text-xs text-gray-400">AUD</p>
+                  </>
+                ) : (
+                  <p className="text-lg font-medium text-gray-300">Contact for pricing</p>
+                )}
+              </div>
+            </div>
+
+            {/* Inclusions */}
+            {form.inclusions && form.inclusions.filter(i => i.trim()).length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                  <CheckCircle2 className="text-green-400" size={16} />
+                  What's Included
+                </h3>
+                <ul className="grid md:grid-cols-2 gap-2">
+                  {form.inclusions.filter(i => i.trim()).map((item, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm">
+                      <Check className="w-4 h-4 text-green-400 shrink-0 mt-0.5" />
+                      <span className="text-gray-300">{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Custom Notes */}
+            {form.custom_notes && (
+              <div className="bg-white/5 rounded-xl p-4 mb-6">
+                <h3 className="font-semibold mb-2 text-sm">Additional Notes</h3>
+                <p className="text-gray-300 whitespace-pre-wrap text-sm">{form.custom_notes}</p>
+              </div>
+            )}
+
+            {/* Zero Cost Model */}
+            <div className="bg-gradient-to-r from-green-600/20 to-emerald-600/20 border border-green-500/30 rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-green-500/20 rounded-lg">
+                  <DollarSign className="w-5 h-5 text-green-400" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-green-400 mb-1">
+                    Zero Upfront Cost Model
+                  </h3>
+                  <p className="text-gray-300 text-xs">
+                    FFM operates on a revenue-share model. You pay nothing upfront — 
+                    we earn through pay-per-view ticket sales.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works */}
+      <section className="py-8 px-6 bg-white/5">
+        <div className="max-w-2xl mx-auto">
+          <h2 className="text-lg font-bold text-center mb-6">How It Works</h2>
+          
+          <div className="grid grid-cols-3 gap-4">
+            {[
+              { step: '1', title: 'We Produce', icon: Video },
+              { step: '2', title: 'Fans Watch', icon: Users },
+              { step: '3', title: 'You Earn', icon: TrendingUp }
+            ].map((item, i) => (
+              <div key={i} className="text-center">
+                <div className="w-10 h-10 mx-auto mb-2 bg-gradient-to-br from-red-600 to-orange-600 rounded-xl flex items-center justify-center">
+                  <item.icon size={18} />
+                </div>
+                <h3 className="text-sm font-semibold">{item.title}</h3>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="py-8 px-6">
+        <div className="max-w-2xl mx-auto">
+          <div className="bg-gradient-to-br from-red-600/20 to-orange-600/20 border border-red-500/30 rounded-2xl p-6 text-center">
+            <h2 className="text-xl font-bold mb-2">Ready to Get Started?</h2>
+            <p className="text-gray-300 mb-4 text-sm">
+              Let's discuss how we can bring professional livestream production to {form.org_name || 'your organization'}.
+            </p>
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-600 to-orange-600 rounded-xl font-medium text-sm">
+                <Phone size={16} />
+                0411 934 935
+              </div>
+              <div className="flex items-center gap-2 px-4 py-2 bg-white/10 border border-white/20 rounded-xl font-medium text-sm">
+                <Mail size={16} />
+                Email Us
+              </div>
+            </div>
+
+            {form.contact_name && (
+              <p className="mt-4 text-xs text-gray-400">
+                Prepared for {form.contact_name}
+                {form.contact_email && ` (${form.contact_email})`}
+              </p>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="py-4 px-6 border-t border-white/10 text-center text-gray-400 text-xs">
+        <p>© {new Date().getFullYear()} Fit Focus Media</p>
+      </footer>
+    </div>
   )
 }
