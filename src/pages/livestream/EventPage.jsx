@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { Calendar, MapPin, Clock, AlertTriangle, Navigation, Play, Users, Star, Sparkles } from 'lucide-react'
-import { supabase, getLivestreamEvent, getLivestreamSettings } from '../../lib/supabase'
+import { getLivestreamEvent, getLivestreamSettings } from '../../lib/supabase'
 import { trackPageView, trackGeoCheck, trackGeoBlocked, trackGeoPassed, trackPurchaseView, trackCheckoutStart } from '../../lib/analytics'
 import PremiumCountdown from '../../components/PremiumCountdown'
 import PremiumPurchaseCard from '../../components/PremiumPurchaseCard'
@@ -172,19 +172,25 @@ export default function EventPage() {
     trackCheckoutStart(eventId, email)
 
     try {
-      // Always use edge function for checkout - it's the single source of truth
-      // for demo mode AND handles user_id linking properly
-      const { data, error: invokeError } = await supabase.functions.invoke('livestream-checkout', {
-        body: { 
+      // Direct fetch to edge function (sb_publishable key doesn't work with supabase.functions.invoke)
+      const response = await fetch('https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/livestream-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
           event_id: eventId, 
           email,
           buyer_lat: userLocation?.lat,
           buyer_lng: userLocation?.lng,
           distance_from_venue_km: userLocation?.distance_km
-        }
+        })
       })
       
-      if (invokeError) throw invokeError
+      const data = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(data.error || `Checkout failed (${response.status})`)
+      }
+      
       if (data.demo && data.redirect) {
         // Demo mode - edge function created order, redirect to watch
         window.location.href = data.redirect
