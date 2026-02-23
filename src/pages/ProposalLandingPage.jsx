@@ -1,22 +1,60 @@
+import { useParams } from 'react-router-dom'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowRight, Video, Camera, Sparkles, Award, Globe, Users, TrendingUp, DollarSign, Check, Phone, Mail } from 'lucide-react'
 
 /**
- * PitchPage - Simple landing page for outreach
+ * ProposalLandingPage - Private landing page for outreach
  * 
- * A streamlined version of the FFM sales pitch designed for:
- * - Cold outreach recipients
- * - People who want quick, digestible info
- * - Different demographics who prefer simpler layouts
+ * URL format: /proposal/:orgSlug
+ * Example: /proposal/fortitude → "Hi Fortitude Boxing,"
  * 
- * Complements the full website (fitfocusmedia.com.au) and PDF pitch deck
+ * Not linked anywhere on the site — only accessible via direct link.
+ * Designed for cold outreach to specific organizations.
  */
 
-const PitchPage = () => {
+// Helper to format org slug into display name
+const formatOrgName = (slug) => {
+  if (!slug) return 'there'
+  
+  // Custom mappings for known orgs
+  const customNames = {
+    'fortitude': 'Fortitude Boxing',
+    'fortitude-boxing': 'Fortitude Boxing',
+    'inception': 'Inception Fight Series',
+    'inception-fight-series': 'Inception Fight Series',
+    'qbjjc': 'QBJJC',
+    'wng': 'WNG Grappling',
+    'artemis': 'Artemis Grappling',
+    'artemis-grappling': 'Artemis Grappling',
+    'm16': 'M16 BJJ',
+    'm16-bjj': 'M16 BJJ',
+    'nba': 'Natural Bodybuilding Australia',
+    'eternal': 'Eternal MMA',
+    'eternal-mma': 'Eternal MMA',
+    'beatdown': 'Beatdown Promotions',
+    'honour': 'Honour Premier League',
+    'aggression': 'Aggression Thai Boxing',
+  }
+  
+  if (customNames[slug.toLowerCase()]) {
+    return customNames[slug.toLowerCase()]
+  }
+  
+  // Default: capitalize each word
+  return slug
+    .split('-')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+}
+
+const ProposalLandingPage = () => {
+  const { orgSlug } = useParams()
+  const orgName = formatOrgName(orgSlug)
+
   return (
     <div className="pt-20 sm:pt-24 min-h-screen">
-      {/* Hero - Simple and Direct */}
+      {/* Hero - Personalized Greeting */}
       <section className="py-12 sm:py-20 px-4 sm:px-6 bg-gradient-to-b from-primary-950/30 to-transparent">
         <div className="max-w-4xl mx-auto text-center">
           <motion.div
@@ -29,6 +67,14 @@ const PitchPage = () => {
               alt="Fit Focus Media" 
               className="w-24 h-24 sm:w-32 sm:h-32 mx-auto mb-6 rounded-xl"
             />
+            
+            {/* Personalized greeting */}
+            {orgSlug && (
+              <p className="text-lg text-primary-400 mb-2 font-medium">
+                Hi {orgName} 👋
+              </p>
+            )}
+            
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-black mb-4">
               <span className="text-gradient">Professional Live Production</span>
               <br />
@@ -81,7 +127,7 @@ const PitchPage = () => {
             viewport={{ once: true }}
             className="text-2xl sm:text-3xl font-black text-center mb-10"
           >
-            <span className="text-gradient">What We Offer</span>
+            <span className="text-gradient">What We Can Do For {orgSlug ? orgName : 'You'}</span>
           </motion.h2>
 
           <div className="space-y-6">
@@ -92,7 +138,7 @@ const PitchPage = () => {
                 points: [
                   'Multi-camera professional broadcast',
                   'PPV platform setup & management',
-                  'Live graphics, overlays & instant replay',
+                  'Live graphics & instant replay',
                   'Full show recording for VOD',
                 ],
               },
@@ -235,7 +281,11 @@ const PitchPage = () => {
             ].map((org, i) => (
               <span
                 key={i}
-                className="px-4 py-2 bg-dark-800 border border-gray-700 rounded-full text-gray-300"
+                className={`px-4 py-2 rounded-full text-gray-300 ${
+                  org.toLowerCase().includes(orgSlug?.toLowerCase() || '---') 
+                    ? 'bg-primary-600/30 border border-primary-500/50 text-primary-300' 
+                    : 'bg-dark-800 border border-gray-700'
+                }`}
               >
                 {org}
               </span>
@@ -256,25 +306,27 @@ const PitchPage = () => {
               Ready to <span className="text-gradient">Get Started?</span>
             </h2>
             <p className="text-gray-400 mb-8">
-              Get a free analysis of your organization and see exactly how much revenue 
-              professional media coverage could generate.
+              {orgSlug 
+                ? `Let's discuss how FFM can help ${orgName} reach more fans and generate new revenue.`
+                : 'Get a free analysis of your organization and see exactly how much revenue professional media coverage could generate.'
+              }
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
               <Link
-                to="/proposal"
+                to="/book"
                 className="group px-8 py-4 bg-primary-600 hover:bg-primary-700 text-white font-black rounded-lg text-lg transition-all hover:scale-105 inline-flex items-center justify-center gap-2"
               >
-                Get Free Analysis
+                Book a Call
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Link>
-              <Link
-                to="/book"
+              <a
+                href="mailto:brandon@fitfocusmedia.com.au"
                 className="px-8 py-4 bg-white/10 hover:bg-white/20 text-white font-bold rounded-lg text-lg transition-all border border-white/20 inline-flex items-center justify-center gap-2"
               >
-                <Phone className="w-5 h-5" />
-                Book a Call
-              </Link>
+                <Mail className="w-5 h-5" />
+                Email Us
+              </a>
             </div>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 text-sm text-gray-400">
@@ -295,7 +347,7 @@ const PitchPage = () => {
       <section className="py-6 px-4 sm:px-6 border-t border-gray-800">
         <div className="max-w-4xl mx-auto text-center">
           <p className="text-sm text-gray-500">
-            For full details, visit{' '}
+            Learn more at{' '}
             <a href="https://fitfocusmedia.com.au" className="text-primary-400 hover:text-primary-300">
               fitfocusmedia.com.au
             </a>
@@ -306,4 +358,4 @@ const PitchPage = () => {
   )
 }
 
-export default PitchPage
+export default ProposalLandingPage

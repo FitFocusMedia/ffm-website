@@ -12,7 +12,7 @@ import CalculatorPage from './pages/CalculatorPage'
 import OrderPage from './pages/OrderPage'
 import ContentLandingPage from './pages/ContentLandingPage'
 import OrgOrderPage from './pages/OrgOrderPage'
-import PitchPage from './pages/PitchPage'
+import ProposalLandingPage from './pages/ProposalLandingPage'
 
 // Portal imports
 import { AuthProvider } from './context/AuthContext'
@@ -92,7 +92,7 @@ function App() {
         <Route path="/order" element={<PublicLayout><OrderPage /></PublicLayout>} />
         <Route path="/content" element={<PublicLayout><ContentLandingPage /></PublicLayout>} />
         <Route path="/order/:orgSlug" element={<PublicLayout><OrgOrderPage /></PublicLayout>} />
-        <Route path="/pitch" element={<PublicLayout><PitchPage /></PublicLayout>} />
+        <Route path="/proposal/:orgSlug" element={<PublicLayout><ProposalLandingPage /></PublicLayout>} />
 
         {/* Legal Pages */}
         <Route path="/privacy" element={<PublicLayout><PrivacyPage /></PublicLayout>} />
