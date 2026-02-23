@@ -1212,3 +1212,60 @@ export async function createLeadFromProposal(proposalId) {
   
   return { existing: false, lead_id: lead.id }
 }
+
+/**
+ * Send proposal via email using Postmark
+ * @param {string} proposalId - Proposal ID to send
+ * @param {string} recipientEmail - Email to send to (defaults to proposal contact_email)
+ * @param {string} customMessage - Optional custom message to include
+ */
+export async function sendProposalEmail(proposalId, recipientEmail = null, customMessage = '') {
+  // Get proposal data
+  const proposal = await getProposalById(proposalId)
+  if (!proposal) throw new Error('Proposal not found')
+  
+  const toEmail = recipientEmail || proposal.contact_email
+  if (!toEmail) throw new Error('No email address provided')
+  
+  const proposalUrl = `https://fitfocusmedia.com.au/#/proposals/${proposal.slug}`
+  
+  // Call edge function to send email
+  const response = await fetch('https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/send-proposal-email', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      to: toEmail,
+      proposal_id: proposalId,
+      proposal_url: proposalUrl,
+      org_name: proposal.org_name,
+      contact_name: proposal.contact_name,
+      event_name: proposal.event_name,
+      price: proposal.price,
+      custom_message: customMessage
+    })
+  })
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    throw new Error(errorData.error || 'Failed to send email')
+  }
+  
+  // Update proposal status to sent and record sent timestamp
+  await updateProposal(proposalId, { 
+    status: 'sent',
+    sent_at: new Date().toISOString(),
+    sent_to: toEmail
+  })
+  
+  return { success: true, sentTo: toEmail }
+}
+
+/**
+ * Resend proposal email
+ */
+export async function resendProposalEmail(proposalId) {
+  const proposal = await getProposalById(proposalId)
+  if (!proposal) throw new Error('Proposal not found')
+  
+  return sendProposalEmail(proposalId, proposal.sent_to || proposal.contact_email)
+}

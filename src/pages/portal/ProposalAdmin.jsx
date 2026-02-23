@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { 
   getProposals, createProposal, updateProposal, deleteProposal,
-  updateProposalStatus, createLeadFromProposal
+  updateProposalStatus, createLeadFromProposal, sendProposalEmail
 } from '../../lib/supabase'
 
 // Default package options
@@ -77,6 +77,8 @@ export default function ProposalAdmin() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingProposal, setEditingProposal] = useState(null)
   const [copiedSlug, setCopiedSlug] = useState(null)
+  const [emailModal, setEmailModal] = useState(null) // Proposal to send email for
+  const [sendingEmail, setSendingEmail] = useState(false)
 
   // Load proposals
   useEffect(() => {
@@ -137,6 +139,25 @@ export default function ProposalAdmin() {
       setProposals(prev => prev.filter(p => p.id !== id))
     } catch (err) {
       console.error('Error deleting proposal:', err)
+    }
+  }
+
+  // Handle send email
+  async function handleSendEmail(proposalId, customMessage = '') {
+    setSendingEmail(true)
+    try {
+      await sendProposalEmail(proposalId, null, customMessage)
+      // Update local state to reflect sent status
+      setProposals(prev => prev.map(p => 
+        p.id === proposalId ? { ...p, status: 'sent', sent_at: new Date().toISOString() } : p
+      ))
+      setEmailModal(null)
+      alert('Email sent successfully!')
+    } catch (err) {
+      console.error('Error sending email:', err)
+      alert('Failed to send email: ' + err.message)
+    } finally {
+      setSendingEmail(false)
     }
   }
 
@@ -228,6 +249,7 @@ export default function ProposalAdmin() {
                 onDelete={() => handleDelete(proposal.id)}
                 onCopyLink={() => copyProposalLink(proposal.slug)}
                 onStatusChange={(status) => handleStatusChange(proposal.id, status)}
+                onSendEmail={() => setEmailModal(proposal)}
                 copied={copiedSlug === proposal.slug}
               />
             ))}
@@ -253,6 +275,18 @@ export default function ProposalAdmin() {
                 setShowCreateModal(false)
                 setEditingProposal(null)
               }}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Send Email Modal */}
+        <AnimatePresence>
+          {emailModal && (
+            <SendEmailModal
+              proposal={emailModal}
+              sending={sendingEmail}
+              onClose={() => setEmailModal(null)}
+              onSend={(customMessage) => handleSendEmail(emailModal.id, customMessage)}
             />
           )}
         </AnimatePresence>
@@ -287,7 +321,7 @@ function StatCard({ label, value, icon: Icon, color = 'gray' }) {
 }
 
 // Proposal Card Component
-function ProposalCard({ proposal, onEdit, onDelete, onCopyLink, onStatusChange, copied }) {
+function ProposalCard({ proposal, onEdit, onDelete, onCopyLink, onStatusChange, onSendEmail, copied }) {
   const [showStatusMenu, setShowStatusMenu] = useState(false)
 
   return (
@@ -367,6 +401,17 @@ function ProposalCard({ proposal, onEdit, onDelete, onCopyLink, onStatusChange, 
               </>
             )}
           </div>
+
+          {/* Send Email */}
+          {proposal.contact_email && (
+            <button
+              onClick={onSendEmail}
+              className="p-2 bg-white/5 rounded-lg hover:bg-blue-500/20 hover:text-blue-400 transition-colors"
+              title={`Send to ${proposal.contact_email}`}
+            >
+              <Send size={18} />
+            </button>
+          )}
 
           {/* Copy Link */}
           <button
@@ -981,5 +1026,101 @@ function ProposalPreview({ form }) {
         <p>© {new Date().getFullYear()} Fit Focus Media</p>
       </footer>
     </div>
+  )
+}
+
+// Send Email Modal Component
+function SendEmailModal({ proposal, sending, onClose, onSend }) {
+  const [customMessage, setCustomMessage] = useState('')
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        onClick={e => e.stopPropagation()}
+        className="bg-[#12121a] border border-white/10 rounded-2xl max-w-md w-full p-6"
+      >
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-3 bg-blue-500/20 rounded-xl">
+            <Send size={24} className="text-blue-400" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold">Send Proposal</h2>
+            <p className="text-sm text-gray-400">Email to {proposal.contact_email}</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          {/* Proposal Summary */}
+          <div className="bg-white/5 rounded-xl p-4">
+            <p className="font-semibold">{proposal.org_name}</p>
+            {proposal.event_name && (
+              <p className="text-sm text-gray-400">{proposal.event_name}</p>
+            )}
+            {proposal.price && (
+              <p className="text-lg font-bold text-red-400 mt-2">
+                ${proposal.price.toLocaleString()} AUD
+              </p>
+            )}
+          </div>
+
+          {/* Custom Message */}
+          <div>
+            <label className="block text-sm text-gray-400 mb-2">
+              Add a personal message (optional)
+            </label>
+            <textarea
+              value={customMessage}
+              onChange={e => setCustomMessage(e.target.value)}
+              rows={3}
+              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-blue-500/50 resize-none text-sm"
+              placeholder="e.g., Looking forward to working with you on this event..."
+            />
+          </div>
+
+          {/* Sent Before Notice */}
+          {proposal.sent_at && (
+            <div className="flex items-center gap-2 text-sm text-yellow-400 bg-yellow-500/10 rounded-lg px-3 py-2">
+              <Clock size={16} />
+              Previously sent {new Date(proposal.sent_at).toLocaleDateString()}
+            </div>
+          )}
+        </div>
+
+        <div className="flex gap-3 mt-6">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-3 bg-white/5 rounded-lg hover:bg-white/10 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onSend(customMessage)}
+            disabled={sending}
+            className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {sending ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Sending...
+              </>
+            ) : (
+              <>
+                <Send size={18} />
+                Send Email
+              </>
+            )}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
   )
 }

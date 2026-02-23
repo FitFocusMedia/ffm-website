@@ -3,6 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom'
 import { Calendar, MapPin, Clock, AlertTriangle, Navigation, Play, Users, Star, Sparkles } from 'lucide-react'
 import { getLivestreamEvent, getLivestreamSettings } from '../../lib/supabase'
 import { trackPageView, trackGeoCheck, trackGeoBlocked, trackGeoPassed, trackPurchaseView, trackCheckoutStart } from '../../lib/analytics'
+import { sanitizeEmail, isValidEmail, checkRateLimit } from '../../lib/validation'
 import PremiumCountdown from '../../components/PremiumCountdown'
 import PremiumPurchaseCard from '../../components/PremiumPurchaseCard'
 import SocialShare from '../../components/SocialShare'
@@ -162,14 +163,24 @@ export default function EventPage() {
 
   const handlePurchase = async (e) => {
     if (e) e.preventDefault()
-    if (!email) {
-      setError('Please enter your email')
+    
+    // Validate email
+    const cleanEmail = sanitizeEmail(email)
+    if (!cleanEmail) {
+      setError('Please enter a valid email address')
+      return
+    }
+
+    // Client-side rate limiting (UX only - server enforces real limits)
+    const rateCheck = checkRateLimit(`checkout:${cleanEmail}`, 3, 60000)
+    if (!rateCheck.allowed) {
+      setError(`Too many attempts. Please wait ${rateCheck.waitSeconds} seconds.`)
       return
     }
 
     setPurchasing(true)
     setError(null)
-    trackCheckoutStart(eventId, email)
+    trackCheckoutStart(eventId, cleanEmail)
 
     try {
       // Use Supabase edge function (JWT verification disabled)
@@ -180,7 +191,7 @@ export default function EventPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           event_id: eventId, 
-          email,
+          email: cleanEmail,
           buyer_lat: userLocation?.lat,
           buyer_lng: userLocation?.lng,
           distance_from_venue_km: userLocation?.distance_km
@@ -203,7 +214,9 @@ export default function EventPage() {
         throw new Error(data.error || 'Checkout failed')
       }
     } catch (err) {
-      setError(err.message || 'Purchase failed. Please try again.')
+      console.error('Checkout error:', err)
+      // Don't expose internal error details to users
+      setError('Unable to process your request. Please try again or contact support.')
     } finally {
       setPurchasing(false)
     }
