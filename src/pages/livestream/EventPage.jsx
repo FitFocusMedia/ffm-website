@@ -172,8 +172,10 @@ export default function EventPage() {
     trackCheckoutStart(eventId, email)
 
     try {
-      // Direct fetch to edge function (sb_publishable key doesn't work with supabase.functions.invoke)
-      const response = await fetch('https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/livestream_checkout', {
+      // Use local checkout API (Tailscale Funnel - publicly accessible)
+      const checkoutApiUrl = 'https://clawdbots-mini.tailcfdc1.ts.net/checkout'
+      
+      const response = await fetch(checkoutApiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
