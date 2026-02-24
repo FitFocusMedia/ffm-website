@@ -292,7 +292,7 @@ export default function EventsPage() {
   const organizations = useMemo(() => {
     const orgMap = new Map()
     events.forEach(e => {
-      const displayName = e.display_name || e.organization
+      const displayName = e.org_display_name || e.organization
       if (displayName && !orgMap.has(displayName)) {
         orgMap.set(displayName, { display: displayName, original: e.organization })
       }
@@ -307,10 +307,10 @@ export default function EventsPage() {
   const filteredEvents = useMemo(() => {
     let filtered = events
     
-    // Filter by organization (match against display_name or organization)
+    // Filter by organization (match against org_display_name or organization)
     if (selectedOrg !== 'all') {
       filtered = filtered.filter(e => 
-        (e.display_name || e.organization) === selectedOrg
+        (e.org_display_name || e.organization) === selectedOrg
       )
     }
     
@@ -320,7 +320,7 @@ export default function EventsPage() {
       filtered = filtered.filter(e => 
         e.title?.toLowerCase().includes(query) ||
         e.organization?.toLowerCase().includes(query) ||
-        e.display_name?.toLowerCase().includes(query) ||
+        e.org_display_name?.toLowerCase().includes(query) ||
         e.venue?.toLowerCase().includes(query)
       )
     }
