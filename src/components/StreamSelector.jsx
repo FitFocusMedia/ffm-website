@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Radio, Check, Tv } from 'lucide-react'
 
-// API endpoint for checking MUX stream status
-const STREAM_STATUS_API = 'https://clawdbots-mini.tailcfdc1.ts.net/checkout/stream-status'
+// Supabase edge function for MUX stream status
+const SUPABASE_URL = 'https://gonalgubgldgpkcekaxe.supabase.co'
+const STREAM_STATUS_API = `${SUPABASE_URL}/functions/v1/mux-stream/status`
 
 export default function StreamSelector({ streams, selectedStream, onSelect, isLive = false }) {
   const [liveStatuses, setLiveStatuses] = useState({})

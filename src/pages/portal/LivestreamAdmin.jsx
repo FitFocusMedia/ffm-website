@@ -1477,8 +1477,8 @@ function MultiStreamManager({ eventId, event, onEventUpdate }) {
     if (!newStreamName.trim()) return
     setAdding(true)
     try {
-      // First, auto-create MUX stream
-      const muxResponse = await fetch('https://clawdbots-mini.tailcfdc1.ts.net/checkout/mux/create-stream', {
+      // First, auto-create MUX stream via Supabase edge function
+      const muxResponse = await fetch('https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/mux-stream/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -1550,7 +1550,7 @@ function MultiStreamManager({ eventId, event, onEventUpdate }) {
 
   const handleGenerateStreamKey = async (stream) => {
     try {
-      const response = await fetch('https://clawdbots-mini.tailcfdc1.ts.net/checkout/mux/create-stream', {
+      const response = await fetch('https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/mux-stream/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 

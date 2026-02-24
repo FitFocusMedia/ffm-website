@@ -42,8 +42,9 @@ export default function WatchPage() {
   const [showStreamSelector, setShowStreamSelector] = useState(false)
   const [streamLiveStatuses, setStreamLiveStatuses] = useState({})
   
-  // MUX status API endpoint
-  const STREAM_STATUS_API = 'https://clawdbots-mini.tailcfdc1.ts.net/checkout/stream-status'
+  // Supabase edge function for MUX stream status
+  const SUPABASE_URL = 'https://gonalgubgldgpkcekaxe.supabase.co'
+  const STREAM_STATUS_API = `${SUPABASE_URL}/functions/v1/mux-stream/status`
   
   // Fetch real MUX status for streams
   useEffect(() => {
