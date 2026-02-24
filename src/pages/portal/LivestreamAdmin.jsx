@@ -829,34 +829,58 @@ export default function LivestreamAdmin() {
   )
 }
 
-function EventModal({ event, onClose, onSave }) {
+function EventModal({ event: initialEvent, onClose, onSave }) {
+  const [event, setEvent] = useState(initialEvent)
   const [formData, setFormData] = useState({
-    title: event?.title || '',
-    organization: event?.organization || '',
-    venue: event?.venue || '',
-    start_time: event?.start_time?.slice(0, 16) || '',
-    end_time: event?.end_time?.slice(0, 16) || '',
-    price: event?.price || 29.99,
-    description: event?.description || '',
-    category: event?.category || '',
-    thumbnail_url: event?.thumbnail_url || '',
-    player_poster_url: event?.player_poster_url || '',
-    ticket_url: event?.ticket_url || '',
-    vod_enabled: event?.vod_enabled || false,
-    status: event?.status || 'draft',
-    mux_playback_id: event?.mux_playback_id || '',
-    mux_stream_key: event?.mux_stream_key || '',
-    geo_blocking_enabled: event?.geo_blocking_enabled || false,
-    geo_lat: event?.geo_lat || null,
-    geo_lng: event?.geo_lng || null,
-    geo_radius_km: event?.geo_radius_km || 50,
-    geo_venue_address: event?.geo_venue_address || '',
-    crew_bypass_token: event?.crew_bypass_token || null,
-    bypass_created_at: event?.bypass_created_at || null
+    title: initialEvent?.title || '',
+    organization: initialEvent?.organization || '',
+    venue: initialEvent?.venue || '',
+    start_time: initialEvent?.start_time?.slice(0, 16) || '',
+    end_time: initialEvent?.end_time?.slice(0, 16) || '',
+    price: initialEvent?.price || 29.99,
+    description: initialEvent?.description || '',
+    category: initialEvent?.category || '',
+    thumbnail_url: initialEvent?.thumbnail_url || '',
+    player_poster_url: initialEvent?.player_poster_url || '',
+    ticket_url: initialEvent?.ticket_url || '',
+    vod_enabled: initialEvent?.vod_enabled || false,
+    status: initialEvent?.status || 'draft',
+    mux_playback_id: initialEvent?.mux_playback_id || '',
+    mux_stream_key: initialEvent?.mux_stream_key || '',
+    geo_blocking_enabled: initialEvent?.geo_blocking_enabled || false,
+    geo_lat: initialEvent?.geo_lat || null,
+    geo_lng: initialEvent?.geo_lng || null,
+    geo_radius_km: initialEvent?.geo_radius_km || 50,
+    geo_venue_address: initialEvent?.geo_venue_address || '',
+    crew_bypass_token: initialEvent?.crew_bypass_token || null,
+    bypass_created_at: initialEvent?.bypass_created_at || null
   })
   const [saving, setSaving] = useState(false)
   const [existingEvents, setExistingEvents] = useState([])
   const [loadingEvents, setLoadingEvents] = useState(true)
+  
+  // Reload event data from database (used after multi-stream conversion)
+  const loadEvent = async () => {
+    if (!initialEvent?.id) return
+    try {
+      const { data, error } = await supabase
+        .from('livestream_events')
+        .select('*')
+        .eq('id', initialEvent.id)
+        .single()
+      if (data && !error) {
+        setEvent(data)
+        // Update form data for fields that may have changed
+        setFormData(prev => ({
+          ...prev,
+          mux_playback_id: data.mux_playback_id || '',
+          mux_stream_key: data.mux_stream_key || ''
+        }))
+      }
+    } catch (err) {
+      console.error('Failed to reload event:', err)
+    }
+  }
 
   // Load existing events from onboarding and contracts
   useEffect(() => {
@@ -1396,7 +1420,7 @@ function EventModal({ event, onClose, onSave }) {
           
           {/* Multi-Stream Section */}
           {event?.id && (
-            <MultiStreamManager eventId={event.id} />
+            <MultiStreamManager eventId={event.id} event={event} onEventUpdate={loadEvent} />
           )}
 
           <div className="flex justify-end gap-3 pt-4 border-t border-dark-800">
@@ -1422,13 +1446,19 @@ function EventModal({ event, onClose, onSave }) {
 }
 
 // Multi-Stream Manager Component
-function MultiStreamManager({ eventId }) {
+function MultiStreamManager({ eventId, event, onEventUpdate }) {
   const [streams, setStreams] = useState([])
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
+  const [converting, setConverting] = useState(false)
   const [newStreamName, setNewStreamName] = useState('')
+  const [convertStreamName, setConvertStreamName] = useState('')
+  const [showConvertModal, setShowConvertModal] = useState(false)
   const [expandedStream, setExpandedStream] = useState(null)
 
+  // Check if event has existing single stream that can be converted
+  const hasExistingSingleStream = event?.mux_stream_id && !event?.is_multi_stream
+  
   useEffect(() => {
     loadStreams()
   }, [eventId])
@@ -1540,6 +1570,49 @@ function MultiStreamManager({ eventId }) {
     }
   }
 
+  const handleConvertToMultiStream = async () => {
+    if (!convertStreamName.trim()) {
+      alert('Please enter a name for the existing stream')
+      return
+    }
+    
+    setConverting(true)
+    try {
+      // Call edge function to migrate the existing stream
+      const { data, error } = await supabase.functions.invoke('mux-stream', {
+        body: {
+          action: 'migrate',
+          event_id: eventId,
+          stream_name: convertStreamName.trim()
+        }
+      })
+      
+      if (error) {
+        throw new Error(error.message || 'Migration failed')
+      }
+      
+      if (data?.error) {
+        throw new Error(data.error)
+      }
+      
+      setShowConvertModal(false)
+      setConvertStreamName('')
+      
+      // Reload streams and event data
+      await loadStreams()
+      if (onEventUpdate) {
+        await onEventUpdate()
+      }
+      
+      alert(`Successfully converted to multi-stream! "${convertStreamName.trim()}" is now your first stream.`)
+    } catch (err) {
+      console.error('Failed to convert to multi-stream:', err)
+      alert('Failed to convert: ' + err.message)
+    } finally {
+      setConverting(false)
+    }
+  }
+
   return (
     <div className="pt-6 border-t border-dark-800">
       <div className="flex items-center justify-between mb-4">
@@ -1557,6 +1630,78 @@ function MultiStreamManager({ eventId }) {
       <p className="text-sm text-gray-500 mb-4">
         Add multiple streams for events with multiple mats/stages. Each stream gets its own OBS stream key.
       </p>
+
+      {/* Convert Existing Stream Banner */}
+      {hasExistingSingleStream && streams.length === 0 && (
+        <div className="mb-4 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-amber-500/20 rounded-lg">
+              <Tv className="w-5 h-5 text-amber-500" />
+            </div>
+            <div className="flex-1">
+              <h4 className="font-medium text-amber-400 mb-1">Existing Stream Detected</h4>
+              <p className="text-sm text-gray-400 mb-3">
+                This event has a stream key already generated. To add multiple streams, convert it to multi-stream mode first.
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowConvertModal(true)}
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+              >
+                <Layers className="w-4 h-4" />
+                Convert to Multi-Stream
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Convert Modal */}
+      {showConvertModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-dark-900 rounded-xl border border-dark-700 p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-white mb-2">Convert to Multi-Stream</h3>
+            <p className="text-sm text-gray-400 mb-4">
+              Name your existing stream. This will become the first stream in multi-stream mode.
+            </p>
+            <input
+              type="text"
+              value={convertStreamName}
+              onChange={(e) => setConvertStreamName(e.target.value)}
+              placeholder="e.g., Main Stage, Mat 1, Ring A"
+              className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white placeholder-gray-500 mb-4"
+              autoFocus
+            />
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => { setShowConvertModal(false); setConvertStreamName('') }}
+                className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConvertToMultiStream}
+                disabled={converting || !convertStreamName.trim()}
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-dark-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+              >
+                {converting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                    Converting...
+                  </>
+                ) : (
+                  <>
+                    <Layers className="w-4 h-4" />
+                    Convert
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add Stream Form */}
       <div className="flex gap-2 mb-4">
