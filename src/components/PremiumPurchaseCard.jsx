@@ -23,19 +23,19 @@ export default function PremiumPurchaseCard({
   const [focused, setFocused] = useState(false)
   const discount = originalPrice ? Math.round((1 - price / originalPrice) * 100) : null
 
-  // Different benefits for VOD vs Live
+  // Different benefits for VOD vs Live - all highlighted for trust
   const liveBenefits = [
     { icon: Zap, text: 'Instant access after payment', highlight: true },
-    { icon: Play, text: 'Watch live + replay for 7 days' },
-    { icon: Star, text: 'HD quality streaming' },
-    { icon: Shield, text: 'Secure payment via Stripe' }
+    { icon: Play, text: 'Watch live + replay for 7 days', highlight: true },
+    { icon: Star, text: 'HD quality streaming', highlight: true },
+    { icon: Shield, text: 'Secure payment via Stripe', highlight: true }
   ]
   
   const vodBenefits = [
     { icon: PlayCircle, text: 'Instant access to full replay', highlight: true },
-    { icon: Film, text: 'Watch anytime, any device' },
-    { icon: Star, text: 'HD quality streaming' },
-    { icon: Shield, text: 'Secure payment via Stripe' }
+    { icon: Film, text: 'Watch anytime, any device', highlight: true },
+    { icon: Star, text: 'HD quality streaming', highlight: true },
+    { icon: Shield, text: 'Secure payment via Stripe', highlight: true }
   ]
   
   const benefits = isVod ? vodBenefits : liveBenefits
