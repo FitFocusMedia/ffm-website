@@ -191,19 +191,24 @@ export default function WatchPage() {
     }
   }, [event, searchParams])
 
-  // Heartbeat to keep session alive
+  // Heartbeat to keep session alive + check if session still valid
   useEffect(() => {
     if (sessionToken && hasAccess) {
       heartbeatRef.current = setInterval(async () => {
         try {
           const session = await updateSessionHeartbeat(sessionToken)
           if (!session) {
+            // Session was deactivated (another device took over)
             setSessionEnded(true)
             setHasAccess(false)
             clearInterval(heartbeatRef.current)
           }
         } catch (err) {
           console.error('Heartbeat failed:', err)
+          // Session was deactivated or invalid - kick user out
+          setSessionEnded(true)
+          setHasAccess(false)
+          clearInterval(heartbeatRef.current)
         }
       }, 30000)
     }
