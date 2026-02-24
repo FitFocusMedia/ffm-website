@@ -40,6 +40,60 @@ export default function WatchPage() {
   const [streams, setStreams] = useState([])
   const [selectedStream, setSelectedStream] = useState(null)
   const [showStreamSelector, setShowStreamSelector] = useState(false)
+  const [streamLiveStatuses, setStreamLiveStatuses] = useState({})
+  
+  // MUX status API endpoint
+  const STREAM_STATUS_API = 'https://clawdbots-mini.tailcfdc1.ts.net/checkout/stream-status'
+  
+  // Fetch real MUX status for streams
+  useEffect(() => {
+    if (!streams || streams.length === 0) return
+    
+    const fetchStatuses = async () => {
+      const streamsWithMuxId = streams.filter(s => s.mux_stream_id)
+      
+      if (streamsWithMuxId.length === 0) return
+      
+      try {
+        const results = await Promise.all(
+          streamsWithMuxId.map(async (stream) => {
+            try {
+              const res = await fetch(`${STREAM_STATUS_API}/${stream.mux_stream_id}`)
+              if (res.ok) {
+                const data = await res.json()
+                return { id: stream.id, isLive: data.isLive, status: data.status }
+              }
+            } catch (err) {
+              console.warn('Failed to fetch stream status:', err)
+            }
+            return { id: stream.id, isLive: false, status: 'unknown' }
+          })
+        )
+        
+        const statusMap = {}
+        results.forEach(r => {
+          statusMap[r.id] = r
+        })
+        setStreamLiveStatuses(statusMap)
+      } catch (err) {
+        console.error('Failed to fetch stream statuses:', err)
+      }
+    }
+    
+    fetchStatuses()
+    // Poll every 30 seconds
+    const interval = setInterval(fetchStatuses, 30000)
+    return () => clearInterval(interval)
+  }, [streams])
+  
+  // Helper to check if stream is live (MUX status takes priority)
+  const isStreamLive = (stream) => {
+    if (streamLiveStatuses[stream.id]) {
+      return streamLiveStatuses[stream.id].isLive
+    }
+    // Fallback to database status
+    return stream.status === 'live' || stream.status === 'active'
+  }
 
   useEffect(() => {
     loadEvent()
@@ -662,7 +716,7 @@ export default function WatchPage() {
             
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {streams.map((stream) => {
-                const isStreamLive = stream.status === 'live' || stream.status === 'active'
+                const streamIsLive = isStreamLive(stream)
                 
                 return (
                   <button
@@ -674,7 +728,7 @@ export default function WatchPage() {
                     className="relative flex flex-col items-center justify-center p-6 rounded-xl border-2 border-dark-600 bg-dark-800 hover:border-red-500 hover:bg-red-500/10 transition-all duration-200 group"
                   >
                     {/* Live indicator */}
-                    {isStreamLive && (
+                    {streamIsLive && (
                       <span className="absolute top-3 right-3 flex items-center gap-1 px-2 py-0.5 bg-red-500/20 text-red-500 text-xs font-medium rounded-full">
                         <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
                         LIVE
@@ -692,8 +746,8 @@ export default function WatchPage() {
                     </span>
                     
                     {/* Status */}
-                    <span className={`text-sm mt-1 ${isStreamLive ? 'text-red-400' : 'text-gray-500'}`}>
-                      {isStreamLive ? 'Now Streaming' : 'Waiting'}
+                    <span className={`text-sm mt-1 ${streamIsLive ? 'text-red-400' : 'text-gray-500'}`}>
+                      {streamIsLive ? 'Now Streaming' : 'Waiting'}
                     </span>
                     
                     {/* Watch button on hover */}
@@ -802,7 +856,7 @@ export default function WatchPage() {
                 <span className="text-gray-400 text-sm mr-2">Quick Switch:</span>
                 {streams.map((stream) => {
                   const isSelected = selectedStream?.id === stream.id
-                  const isStreamLive = stream.status === 'live' || stream.status === 'active'
+                  const streamIsLive = isStreamLive(stream)
                   
                   return (
                     <button
@@ -814,7 +868,7 @@ export default function WatchPage() {
                           : 'bg-dark-700 text-gray-300 hover:bg-dark-600 hover:text-white'
                       }`}
                     >
-                      {isStreamLive && !isSelected && (
+                      {streamIsLive && !isSelected && (
                         <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
                       )}
                       <Tv className="w-4 h-4" />

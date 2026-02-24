@@ -1,8 +1,63 @@
 import { useState, useEffect } from 'react'
 import { Radio, Check, Tv } from 'lucide-react'
 
+// API endpoint for checking MUX stream status
+const STREAM_STATUS_API = 'https://clawdbots-mini.tailcfdc1.ts.net/checkout/stream-status'
+
 export default function StreamSelector({ streams, selectedStream, onSelect, isLive = false }) {
+  const [liveStatuses, setLiveStatuses] = useState({})
+  
+  // Fetch real MUX status for streams that have mux_stream_id
+  useEffect(() => {
+    if (!streams || streams.length === 0) return
+    
+    const fetchStatuses = async () => {
+      const streamsWithMuxId = streams.filter(s => s.mux_stream_id)
+      
+      if (streamsWithMuxId.length === 0) return
+      
+      try {
+        const results = await Promise.all(
+          streamsWithMuxId.map(async (stream) => {
+            try {
+              const res = await fetch(`${STREAM_STATUS_API}/${stream.mux_stream_id}`)
+              if (res.ok) {
+                const data = await res.json()
+                return { id: stream.id, isLive: data.isLive, status: data.status }
+              }
+            } catch (err) {
+              console.warn('Failed to fetch stream status:', err)
+            }
+            return { id: stream.id, isLive: false, status: 'unknown' }
+          })
+        )
+        
+        const statusMap = {}
+        results.forEach(r => {
+          statusMap[r.id] = r
+        })
+        setLiveStatuses(statusMap)
+      } catch (err) {
+        console.error('Failed to fetch stream statuses:', err)
+      }
+    }
+    
+    fetchStatuses()
+    // Poll every 30 seconds
+    const interval = setInterval(fetchStatuses, 30000)
+    return () => clearInterval(interval)
+  }, [streams])
+  
   if (!streams || streams.length <= 1) return null
+  
+  // Helper to check if stream is live (MUX status takes priority)
+  const isStreamLive = (stream) => {
+    if (liveStatuses[stream.id]) {
+      return liveStatuses[stream.id].isLive
+    }
+    // Fallback to database status if no MUX check available
+    return stream.status === 'live' || stream.status === 'active'
+  }
 
   return (
     <div className="bg-dark-900/80 backdrop-blur-sm rounded-xl border border-dark-700 p-4 mb-4">
@@ -20,7 +75,7 @@ export default function StreamSelector({ streams, selectedStream, onSelect, isLi
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {streams.map((stream) => {
           const isSelected = selectedStream?.id === stream.id
-          const isStreamLive = stream.status === 'live' || stream.status === 'active'
+          const streamIsLive = isStreamLive(stream)
           
           return (
             <button
@@ -33,7 +88,7 @@ export default function StreamSelector({ streams, selectedStream, onSelect, isLi
               }`}
             >
               {/* Live indicator */}
-              {isStreamLive && (
+              {streamIsLive && (
                 <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
               )}
               
@@ -54,9 +109,9 @@ export default function StreamSelector({ streams, selectedStream, onSelect, isLi
               
               {/* Status badge */}
               <span className={`text-xs mt-1 ${
-                isStreamLive ? 'text-red-400' : 'text-gray-500'
+                streamIsLive ? 'text-red-400' : 'text-gray-500'
               }`}>
-                {isStreamLive ? 'Live' : 'Waiting'}
+                {streamIsLive ? 'Live' : 'Waiting'}
               </span>
             </button>
           )
@@ -71,10 +126,61 @@ export default function StreamSelector({ streams, selectedStream, onSelect, isLi
 }
 
 // Compact version for inside the player controls
-export function StreamSelectorCompact({ streams, selectedStream, onSelect }) {
+export function StreamSelectorCompact({ streams, selectedStream, onSelect, liveStatuses = {} }) {
   const [isOpen, setIsOpen] = useState(false)
+  const [localLiveStatuses, setLocalLiveStatuses] = useState({})
+  
+  // Fetch real MUX status for streams that have mux_stream_id
+  useEffect(() => {
+    if (!streams || streams.length === 0) return
+    
+    const fetchStatuses = async () => {
+      const streamsWithMuxId = streams.filter(s => s.mux_stream_id)
+      
+      if (streamsWithMuxId.length === 0) return
+      
+      try {
+        const results = await Promise.all(
+          streamsWithMuxId.map(async (stream) => {
+            try {
+              const res = await fetch(`${STREAM_STATUS_API}/${stream.mux_stream_id}`)
+              if (res.ok) {
+                const data = await res.json()
+                return { id: stream.id, isLive: data.isLive, status: data.status }
+              }
+            } catch (err) {
+              console.warn('Failed to fetch stream status:', err)
+            }
+            return { id: stream.id, isLive: false, status: 'unknown' }
+          })
+        )
+        
+        const statusMap = {}
+        results.forEach(r => {
+          statusMap[r.id] = r
+        })
+        setLocalLiveStatuses(statusMap)
+      } catch (err) {
+        console.error('Failed to fetch stream statuses:', err)
+      }
+    }
+    
+    fetchStatuses()
+    const interval = setInterval(fetchStatuses, 30000)
+    return () => clearInterval(interval)
+  }, [streams])
   
   if (!streams || streams.length <= 1) return null
+  
+  // Merge passed-in statuses with local ones
+  const mergedStatuses = { ...liveStatuses, ...localLiveStatuses }
+  
+  const isStreamLive = (stream) => {
+    if (mergedStatuses[stream.id]) {
+      return mergedStatuses[stream.id].isLive
+    }
+    return stream.status === 'live' || stream.status === 'active'
+  }
   
   return (
     <div className="relative">
@@ -98,7 +204,7 @@ export function StreamSelectorCompact({ streams, selectedStream, onSelect }) {
           <div className="absolute bottom-full left-0 mb-2 w-48 bg-dark-900 border border-dark-700 rounded-lg shadow-xl z-50">
             {streams.map((stream) => {
               const isSelected = selectedStream?.id === stream.id
-              const isStreamLive = stream.status === 'live' || stream.status === 'active'
+              const streamIsLive = isStreamLive(stream)
               
               return (
                 <button
@@ -115,14 +221,14 @@ export function StreamSelectorCompact({ streams, selectedStream, onSelect }) {
                 >
                   <div className="relative">
                     <Radio className={`w-5 h-5 ${isSelected ? 'text-red-500' : 'text-gray-500'}`} />
-                    {isStreamLive && (
+                    {streamIsLive && (
                       <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full" />
                     )}
                   </div>
                   <div className="flex-1">
                     <p className="font-medium">{stream.name}</p>
-                    <p className={`text-xs ${isStreamLive ? 'text-red-400' : 'text-gray-500'}`}>
-                      {isStreamLive ? 'Live' : 'Waiting'}
+                    <p className={`text-xs ${streamIsLive ? 'text-red-400' : 'text-gray-500'}`}>
+                      {streamIsLive ? 'Live' : 'Waiting'}
                     </p>
                   </div>
                   {isSelected && <Check className="w-4 h-4 text-red-500" />}
