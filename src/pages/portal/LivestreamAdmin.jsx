@@ -807,6 +807,10 @@ export default function LivestreamAdmin() {
               if (cleanData.end_time === '') cleanData.end_time = null
               if (cleanData.vod_available_until === '') cleanData.vod_available_until = null
               
+              // Convert empty numeric strings to null (Postgres rejects empty strings for numeric)
+              if (cleanData.vod_price === '' || cleanData.vod_price === undefined) cleanData.vod_price = null
+              if (cleanData.price === '' || cleanData.price === undefined) cleanData.price = null
+              
               if (editingEvent) {
                 await updateLivestreamEvent(editingEvent.id, cleanData)
               } else {
