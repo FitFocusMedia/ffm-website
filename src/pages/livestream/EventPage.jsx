@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { Calendar, MapPin, Clock, AlertTriangle, Navigation, Play, Users, Star, Sparkles } from 'lucide-react'
 import { getLivestreamEvent, getLivestreamSettings } from '../../lib/supabase'
+import { getDirectImageUrl } from '../../lib/imageUtils'
 import { trackPageView, trackGeoCheck, trackGeoBlocked, trackGeoPassed, trackPurchaseView, trackCheckoutStart } from '../../lib/analytics'
 import { sanitizeEmail, isValidEmail, checkRateLimit } from '../../lib/validation'
 import PremiumCountdown from '../../components/PremiumCountdown'
@@ -427,7 +428,7 @@ export default function EventPage() {
       <MetaTags 
         title={`${event.title} - ${event.organization}`}
         description={`Watch ${event.title} live! ${eventDate.toLocaleDateString('en-AU')} at ${event.venue}. Stream access $${event.price} AUD.`}
-        image={event.thumbnail_url}
+        image={getDirectImageUrl(event.thumbnail_url)}
         type="video.other"
       />
       
@@ -440,7 +441,7 @@ export default function EventPage() {
               <div className="relative aspect-video bg-dark-800 rounded-2xl overflow-hidden group">
                 {event.thumbnail_url ? (
                   <img 
-                    src={event.thumbnail_url} 
+                    src={getDirectImageUrl(event.thumbnail_url)} 
                     alt={event.title}
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />

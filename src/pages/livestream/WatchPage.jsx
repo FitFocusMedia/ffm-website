@@ -9,6 +9,7 @@ import {
   updateSessionHeartbeat,
   getEventStreams
 } from '../../lib/supabase'
+import { getDirectImageUrl } from '../../lib/imageUtils'
 import { trackPurchaseComplete } from '../../lib/analytics'
 import PremiumCountdown from '../../components/PremiumCountdown'
 import PremiumPlayer from '../../components/PremiumPlayer'
@@ -388,7 +389,7 @@ export default function WatchPage() {
             {event.thumbnail_url && (
               <div className="relative h-32 overflow-hidden">
                 <img 
-                  src={event.thumbnail_url} 
+                  src={getDirectImageUrl(event.thumbnail_url)} 
                   alt={event.title}
                   className="w-full h-full object-cover opacity-50"
                 />
@@ -487,7 +488,7 @@ export default function WatchPage() {
             {event.thumbnail_url && (
               <div className="relative max-w-2xl mx-auto mb-8 rounded-2xl overflow-hidden shadow-2xl shadow-red-500/10 group">
                 <img 
-                  src={event.thumbnail_url} 
+                  src={getDirectImageUrl(event.thumbnail_url)} 
                   alt={event.title}
                   className="w-full aspect-video object-cover opacity-80 transition-transform duration-500 group-hover:scale-105"
                 />
@@ -572,7 +573,7 @@ export default function WatchPage() {
             {event.thumbnail_url && (
               <div className="relative max-w-sm mx-auto mb-6 rounded-xl overflow-hidden">
                 <img 
-                  src={event.thumbnail_url} 
+                  src={getDirectImageUrl(event.thumbnail_url)} 
                   alt={event.title}
                   className="w-full aspect-video object-cover opacity-60"
                 />
@@ -645,7 +646,7 @@ export default function WatchPage() {
             <PremiumPlayer
               playbackId={activePlaybackId}
               title={selectedStream ? `${event.title} - ${selectedStream.name}` : event.title}
-              poster={event.thumbnail_url || event.player_poster_url}
+              poster={getDirectImageUrl(event.thumbnail_url || event.player_poster_url)}
               isLive={isLive || selectedStream?.status === 'live'}
               viewerEmail={email}
               onShare={() => {

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { Calendar, MapPin, Clock, Play, Ticket, Search, ChevronRight, ChevronLeft, X } from 'lucide-react'
 import { getLivestreamEvents } from '../../lib/supabase'
+import { getDirectImageUrl } from '../../lib/imageUtils'
 
 // Countdown Timer Component
 function CountdownTimer({ targetDate }) {
@@ -106,7 +107,7 @@ function EventCard({ event, featured = false, compact = false }) {
           <div className="absolute inset-0">
             {event.thumbnail_url ? (
               <img 
-                src={event.thumbnail_url} 
+                src={getDirectImageUrl(event.thumbnail_url)} 
                 alt={event.title}
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
               />
@@ -190,7 +191,7 @@ function EventCard({ event, featured = false, compact = false }) {
       <div className="relative aspect-video bg-dark-800 overflow-hidden">
         {event.thumbnail_url ? (
           <img 
-            src={event.thumbnail_url} 
+            src={getDirectImageUrl(event.thumbnail_url)} 
             alt={event.title}
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
           />

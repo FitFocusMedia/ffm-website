@@ -780,7 +780,6 @@ export default function LivestreamAdmin() {
                 category, 
                 crew_bypass_token, 
                 bypass_created_at, 
-                player_poster_url,
                 vod_enabled,
                 geo_venue_address,
                 ...cleanData 
