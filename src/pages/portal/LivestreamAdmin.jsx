@@ -794,12 +794,11 @@ export default function LivestreamAdmin() {
             try {
               let eventId = editingEvent?.id
               
-              // Remove fields that might not exist in database
+              // Remove fields that might not exist in database (keep VOD fields)
               const { 
                 category, 
                 crew_bypass_token, 
                 bypass_created_at, 
-                vod_enabled,
                 geo_venue_address,
                 ...cleanData 
               } = data
@@ -862,6 +861,10 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
     player_poster_url: initialEvent?.player_poster_url || '',
     ticket_url: initialEvent?.ticket_url || '',
     vod_enabled: initialEvent?.vod_enabled || false,
+    vod_asset_id: initialEvent?.vod_asset_id || '',
+    vod_playback_id: initialEvent?.vod_playback_id || '',
+    vod_price: initialEvent?.vod_price || '',
+    vod_available_until: initialEvent?.vod_available_until || '',
     status: initialEvent?.status || 'draft',
     mux_playback_id: initialEvent?.mux_playback_id || '',
     mux_stream_key: initialEvent?.mux_stream_key || '',
@@ -1163,6 +1166,64 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
               </div>
             </div>
           </div>
+
+          {/* VOD Configuration - shown when VOD is enabled */}
+          {formData.vod_enabled && (
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 space-y-4">
+              <h4 className="text-sm font-medium text-blue-400 flex items-center gap-2">
+                <Film className="w-4 h-4" />
+                VOD Replay Settings
+              </h4>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-1">VOD Price (leave empty = same as live)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.vod_price}
+                    onChange={(e) => setFormData({ ...formData, vod_price: e.target.value })}
+                    className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
+                    placeholder="e.g., 19.99"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-1">VOD Available Until (optional)</label>
+                  <input
+                    type="datetime-local"
+                    value={formData.vod_available_until ? formData.vod_available_until.slice(0, 16) : ''}
+                    onChange={(e) => setFormData({ ...formData, vod_available_until: e.target.value ? new Date(e.target.value).toISOString() : '' })}
+                    className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
+                  />
+                </div>
+              </div>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-1">VOD Asset ID (from MUX)</label>
+                  <input
+                    type="text"
+                    value={formData.vod_asset_id}
+                    onChange={(e) => setFormData({ ...formData, vod_asset_id: e.target.value })}
+                    className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
+                    placeholder="Auto-linked after event ends"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-1">VOD Playback ID</label>
+                  <input
+                    type="text"
+                    value={formData.vod_playback_id}
+                    onChange={(e) => setFormData({ ...formData, vod_playback_id: e.target.value })}
+                    className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
+                    placeholder="Auto-linked after event ends"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-gray-500">
+                VOD assets are automatically created by MUX when the livestream ends. 
+                Live ticket purchasers automatically get VOD access.
+              </p>
+            </div>
+          )}
 
           <div className="grid md:grid-cols-2 gap-4">
             <div>

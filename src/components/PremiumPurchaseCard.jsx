@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Check, Shield, Zap, Play, Lock, Star, CreditCard, Mail } from 'lucide-react'
+import { Check, Shield, Zap, Play, Lock, Star, CreditCard, Mail, Film, PlayCircle } from 'lucide-react'
 
 /**
  * Premium Purchase Card with glassmorphism and animations
@@ -16,30 +16,88 @@ export default function PremiumPurchaseCard({
   demoMode = false,
   isLive = false,
   isPast = false,
+  isVod = false,
+  vodExpired = false,
   className = ''
 }) {
   const [focused, setFocused] = useState(false)
   const discount = originalPrice ? Math.round((1 - price / originalPrice) * 100) : null
 
-  const benefits = [
+  // Different benefits for VOD vs Live
+  const liveBenefits = [
     { icon: Zap, text: 'Instant access after payment', highlight: true },
     { icon: Play, text: 'Watch live + replay for 7 days' },
     { icon: Star, text: 'HD quality streaming' },
     { icon: Shield, text: 'Secure payment via Stripe' }
   ]
+  
+  const vodBenefits = [
+    { icon: PlayCircle, text: 'Instant access to full replay', highlight: true },
+    { icon: Film, text: 'Watch anytime, any device' },
+    { icon: Star, text: 'HD quality streaming' },
+    { icon: Shield, text: 'Secure payment via Stripe' }
+  ]
+  
+  const benefits = isVod ? vodBenefits : liveBenefits
+
+  // VOD Expired state
+  if (vodExpired) {
+    return (
+      <div className={`relative ${className}`}>
+        <div className="absolute inset-0 bg-gradient-to-r from-gray-500/10 to-gray-500/10 blur-xl rounded-3xl"></div>
+        <div className="relative bg-dark-900/90 backdrop-blur-xl border border-dark-700/50 rounded-2xl overflow-hidden p-8 text-center">
+          <Film className="w-12 h-12 text-gray-500 mx-auto mb-4" />
+          <h3 className="text-xl font-bold text-white mb-2">Replay No Longer Available</h3>
+          <p className="text-gray-400 mb-4">
+            The VOD replay for this event has expired.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // Event ended without VOD
+  if (isPast && !isVod) {
+    return (
+      <div className={`relative ${className}`}>
+        <div className="absolute inset-0 bg-gradient-to-r from-gray-500/10 to-gray-500/10 blur-xl rounded-3xl"></div>
+        <div className="relative bg-dark-900/90 backdrop-blur-xl border border-dark-700/50 rounded-2xl overflow-hidden p-8 text-center">
+          <Play className="w-12 h-12 text-gray-500 mx-auto mb-4" />
+          <h3 className="text-xl font-bold text-white mb-2">Event Has Ended</h3>
+          <p className="text-gray-400">
+            This event has concluded and replay is not available.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className={`relative ${className}`}>
       {/* Glow effect behind card */}
-      <div className="absolute inset-0 bg-gradient-to-r from-red-500/20 to-orange-500/20 blur-xl rounded-3xl"></div>
+      <div className={`absolute inset-0 blur-xl rounded-3xl ${isVod ? 'bg-gradient-to-r from-blue-500/20 to-purple-500/20' : 'bg-gradient-to-r from-red-500/20 to-orange-500/20'}`}></div>
       
       {/* Main Card */}
       <div className="relative bg-dark-900/90 backdrop-blur-xl border border-dark-700/50 rounded-2xl overflow-hidden">
         {/* Premium Header */}
         <div className="bg-gradient-to-r from-dark-800 to-dark-800/50 px-6 py-4 border-b border-dark-700/50">
           <div className="flex items-center justify-between">
-            <span className="text-gray-400 font-medium">Stream Access</span>
-            {discount && (
+            <span className="text-gray-400 font-medium flex items-center gap-2">
+              {isVod ? (
+                <>
+                  <Film className="w-4 h-4 text-blue-400" />
+                  VOD Replay
+                </>
+              ) : (
+                'Stream Access'
+              )}
+            </span>
+            {isVod && (
+              <span className="px-2 py-1 bg-blue-500/20 text-blue-400 text-xs font-bold rounded-full">
+                REPLAY
+              </span>
+            )}
+            {discount && !isVod && (
               <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs font-bold rounded-full">
                 {discount}% OFF
               </span>
@@ -110,8 +168,8 @@ export default function PremiumPurchaseCard({
               </>
             ) : (
               <>
-                <CreditCard className="w-5 h-5" />
-                {isPast ? 'Buy Replay Access' : isLive ? 'Watch Now' : 'Buy Access'}
+                {isVod ? <Film className="w-5 h-5" /> : <CreditCard className="w-5 h-5" />}
+                {isVod ? 'Buy Replay Access' : isPast ? 'Event Ended' : isLive ? 'Watch Now' : 'Buy Access'}
               </>
             )}
           </button>

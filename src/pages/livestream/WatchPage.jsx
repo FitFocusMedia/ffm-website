@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
-import { Calendar, MapPin, AlertCircle, RefreshCw, Clock, Bell, Play, Sparkles, Lock, Mail, Users, Tv, DoorClosed } from 'lucide-react'
+import { Calendar, MapPin, AlertCircle, RefreshCw, Clock, Bell, Play, Sparkles, Lock, Mail, Users, Tv, DoorClosed, Film, PlayCircle } from 'lucide-react'
 import { 
   supabase,
   getLivestreamEvent, 
@@ -41,6 +41,10 @@ export default function WatchPage() {
   const [selectedStream, setSelectedStream] = useState(null)
   const [showStreamSelector, setShowStreamSelector] = useState(false)
   const [streamLiveStatuses, setStreamLiveStatuses] = useState({})
+  
+  // VOD Replay support
+  const [isVodMode, setIsVodMode] = useState(false)
+  const [vodExpired, setVodExpired] = useState(false)
   
   // Fetch real MUX status for streams via Supabase edge function
   useEffect(() => {
@@ -110,6 +114,33 @@ export default function WatchPage() {
         checkGeoBlocking()
       } else {
         setCheckingAccess(false)
+      }
+    }
+  }, [event])
+
+  // Check for VOD mode (event ended + VOD enabled)
+  useEffect(() => {
+    if (!event) return
+    
+    const now = new Date()
+    const eventEnd = event.end_time ? new Date(event.end_time) : null
+    const eventStart = new Date(event.start_time)
+    
+    // Consider event "ended" if:
+    // - end_time is set and has passed, OR
+    // - start_time + 8 hours has passed (fallback for events without end_time)
+    const fallbackEnd = new Date(eventStart.getTime() + 8 * 60 * 60 * 1000)
+    const eventHasEnded = eventEnd ? now > eventEnd : now > fallbackEnd
+    
+    if (eventHasEnded && event.vod_enabled) {
+      setIsVodMode(true)
+      
+      // Check if VOD has expired
+      if (event.vod_available_until) {
+        const vodExpiry = new Date(event.vod_available_until)
+        if (now > vodExpiry) {
+          setVodExpired(true)
+        }
       }
     }
   }, [event])
@@ -544,6 +575,29 @@ export default function WatchPage() {
   // Event not started yet (waiting room)
   const eventNotStarted = !doorsOpen && !isLive && !eventTimeHasPassed && !previewMode
 
+  // VOD Expired Screen
+  if (isVodMode && vodExpired) {
+    return (
+      <div className="min-h-screen bg-dark-950 flex items-center justify-center">
+        <div className="max-w-lg mx-auto px-4 text-center">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gray-500/20 flex items-center justify-center">
+            <Film className="w-10 h-10 text-gray-500" />
+          </div>
+          <h1 className="text-3xl font-bold text-white mb-4">Replay No Longer Available</h1>
+          <p className="text-gray-400 mb-6">
+            The VOD replay for this event has expired and is no longer available for viewing.
+          </p>
+          <Link 
+            to="/live"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl transition-colors"
+          >
+            Browse Other Events
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
   // Doors Closed Screen (emergency/mid-event closure)
   if (doorsClosed) {
     return (
@@ -691,8 +745,10 @@ export default function WatchPage() {
     )
   }
 
-  // Determine which playback ID to use (selected stream or event default)
-  const activePlaybackId = selectedStream?.mux_playback_id || event.mux_playback_id || 'demo-playback-id'
+  // Determine which playback ID to use (VOD mode uses vod_playback_id, otherwise stream or event default)
+  const activePlaybackId = isVodMode && event.vod_playback_id 
+    ? event.vod_playback_id 
+    : (selectedStream?.mux_playback_id || event.mux_playback_id || 'demo-playback-id')
   const isMultiStream = streams.length > 1
   
   // Stream selector screen for multi-stream events (show before player)

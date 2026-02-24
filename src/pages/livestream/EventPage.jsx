@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { Calendar, MapPin, Clock, AlertTriangle, Navigation, Play, Users, Star, Sparkles } from 'lucide-react'
+import { Calendar, MapPin, Clock, AlertTriangle, Navigation, Play, Users, Star, Sparkles, Film } from 'lucide-react'
 import { getLivestreamEvent, getLivestreamSettings } from '../../lib/supabase'
 import { getDirectImageUrl } from '../../lib/imageUtils'
 import { trackPageView, trackGeoCheck, trackGeoBlocked, trackGeoPassed, trackPurchaseView, trackCheckoutStart } from '../../lib/analytics'
@@ -187,6 +187,13 @@ export default function EventPage() {
       // Use Supabase edge function (JWT verification disabled)
       const checkoutApiUrl = 'https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/livestream_checkout'
       
+      // Check if this is a VOD purchase (event ended + VOD enabled)
+      const eventEnd = event.end_time ? new Date(event.end_time) : null
+      const eventStart = new Date(event.start_time)
+      const fallbackEnd = new Date(eventStart.getTime() + 8 * 60 * 60 * 1000)
+      const eventHasEnded = eventEnd ? new Date() > eventEnd : new Date() > fallbackEnd
+      const isVodPurchase = eventHasEnded && event.vod_enabled && event.vod_playback_id
+      
       const response = await fetch(checkoutApiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -195,7 +202,8 @@ export default function EventPage() {
           email: cleanEmail,
           buyer_lat: userLocation?.lat,
           buyer_lng: userLocation?.lng,
-          distance_from_venue_km: userLocation?.distance_km
+          distance_from_venue_km: userLocation?.distance_km,
+          is_vod_purchase: isVodPurchase
         })
       })
       
@@ -421,7 +429,14 @@ export default function EventPage() {
   
   const eventDate = parseAsLocalTime(event.start_time)
   const isLive = event.is_live || event.status === 'live'
-  const isPast = event.status === 'ended' || parseAsLocalTime(event.end_time) < new Date()
+  const eventEnd = event.end_time ? parseAsLocalTime(event.end_time) : null
+  const fallbackEnd = new Date(eventDate.getTime() + 8 * 60 * 60 * 1000) // 8 hours after start
+  const isPast = event.status === 'ended' || (eventEnd ? eventEnd < new Date() : fallbackEnd < new Date())
+  
+  // VOD availability
+  const isVodAvailable = isPast && event.vod_enabled && event.vod_playback_id
+  const vodExpired = event.vod_available_until && new Date(event.vod_available_until) < new Date()
+  const vodPrice = event.vod_price || event.price // Use VOD price or fall back to live price
 
   return (
     <>
@@ -567,7 +582,7 @@ export default function EventPage() {
             <div className="lg:col-span-2">
               <div className="sticky top-24">
                 <PremiumPurchaseCard
-                  price={event.price}
+                  price={isVodAvailable ? vodPrice : event.price}
                   currency="AUD"
                   email={email}
                   onEmailChange={setEmail}
@@ -577,6 +592,8 @@ export default function EventPage() {
                   demoMode={settings.demo_mode}
                   isLive={isLive}
                   isPast={isPast}
+                  isVod={isVodAvailable && !vodExpired}
+                  vodExpired={vodExpired}
                 />
               </div>
             </div>
