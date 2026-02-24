@@ -805,6 +805,7 @@ export default function LivestreamAdmin() {
               // Convert empty timestamp strings to null (Postgres rejects empty strings for timestamps)
               if (cleanData.start_time === '') cleanData.start_time = null
               if (cleanData.end_time === '') cleanData.end_time = null
+              if (cleanData.vod_available_until === '') cleanData.vod_available_until = null
               
               if (editingEvent) {
                 await updateLivestreamEvent(editingEvent.id, cleanData)
