@@ -148,8 +148,12 @@ export default function ContentLandingPage() {
                   to={`/order/${org.slug}`}
                   className="flex items-center gap-4 p-6 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 hover:border-red-500/50 rounded-xl transition-all group"
                 >
-                  <div className="w-16 h-16 bg-gray-700 rounded-lg flex items-center justify-center text-2xl font-bold text-red-500">
-                    {org.name.split(' ').map(w => w[0]).join('').slice(0, 3)}
+                  <div className="w-16 h-16 bg-gray-700 rounded-lg flex items-center justify-center text-2xl font-bold text-red-500 overflow-hidden">
+                    {org.logo_url ? (
+                      <img src={org.logo_url} alt={org.name} className="w-full h-full object-contain p-1" />
+                    ) : (
+                      org.name.split(' ').map(w => w[0]).join('').slice(0, 3)
+                    )}
                   </div>
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold group-hover:text-red-500 transition-colors">{org.name}</h3>
