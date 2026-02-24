@@ -8,8 +8,7 @@ import {
   getLivestreamOrders,
   getLivestreamSettings,
   updateLivestreamSettings,
-  getOnboardingSessions,
-  getContracts,
+  getContentManagementEvents,
   getEventStreams,
   createEventStream,
   updateEventStream,
@@ -904,51 +903,22 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
     }
   }
 
-  // Load existing events from onboarding and contracts
+  // Load existing events from Content Management (events table)
   useEffect(() => {
     const loadExistingEvents = async () => {
       try {
-        const [onboardingSessions, contracts] = await Promise.all([
-          getOnboardingSessions(),
-          getContracts()
-        ])
+        const contentEvents = await getContentManagementEvents()
         
-        const events = []
-        
-        // Add onboarding sessions
-        if (onboardingSessions) {
-          onboardingSessions.forEach(session => {
-            if (session.event_name) {
-              events.push({
-                id: `onboarding-${session.id}`,
-                source: 'Onboarding',
-                title: session.event_name,
-                organization: session.org_name,
-                venue: session.event_location || '',
-                date: session.event_date,
-                contact: session.contact_name
-              })
-            }
-          })
-        }
-        
-        // Add contracts
-        if (contracts) {
-          contracts.forEach(contract => {
-            const data = contract.contract_data || {}
-            if (data.event_name) {
-              events.push({
-                id: `contract-${contract.id}`,
-                source: 'Contract',
-                title: data.event_name,
-                organization: contract.org_name,
-                venue: data.event_location || '',
-                date: data.event_date,
-                contact: contract.promoter_name
-              })
-            }
-          })
-        }
+        const events = contentEvents.map(evt => ({
+          id: `content-${evt.id}`,
+          source: 'Content',
+          title: evt.name,
+          organization: evt.org_display_name,
+          organizationId: evt.organization_id,
+          venue: evt.location || '',
+          date: evt.date,
+          status: evt.status
+        }))
         
         setExistingEvents(events)
       } catch (err) {
@@ -990,6 +960,7 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
       ...prev,
       title: selected.title || prev.title,
       organization: selected.organization || prev.organization,
+      organization_id: selected.organizationId || prev.organization_id,
       venue: selected.venue || prev.venue,
       start_time: startTime || prev.start_time,
       end_time: endTime || prev.end_time

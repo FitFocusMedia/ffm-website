@@ -608,6 +608,29 @@ export async function deleteOnboardingFile(fileId) {
 }
 
 // ============================================
+// CONTENT MANAGEMENT EVENTS
+// ============================================
+
+/**
+ * Get all events from Content Management (events table)
+ * These are the master list of upcoming events for all orgs
+ */
+export async function getContentManagementEvents() {
+  const { data, error } = await supabase
+    .from('events')
+    .select('*, organizations(id, name, display_name)')
+    .eq('active', true)
+    .order('date', { ascending: true })
+  
+  if (error) throw error
+  
+  return (data || []).map(event => ({
+    ...event,
+    org_display_name: event.organizations?.display_name || event.organizations?.name || 'Unknown'
+  }))
+}
+
+// ============================================
 // LIVESTREAM FUNCTIONS
 // ============================================
 
