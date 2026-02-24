@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit, Trash2, Eye, DollarSign, Users, Calendar, ToggleLeft, ToggleRight, Download, Radio, Copy, ExternalLink, BarChart3, MapPin, TrendingUp, Shield, RefreshCw, Film, Tag, Archive, Play, StopCircle, Tv, Layers } from 'lucide-react'
+import { Plus, Edit, Trash2, Eye, DollarSign, Users, Calendar, ToggleLeft, ToggleRight, Download, Radio, Copy, ExternalLink, BarChart3, MapPin, TrendingUp, Shield, RefreshCw, Film, Tag, Archive, Play, StopCircle, Tv, Layers, DoorOpen, DoorClosed } from 'lucide-react'
 import { 
   getAllLivestreamEvents, 
   createLivestreamEvent, 
@@ -352,8 +352,27 @@ export default function LivestreamAdmin() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
-                    {/* Go Live Toggle */}
-                    {/* Go Live / End Stream */}
+                    {/* Open/Close Doors */}
+                    {event.status !== 'ended' && (
+                      <button
+                        onClick={async () => {
+                          const newDoorsOpen = !event.doors_open
+                          await updateLivestreamEvent(event.id, { 
+                            doors_open: newDoorsOpen
+                          })
+                          loadData()
+                        }}
+                        className={`p-2 rounded-lg transition-colors ${
+                          event.doors_open 
+                            ? 'text-green-500 bg-green-500/20 hover:bg-green-500/30' 
+                            : 'text-gray-400 hover:text-green-500 hover:bg-dark-800'
+                        }`}
+                        title={event.doors_open ? 'Close Doors (block viewers)' : 'Open Doors (allow viewers)'}
+                      >
+                        {event.doors_open ? <DoorOpen className="w-5 h-5" /> : <DoorClosed className="w-5 h-5" />}
+                      </button>
+                    )}
+                    {/* Go Live Toggle - legacy, now mainly for status display */}
                     {event.status !== 'ended' ? (
                       <button
                         onClick={async () => {

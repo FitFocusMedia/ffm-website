@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
-import { Calendar, MapPin, AlertCircle, RefreshCw, Clock, Bell, Play, Sparkles, Lock, Mail, Users, Tv } from 'lucide-react'
+import { Calendar, MapPin, AlertCircle, RefreshCw, Clock, Bell, Play, Sparkles, Lock, Mail, Users, Tv, DoorClosed } from 'lucide-react'
 import { 
   supabase,
   getLivestreamEvent, 
@@ -534,9 +534,35 @@ export default function WatchPage() {
 
   const eventDate = parseAsLocalTime(event.start_time)
   const isLive = event.is_live || event.status === 'live'
+  const doorsOpen = event.doors_open === true
   const previewMode = searchParams.get('preview') === 'player'
   const eventTimeHasPassed = new Date() >= eventDate
-  const eventNotStarted = !isLive && !eventTimeHasPassed && !previewMode
+  
+  // Doors closed mid-event (emergency shutdown)
+  const doorsClosed = !doorsOpen && (isLive || eventTimeHasPassed) && !previewMode
+  
+  // Event not started yet (waiting room)
+  const eventNotStarted = !doorsOpen && !isLive && !eventTimeHasPassed && !previewMode
+
+  // Doors Closed Screen (emergency/mid-event closure)
+  if (doorsClosed) {
+    return (
+      <div className="min-h-screen bg-dark-950 flex items-center justify-center">
+        <div className="max-w-lg mx-auto px-4 text-center">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-red-500/20 flex items-center justify-center">
+            <DoorClosed className="w-10 h-10 text-red-500" />
+          </div>
+          <h1 className="text-3xl font-bold text-white mb-4">Stream Temporarily Unavailable</h1>
+          <p className="text-gray-400 mb-6">
+            {event.doors_closed_message || "The stream is currently unavailable. Please check back shortly."}
+          </p>
+          <p className="text-sm text-gray-500">
+            If you've purchased access, you'll be able to watch once the stream resumes.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   // Premium Waiting Room
   if (eventNotStarted) {
