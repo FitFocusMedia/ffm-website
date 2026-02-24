@@ -39,6 +39,7 @@ export default function WatchPage() {
   // Multi-stream support
   const [streams, setStreams] = useState([])
   const [selectedStream, setSelectedStream] = useState(null)
+  const [showStreamSelector, setShowStreamSelector] = useState(false)
 
   useEffect(() => {
     loadEvent()
@@ -83,6 +84,10 @@ export default function WatchPage() {
         setGeoInfo({ ...data, crew_bypass: true })
         setHasAccess(true)
         setEmail('crew@bypass')
+        // For multi-stream events with crew bypass, show stream selector first
+        if (event?.is_multi_stream) {
+          setShowStreamSelector(true)
+        }
       } else {
         setGeoBlocked(data.blocked)
         setGeoInfo(data)
@@ -177,10 +182,13 @@ export default function WatchPage() {
         try {
           const eventStreams = await getEventStreams(eventId)
           setStreams(eventStreams || [])
-          // Select default stream or first stream
-          const defaultStream = eventStreams?.find(s => s.is_default) || eventStreams?.[0]
-          if (defaultStream) {
-            setSelectedStream(defaultStream)
+          // Only auto-select stream if NOT using crew bypass (bypass users should choose)
+          const bypassToken = searchParams.get('bypass')
+          if (!bypassToken) {
+            const defaultStream = eventStreams?.find(s => s.is_default) || eventStreams?.[0]
+            if (defaultStream) {
+              setSelectedStream(defaultStream)
+            }
           }
         } catch (streamErr) {
           console.error('Failed to load streams:', streamErr)
@@ -609,6 +617,117 @@ export default function WatchPage() {
   const activePlaybackId = selectedStream?.mux_playback_id || event.mux_playback_id || 'demo-playback-id'
   const isMultiStream = streams.length > 1
   
+  // Stream selector screen for multi-stream events (show before player)
+  if (isMultiStream && (showStreamSelector || !selectedStream)) {
+    return (
+      <div className="min-h-screen bg-dark-950">
+        {/* Preview Mode Banner */}
+        {previewMode && (
+          <div className="bg-gradient-to-r from-yellow-500 to-orange-500 text-black px-4 py-2 text-center text-sm font-medium">
+            🎨 Preview Mode — This is how the player page will look. No stream is playing.
+          </div>
+        )}
+        
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          {/* Header */}
+          <div className="text-center mb-8">
+            {event.thumbnail_url && (
+              <div className="relative max-w-md mx-auto mb-6 rounded-xl overflow-hidden shadow-xl">
+                <img 
+                  src={getDirectImageUrl(event.thumbnail_url)} 
+                  alt={event.title}
+                  className="w-full aspect-video object-cover opacity-70"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-dark-950 via-dark-950/30 to-transparent" />
+              </div>
+            )}
+            
+            <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">{event.title}</h1>
+            <p className="text-gray-400">{event.organization}</p>
+            
+            {geoInfo?.crew_bypass && (
+              <span className="inline-flex items-center gap-1 mt-3 px-3 py-1 bg-green-500/20 text-green-400 text-sm font-medium rounded-full border border-green-500/30">
+                <Users className="w-4 h-4" />
+                Crew Access
+              </span>
+            )}
+          </div>
+          
+          {/* Stream Selection */}
+          <div className="bg-dark-900/50 backdrop-blur-sm rounded-2xl border border-dark-700/50 p-6 mb-6">
+            <div className="flex items-center justify-center gap-2 mb-6">
+              <Tv className="w-6 h-6 text-red-500" />
+              <h2 className="text-xl font-bold text-white">Select a Stream</h2>
+            </div>
+            
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {streams.map((stream) => {
+                const isStreamLive = stream.status === 'live' || stream.status === 'active'
+                
+                return (
+                  <button
+                    key={stream.id}
+                    onClick={() => {
+                      setSelectedStream(stream)
+                      setShowStreamSelector(false)
+                    }}
+                    className="relative flex flex-col items-center justify-center p-6 rounded-xl border-2 border-dark-600 bg-dark-800 hover:border-red-500 hover:bg-red-500/10 transition-all duration-200 group"
+                  >
+                    {/* Live indicator */}
+                    {isStreamLive && (
+                      <span className="absolute top-3 right-3 flex items-center gap-1 px-2 py-0.5 bg-red-500/20 text-red-500 text-xs font-medium rounded-full">
+                        <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                        LIVE
+                      </span>
+                    )}
+                    
+                    {/* Stream icon */}
+                    <div className="w-16 h-16 rounded-full bg-dark-700 group-hover:bg-red-500/20 flex items-center justify-center mb-3 transition-colors">
+                      <Tv className="w-8 h-8 text-gray-400 group-hover:text-red-500 transition-colors" />
+                    </div>
+                    
+                    {/* Stream name */}
+                    <span className="text-lg font-semibold text-white group-hover:text-red-400 transition-colors">
+                      {stream.name}
+                    </span>
+                    
+                    {/* Status */}
+                    <span className={`text-sm mt-1 ${isStreamLive ? 'text-red-400' : 'text-gray-500'}`}>
+                      {isStreamLive ? 'Now Streaming' : 'Waiting'}
+                    </span>
+                    
+                    {/* Watch button on hover */}
+                    <div className="absolute inset-0 flex items-center justify-center bg-red-500/0 group-hover:bg-red-500/10 rounded-xl transition-colors">
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity text-red-400 font-semibold flex items-center gap-2">
+                        <Play className="w-5 h-5" /> Watch
+                      </span>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+          
+          {/* Event info */}
+          <div className="flex flex-wrap justify-center gap-4 text-sm text-gray-400">
+            <div className="flex items-center gap-2 bg-dark-800/30 px-4 py-2 rounded-xl border border-dark-700/30">
+              <Calendar className="w-4 h-4 text-red-500" />
+              {eventDate.toLocaleDateString('en-AU', {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long'
+              })}
+            </div>
+            <div className="flex items-center gap-2 bg-dark-800/30 px-4 py-2 rounded-xl border border-dark-700/30">
+              <MapPin className="w-4 h-4 text-red-500" />
+              {event.venue}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+  
   // Has access - Show Premium Player
   return (
     <div className="min-h-screen bg-dark-950">
@@ -619,12 +738,16 @@ export default function WatchPage() {
         </div>
       )}
       
-      {/* Multi-Stream Selector Banner */}
+      {/* Multi-Stream Selector Banner - Clickable */}
       {isMultiStream && (
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 text-center text-sm font-medium flex items-center justify-center gap-2">
+        <button
+          onClick={() => setShowStreamSelector(true)}
+          className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white px-4 py-2 text-center text-sm font-medium flex items-center justify-center gap-2 transition-all cursor-pointer"
+        >
           <Tv className="w-4 h-4" />
           Multiple Streams Available — Currently watching: <strong>{selectedStream?.name || 'Stream 1'}</strong>
-        </div>
+          <span className="ml-2 px-2 py-0.5 bg-white/20 rounded text-xs">Click to switch</span>
+        </button>
       )}
       
       {/* Premium Player */}
@@ -671,6 +794,43 @@ export default function WatchPage() {
               </div>
             )}
           </div>
+          
+          {/* Quick Stream Switcher - Below Player */}
+          {isMultiStream && (
+            <div className="bg-dark-900/80 backdrop-blur-sm border-t border-dark-700/50 px-4 py-3">
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                <span className="text-gray-400 text-sm mr-2">Quick Switch:</span>
+                {streams.map((stream) => {
+                  const isSelected = selectedStream?.id === stream.id
+                  const isStreamLive = stream.status === 'live' || stream.status === 'active'
+                  
+                  return (
+                    <button
+                      key={stream.id}
+                      onClick={() => setSelectedStream(stream)}
+                      className={`relative flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                        isSelected 
+                          ? 'bg-red-500 text-white shadow-lg shadow-red-500/25' 
+                          : 'bg-dark-700 text-gray-300 hover:bg-dark-600 hover:text-white'
+                      }`}
+                    >
+                      {isStreamLive && !isSelected && (
+                        <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                      )}
+                      <Tv className="w-4 h-4" />
+                      {stream.name}
+                    </button>
+                  )
+                })}
+                <button
+                  onClick={() => setShowStreamSelector(true)}
+                  className="px-3 py-2 text-gray-500 hover:text-white text-sm transition-colors"
+                >
+                  View All →
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
