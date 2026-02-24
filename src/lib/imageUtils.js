@@ -5,7 +5,7 @@
  * - https://drive.google.com/open?id=FILE_ID
  * - https://drive.google.com/uc?id=FILE_ID
  * 
- * Output: https://drive.google.com/uc?export=view&id=FILE_ID
+ * Uses lh3.googleusercontent.com which is more reliable for embedding
  */
 export function getDirectImageUrl(url) {
   if (!url) return url
@@ -33,7 +33,9 @@ export function getDirectImageUrl(url) {
   }
   
   if (fileId) {
-    return `https://drive.google.com/uc?export=view&id=${fileId}`
+    // Use lh3.googleusercontent.com which bypasses CORS issues
+    // This is the same CDN Google uses for Drive thumbnails
+    return `https://lh3.googleusercontent.com/d/${fileId}`
   }
   
   // Return original if we couldn't parse it
