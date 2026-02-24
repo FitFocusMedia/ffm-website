@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit, Trash2, Eye, DollarSign, Users, Calendar, ToggleLeft, ToggleRight, Download, Radio, Copy, ExternalLink, BarChart3, MapPin, TrendingUp, Shield, RefreshCw, Film, Tag, Archive, Play, StopCircle } from 'lucide-react'
+import { Plus, Edit, Trash2, Eye, DollarSign, Users, Calendar, ToggleLeft, ToggleRight, Download, Radio, Copy, ExternalLink, BarChart3, MapPin, TrendingUp, Shield, RefreshCw, Film, Tag, Archive, Play, StopCircle, Tv, Layers } from 'lucide-react'
 import { 
   getAllLivestreamEvents, 
   createLivestreamEvent, 
@@ -10,6 +10,11 @@ import {
   updateLivestreamSettings,
   getOnboardingSessions,
   getContracts,
+  getEventStreams,
+  createEventStream,
+  updateEventStream,
+  deleteEventStream,
+  updateEventMultiStreamFlag,
   supabase
 } from '../../lib/supabase'
 import GeoBlockingMap from '../../components/GeoBlockingMap'
@@ -1388,6 +1393,11 @@ function EventModal({ event, onClose, onSave }) {
               </div>
             )}
           </div>
+          
+          {/* Multi-Stream Section */}
+          {event?.id && (
+            <MultiStreamManager eventId={event.id} />
+          )}
 
           <div className="flex justify-end gap-3 pt-4 border-t border-dark-800">
             <button
@@ -1407,6 +1417,294 @@ function EventModal({ event, onClose, onSave }) {
           </div>
         </form>
       </div>
+    </div>
+  )
+}
+
+// Multi-Stream Manager Component
+function MultiStreamManager({ eventId }) {
+  const [streams, setStreams] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [adding, setAdding] = useState(false)
+  const [newStreamName, setNewStreamName] = useState('')
+  const [expandedStream, setExpandedStream] = useState(null)
+
+  useEffect(() => {
+    loadStreams()
+  }, [eventId])
+
+  const loadStreams = async () => {
+    try {
+      const data = await getEventStreams(eventId)
+      setStreams(data || [])
+    } catch (err) {
+      console.error('Failed to load streams:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleAddStream = async () => {
+    if (!newStreamName.trim()) return
+    setAdding(true)
+    try {
+      const streamData = {
+        event_id: eventId,
+        name: newStreamName.trim(),
+        display_order: streams.length,
+        is_default: streams.length === 0
+      }
+      await createEventStream(streamData)
+      
+      // Update event's multi-stream flag
+      if (streams.length === 0) {
+        await updateEventMultiStreamFlag(eventId, true)
+      }
+      
+      setNewStreamName('')
+      await loadStreams()
+    } catch (err) {
+      console.error('Failed to add stream:', err)
+      alert('Failed to add stream: ' + err.message)
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  const handleDeleteStream = async (streamId) => {
+    if (!confirm('Delete this stream? This cannot be undone.')) return
+    try {
+      await deleteEventStream(streamId)
+      
+      // Update multi-stream flag if no streams left
+      if (streams.length <= 1) {
+        await updateEventMultiStreamFlag(eventId, false)
+      }
+      
+      await loadStreams()
+    } catch (err) {
+      console.error('Failed to delete stream:', err)
+      alert('Failed to delete stream')
+    }
+  }
+
+  const handleGenerateStreamKey = async (stream) => {
+    try {
+      const { data: muxData, error } = await supabase.functions.invoke('mux-stream', {
+        body: { 
+          action: 'create', 
+          event_id: eventId,
+          stream_id: stream.id,
+          stream_name: stream.name
+        }
+      })
+      
+      if (error) {
+        alert('Failed to create MUX stream: ' + error.message)
+        return
+      }
+      
+      if (muxData?.stream_key) {
+        // Update stream with MUX credentials
+        await updateEventStream(stream.id, {
+          mux_stream_key: muxData.stream_key,
+          mux_playback_id: muxData.playback_id,
+          mux_stream_id: muxData.stream_id
+        })
+        
+        // Copy to clipboard
+        navigator.clipboard.writeText(muxData.stream_key)
+        alert(`Stream Key for ${stream.name} created and copied!\n\nServer: rtmps://global-live.mux.com:443/app\nStream Key: ${muxData.stream_key}`)
+        
+        await loadStreams()
+      }
+    } catch (err) {
+      console.error('Failed to generate stream key:', err)
+      alert('Failed to generate stream key: ' + err.message)
+    }
+  }
+
+  const handleSetDefault = async (streamId) => {
+    try {
+      // Clear default from all streams
+      for (const s of streams) {
+        if (s.is_default) {
+          await updateEventStream(s.id, { is_default: false })
+        }
+      }
+      // Set new default
+      await updateEventStream(streamId, { is_default: true })
+      await loadStreams()
+    } catch (err) {
+      console.error('Failed to set default stream:', err)
+    }
+  }
+
+  return (
+    <div className="pt-6 border-t border-dark-800">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Layers className="w-5 h-5 text-purple-500" />
+          <h3 className="text-lg font-semibold text-white">Multi-Stream</h3>
+          {streams.length > 0 && (
+            <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 text-xs font-medium rounded-full">
+              {streams.length} stream{streams.length !== 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+      </div>
+      
+      <p className="text-sm text-gray-500 mb-4">
+        Add multiple streams for events with multiple mats/stages. Each stream gets its own OBS stream key.
+      </p>
+
+      {/* Add Stream Form */}
+      <div className="flex gap-2 mb-4">
+        <input
+          type="text"
+          value={newStreamName}
+          onChange={(e) => setNewStreamName(e.target.value)}
+          placeholder="Stream name (e.g., Mat 1, Main Stage)"
+          className="flex-1 px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white placeholder-gray-500"
+        />
+        <button
+          type="button"
+          onClick={handleAddStream}
+          disabled={adding || !newStreamName.trim()}
+          className="px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-dark-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+        >
+          {adding ? (
+            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+          ) : (
+            <Plus className="w-4 h-4" />
+          )}
+          Add
+        </button>
+      </div>
+
+      {/* Streams List */}
+      {loading ? (
+        <div className="text-center py-4">
+          <div className="animate-spin rounded-full h-6 w-6 border-2 border-purple-500 border-t-transparent mx-auto" />
+        </div>
+      ) : streams.length === 0 ? (
+        <div className="text-center py-6 text-gray-500 bg-dark-800/50 rounded-lg border border-dashed border-dark-700">
+          <Tv className="w-8 h-8 mx-auto mb-2 opacity-50" />
+          <p>No streams configured yet.</p>
+          <p className="text-sm">Add streams above for multi-mat/stage events.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {streams.map((stream, index) => (
+            <div 
+              key={stream.id}
+              className={`bg-dark-800 rounded-lg border ${stream.is_default ? 'border-purple-500/50' : 'border-dark-700'} overflow-hidden`}
+            >
+              {/* Stream Header */}
+              <div 
+                className="flex items-center justify-between p-3 cursor-pointer hover:bg-dark-700/50"
+                onClick={() => setExpandedStream(expandedStream === stream.id ? null : stream.id)}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-8 h-8 bg-purple-500/20 rounded-lg">
+                    <Radio className="w-4 h-4 text-purple-500" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-white">{stream.name}</span>
+                      {stream.is_default && (
+                        <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 text-xs rounded">Default</span>
+                      )}
+                      {stream.mux_stream_key && (
+                        <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded">Ready</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      {stream.mux_stream_key ? 'Stream key configured' : 'No stream key yet'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {!stream.is_default && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); handleSetDefault(stream.id) }}
+                      className="px-2 py-1 text-xs text-gray-400 hover:text-purple-400 transition-colors"
+                    >
+                      Set Default
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); handleDeleteStream(stream.id) }}
+                    className="p-1.5 text-gray-500 hover:text-red-500 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+              
+              {/* Expanded Stream Details */}
+              {expandedStream === stream.id && (
+                <div className="px-3 pb-3 pt-0 space-y-3 border-t border-dark-700">
+                  {stream.mux_stream_key ? (
+                    <>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Stream Key (for OBS)</label>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            readOnly
+                            value={stream.mux_stream_key}
+                            className="flex-1 px-3 py-2 bg-dark-900 border border-dark-700 rounded-lg text-gray-400 font-mono text-xs"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(stream.mux_stream_key)
+                              alert('Stream key copied!')
+                            }}
+                            className="px-3 py-2 bg-dark-700 hover:bg-dark-600 text-white rounded-lg transition-colors"
+                          >
+                            <Copy className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Playback ID</label>
+                        <input
+                          type="text"
+                          readOnly
+                          value={stream.mux_playback_id || '—'}
+                          className="w-full px-3 py-2 bg-dark-900 border border-dark-700 rounded-lg text-gray-400 font-mono text-xs"
+                        />
+                      </div>
+                      <p className="text-xs text-amber-400 font-medium">
+                        📡 RTMP Server: rtmps://global-live.mux.com:443/app
+                      </p>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleGenerateStreamKey(stream)}
+                      className="w-full px-4 py-3 bg-green-600 hover:bg-green-500 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Play className="w-4 h-4" />
+                      Generate MUX Stream Key
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      
+      {streams.length > 0 && (
+        <p className="text-xs text-gray-500 mt-3">
+          💡 Viewers will see a stream selector to switch between streams during the event.
+        </p>
+      )}
     </div>
   )
 }

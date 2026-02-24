@@ -1,18 +1,20 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
-import { Calendar, MapPin, AlertCircle, RefreshCw, Clock, Bell, Play, Sparkles, Lock, Mail, Users } from 'lucide-react'
+import { Calendar, MapPin, AlertCircle, RefreshCw, Clock, Bell, Play, Sparkles, Lock, Mail, Users, Tv } from 'lucide-react'
 import { 
   supabase,
   getLivestreamEvent, 
   getLivestreamOrderByEmail,
   createLivestreamSession,
-  updateSessionHeartbeat 
+  updateSessionHeartbeat,
+  getEventStreams
 } from '../../lib/supabase'
 import { trackPurchaseComplete } from '../../lib/analytics'
 import PremiumCountdown from '../../components/PremiumCountdown'
 import PremiumPlayer from '../../components/PremiumPlayer'
 import LiveIndicator, { SocialProofBanner } from '../../components/LiveIndicator'
 import ViewerCount from '../../components/ViewerCount'
+import StreamSelector, { StreamSelectorCompact } from '../../components/StreamSelector'
 
 export default function WatchPage() {
   const { eventId } = useParams()
@@ -32,6 +34,10 @@ export default function WatchPage() {
   const [viewerCount, setViewerCount] = useState(0)
   const heartbeatRef = useRef(null)
   const startingSoonRef = useRef(null)
+  
+  // Multi-stream support
+  const [streams, setStreams] = useState([])
+  const [selectedStream, setSelectedStream] = useState(null)
 
   useEffect(() => {
     loadEvent()
@@ -164,6 +170,21 @@ export default function WatchPage() {
     try {
       const data = await getLivestreamEvent(eventId)
       setEvent(data)
+      
+      // Load streams if multi-stream event
+      if (data?.is_multi_stream) {
+        try {
+          const eventStreams = await getEventStreams(eventId)
+          setStreams(eventStreams || [])
+          // Select default stream or first stream
+          const defaultStream = eventStreams?.find(s => s.is_default) || eventStreams?.[0]
+          if (defaultStream) {
+            setSelectedStream(defaultStream)
+          }
+        } catch (streamErr) {
+          console.error('Failed to load streams:', streamErr)
+        }
+      }
     } catch (err) {
       setError('Event not found')
     } finally {
@@ -583,6 +604,10 @@ export default function WatchPage() {
     )
   }
 
+  // Determine which playback ID to use (selected stream or event default)
+  const activePlaybackId = selectedStream?.mux_playback_id || event.mux_playback_id || 'demo-playback-id'
+  const isMultiStream = streams.length > 1
+  
   // Has access - Show Premium Player
   return (
     <div className="min-h-screen bg-dark-950">
@@ -593,25 +618,58 @@ export default function WatchPage() {
         </div>
       )}
       
+      {/* Multi-Stream Selector Banner */}
+      {isMultiStream && (
+        <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 text-center text-sm font-medium flex items-center justify-center gap-2">
+          <Tv className="w-4 h-4" />
+          Multiple Streams Available — Currently watching: <strong>{selectedStream?.name || 'Stream 1'}</strong>
+        </div>
+      )}
+      
       {/* Premium Player */}
       <div className="w-full bg-black">
         <div className="max-w-6xl mx-auto">
-          <PremiumPlayer
-            playbackId={event.mux_playback_id || 'demo-playback-id'}
-            title={event.title}
-            poster={event.thumbnail_url || event.player_poster_url}
-            isLive={isLive}
-            viewerEmail={email}
-            onShare={() => {
-              if (navigator.share) {
-                navigator.share({
-                  title: event.title,
-                  text: `Watch ${event.title} live!`,
-                  url: window.location.href
-                })
-              }
-            }}
-          />
+          {/* Stream Selector (above player on mobile, overlay on desktop) */}
+          {isMultiStream && (
+            <div className="md:hidden">
+              <StreamSelector 
+                streams={streams}
+                selectedStream={selectedStream}
+                onSelect={setSelectedStream}
+                isLive={isLive}
+              />
+            </div>
+          )}
+          
+          <div className="relative">
+            <PremiumPlayer
+              playbackId={activePlaybackId}
+              title={selectedStream ? `${event.title} - ${selectedStream.name}` : event.title}
+              poster={event.thumbnail_url || event.player_poster_url}
+              isLive={isLive || selectedStream?.status === 'live'}
+              viewerEmail={email}
+              onShare={() => {
+                if (navigator.share) {
+                  navigator.share({
+                    title: event.title,
+                    text: `Watch ${event.title} live!`,
+                    url: window.location.href
+                  })
+                }
+              }}
+            />
+            
+            {/* Desktop stream selector overlay */}
+            {isMultiStream && (
+              <div className="hidden md:block absolute bottom-4 left-4 z-10">
+                <StreamSelectorCompact
+                  streams={streams}
+                  selectedStream={selectedStream}
+                  onSelect={setSelectedStream}
+                />
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

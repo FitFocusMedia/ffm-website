@@ -843,6 +843,77 @@ export async function invalidateLivestreamSession(token) {
 }
 
 // ============================================
+// MULTI-STREAM SUPPORT
+// ============================================
+
+/**
+ * Get all streams for an event
+ */
+export async function getEventStreams(eventId) {
+  const { data, error } = await supabase
+    .from('livestream_streams')
+    .select('*')
+    .eq('event_id', eventId)
+    .order('display_order', { ascending: true })
+  
+  if (error) throw error
+  return data || []
+}
+
+/**
+ * Create a new stream for an event
+ */
+export async function createEventStream(streamData) {
+  const { data, error } = await supabase
+    .from('livestream_streams')
+    .insert([streamData])
+    .select()
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+/**
+ * Update a stream
+ */
+export async function updateEventStream(streamId, updates) {
+  const { data, error } = await supabase
+    .from('livestream_streams')
+    .update(updates)
+    .eq('id', streamId)
+    .select()
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+/**
+ * Delete a stream
+ */
+export async function deleteEventStream(streamId) {
+  const { error } = await supabase
+    .from('livestream_streams')
+    .delete()
+    .eq('id', streamId)
+  
+  if (error) throw error
+}
+
+/**
+ * Update event's is_multi_stream flag
+ */
+export async function updateEventMultiStreamFlag(eventId, isMultiStream) {
+  const { error } = await supabase
+    .from('livestream_events')
+    .update({ is_multi_stream: isMultiStream })
+    .eq('id', eventId)
+  
+  if (error) throw error
+}
+
+// ============================================
 // USER AUTHENTICATION (Magic Links)
 // ============================================
 
