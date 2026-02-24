@@ -305,7 +305,7 @@ export default function MyPurchasesPage() {
                               </span>
                             )}
                           </div>
-                          <p className="text-gray-400 text-sm mb-3">{event.display_name || event.organization}</p>
+                          <p className="text-gray-400 text-sm mb-3">{event.org_display_name || event.organization}</p>
                           
                           <div className="flex flex-wrap gap-4 text-sm text-gray-500">
                             <div className="flex items-center gap-1">

@@ -617,12 +617,17 @@ export async function deleteOnboardingFile(fileId) {
 export async function getLivestreamEvents() {
   const { data, error } = await supabase
     .from('livestream_events')
-    .select('*')
+    .select('*, organizations(id, name, display_name, logo_url)')
     .in('status', ['published', 'live', 'ended'])
     .order('start_time', { ascending: true })
   
   if (error) throw error
-  return data
+  
+  // Flatten org data for easier access
+  return (data || []).map(event => ({
+    ...event,
+    org_display_name: event.organizations?.display_name || event.organizations?.name || event.organization
+  }))
 }
 
 /**
@@ -631,12 +636,17 @@ export async function getLivestreamEvents() {
 export async function getLivestreamEvent(id) {
   const { data, error } = await supabase
     .from('livestream_events')
-    .select('*')
+    .select('*, organizations(id, name, display_name, logo_url)')
     .eq('id', id)
     .single()
   
   if (error) throw error
-  return data
+  
+  // Flatten org data for easier access
+  return data ? {
+    ...data,
+    org_display_name: data.organizations?.display_name || data.organizations?.name || data.organization
+  } : null
 }
 
 /**

@@ -441,7 +441,7 @@ export default function EventPage() {
   return (
     <>
       <MetaTags 
-        title={`${event.title} - ${event.display_name || event.organization}`}
+        title={`${event.title} - ${event.org_display_name || event.organization}`}
         description={`Watch ${event.title} live! ${eventDate.toLocaleDateString('en-AU')} at ${event.venue}. Stream access $${event.price} AUD.`}
         image={getDirectImageUrl(event.thumbnail_url)}
         type="video.other"
@@ -482,7 +482,7 @@ export default function EventPage() {
                 {/* Category/Organization Badge */}
                 <div className="absolute bottom-4 left-4">
                   <span className="px-3 py-1 bg-dark-900/80 backdrop-blur-sm text-white text-sm font-medium rounded-full border border-dark-700/50">
-                    {event.display_name || event.organization}
+                    {event.org_display_name || event.organization}
                   </span>
                 </div>
               </div>
@@ -495,7 +495,7 @@ export default function EventPage() {
                   </h1>
                   <div className="flex items-center gap-3 text-gray-400">
                     <Users className="w-4 h-4" />
-                    <span>{event.display_name || event.organization}</span>
+                    <span>{event.org_display_name || event.organization}</span>
                     {geoInfo?.crew_bypass && (
                       <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs font-medium rounded-full">
                         Crew Access
@@ -507,7 +507,7 @@ export default function EventPage() {
                   <AddToCalendar event={event} />
                   <SocialShare 
                     title={`Watch ${event.title} Live!`}
-                    description={`${event.display_name || event.organization} - ${eventDate.toLocaleDateString('en-AU')}`}
+                    description={`${event.org_display_name || event.organization} - ${eventDate.toLocaleDateString('en-AU')}`}
                   />
                 </div>
               </div>

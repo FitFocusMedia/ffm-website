@@ -141,7 +141,7 @@ function EventCard({ event, featured = false, compact = false }) {
             </div>
             
             {/* Event Info */}
-            <p className="text-red-400 font-semibold text-sm md:text-base mb-1">{event.display_name || event.organization}</p>
+            <p className="text-red-400 font-semibold text-sm md:text-base mb-1">{event.org_display_name || event.organization}</p>
             <h2 className="text-2xl md:text-4xl lg:text-5xl font-bold text-white mb-3 group-hover:text-red-400 transition-colors">
               {event.title}
             </h2>
@@ -240,7 +240,7 @@ function EventCard({ event, featured = false, compact = false }) {
         
         {/* Organization Badge */}
         <div className="absolute bottom-3 left-3 px-2.5 py-1 bg-dark-900/80 backdrop-blur-sm text-gray-300 text-xs font-medium rounded-lg truncate max-w-[60%]">
-          {event.display_name || event.organization}
+          {event.org_display_name || event.organization}
         </div>
       </div>
 
@@ -301,7 +301,7 @@ export default function EventsPage() {
   }, [events])
   
   // Helper to get display name for an event
-  const getOrgDisplay = (event) => event.display_name || event.organization
+  const getOrgDisplay = (event) => event.org_display_name || event.organization
 
   // Filter events
   const filteredEvents = useMemo(() => {

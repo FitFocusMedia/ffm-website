@@ -491,7 +491,7 @@ export default function WatchPage() {
             <div className="p-8">
               <div className="text-center mb-6">
                 <h2 className="text-2xl font-bold text-white mb-1">{event.title}</h2>
-                <p className="text-gray-400">{event.display_name || event.organization}</p>
+                <p className="text-gray-400">{event.org_display_name || event.organization}</p>
               </div>
 
               <div className="space-y-4">
@@ -649,7 +649,7 @@ export default function WatchPage() {
             <h1 className="text-3xl md:text-5xl font-bold text-white mb-3">
               {event.title}
             </h1>
-            <p className="text-xl text-gray-400 mb-8">{event.display_name || event.organization}</p>
+            <p className="text-xl text-gray-400 mb-8">{event.org_display_name || event.organization}</p>
 
             {/* Premium Countdown */}
             <div className="bg-dark-800/30 backdrop-blur-sm rounded-2xl p-8 max-w-xl mx-auto mb-8 border border-dark-700/50">
@@ -777,7 +777,7 @@ export default function WatchPage() {
             )}
             
             <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">{event.title}</h1>
-            <p className="text-gray-400">{event.display_name || event.organization}</p>
+            <p className="text-gray-400">{event.org_display_name || event.organization}</p>
             
             {geoInfo?.crew_bypass && (
               <span className="inline-flex items-center gap-1 mt-3 px-3 py-1 bg-green-500/20 text-green-400 text-sm font-medium rounded-full border border-green-500/30">
@@ -984,7 +984,7 @@ export default function WatchPage() {
                 </span>
               )}
             </div>
-            <p className="text-gray-400">{event.display_name || event.organization}</p>
+            <p className="text-gray-400">{event.org_display_name || event.organization}</p>
           </div>
           
           {/* Viewer Count - shows when live */}
