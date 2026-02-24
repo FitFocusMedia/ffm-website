@@ -172,11 +172,11 @@ function EventCard({ event, featured = false, compact = false }) {
             <div className="flex flex-wrap items-center gap-4 text-sm md:text-base text-gray-300 mb-4">
               <span className="flex items-center gap-1.5">
                 <Calendar className="w-4 h-4" />
-                {eventDate.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })}
+                {eventDate.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })}
               </span>
               <span className="flex items-center gap-1.5">
                 <Clock className="w-4 h-4" />
-                {eventDate.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}
+                {eventDate.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })}
               </span>
               <span className="flex items-center gap-1.5">
                 <MapPin className="w-4 h-4" />
@@ -276,11 +276,11 @@ function EventCard({ event, featured = false, compact = false }) {
         <div className="flex items-center gap-3 text-sm text-gray-500">
           <span className="flex items-center gap-1">
             <Calendar className="w-3.5 h-3.5" />
-            {eventDate.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
+            {eventDate.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', timeZone: 'UTC' })}
           </span>
           <span className="flex items-center gap-1">
             <Clock className="w-3.5 h-3.5" />
-            {eventDate.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}
+            {eventDate.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })}
           </span>
         </div>
       </div>
@@ -345,11 +345,11 @@ function HeroEvent({ event }) {
         <div className="flex flex-wrap items-center justify-center gap-4 md:gap-8 text-gray-300 mb-10">
           <span className="flex items-center gap-2 text-lg">
             <Calendar className="w-5 h-5 text-red-400" />
-            {eventDate.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' })}
+            {eventDate.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })}
           </span>
           <span className="flex items-center gap-2 text-lg">
             <Clock className="w-5 h-5 text-red-400" />
-            {eventDate.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}
+            {eventDate.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })}
           </span>
           <span className="flex items-center gap-2 text-lg">
             <MapPin className="w-5 h-5 text-red-400" />
