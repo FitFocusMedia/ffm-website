@@ -147,6 +147,12 @@ export default function ContentAdmin() {
   }
 
   async function deleteItem(table, id) {
+    // Special handling for organizations - show cascade preview
+    if (table === 'organizations') {
+      await deleteOrganizationWithPreview(id)
+      return
+    }
+    
     if (!confirm('Are you sure you want to delete this item?')) return
     const { error } = await supabase.from(table).delete().eq('id', id)
     if (error) {
@@ -154,11 +160,100 @@ export default function ContentAdmin() {
       alert(`Failed to delete: ${error.message}`)
       return
     }
-    if (table === 'organizations') {
-      loadOrganizations()
-      if (selectedOrg?.id === id) setSelectedOrg(null)
+    loadOrgData(selectedOrg.id)
+  }
+
+  async function deleteOrganizationWithPreview(orgId) {
+    // Fetch related items to show in preview
+    const org = organizations.find(o => o.id === orgId)
+    if (!org) return
+    
+    const [eventsRes, packagesRes, ordersRes, livestreamRes] = await Promise.all([
+      supabase.from('events').select('id, name').eq('organization_id', orgId),
+      supabase.from('packages').select('id, name').eq('organization_id', orgId),
+      supabase.from('content_orders').select('id').eq('organization_id', orgId),
+      supabase.from('livestream_events').select('id, title').eq('organization_id', orgId)
+    ])
+    
+    const events = eventsRes.data || []
+    const packages = packagesRes.data || []
+    const orders = ordersRes.data || []
+    const livestreams = livestreamRes.data || []
+    
+    // Build warning message
+    let warning = `⚠️ DELETE "${org.display_name || org.name}"?\n\nThis will also delete:\n`
+    
+    if (events.length > 0) {
+      warning += `\n📅 ${events.length} event${events.length > 1 ? 's' : ''}`
+      events.slice(0, 3).forEach(e => { warning += `\n   • ${e.name}` })
+      if (events.length > 3) warning += `\n   • ...and ${events.length - 3} more`
+    }
+    
+    if (packages.length > 0) {
+      warning += `\n\n📦 ${packages.length} package${packages.length > 1 ? 's' : ''}`
+      packages.slice(0, 3).forEach(p => { warning += `\n   • ${p.name}` })
+      if (packages.length > 3) warning += `\n   • ...and ${packages.length - 3} more`
+    }
+    
+    if (livestreams.length > 0) {
+      warning += `\n\n🎬 ${livestreams.length} livestream event${livestreams.length > 1 ? 's' : ''}`
+      livestreams.slice(0, 3).forEach(l => { warning += `\n   • ${l.title}` })
+      if (livestreams.length > 3) warning += `\n   • ...and ${livestreams.length - 3} more`
+    }
+    
+    if (orders.length > 0) {
+      warning += `\n\n🧾 ${orders.length} order${orders.length > 1 ? 's' : ''}`
+    }
+    
+    const totalRelated = events.length + packages.length + orders.length + livestreams.length
+    if (totalRelated === 0) {
+      warning = `Delete "${org.display_name || org.name}"?\n\nNo related items will be affected.`
     } else {
-      loadOrgData(selectedOrg.id)
+      warning += `\n\n⚠️ THIS CANNOT BE UNDONE!`
+    }
+    
+    if (!confirm(warning)) return
+    
+    // Cascade delete (order matters - delete children first)
+    try {
+      // Delete orders first (no FK dependencies)
+      if (orders.length > 0) {
+        await supabase.from('content_orders').delete().eq('organization_id', orgId)
+      }
+      
+      // Delete packages
+      if (packages.length > 0) {
+        await supabase.from('packages').delete().eq('organization_id', orgId)
+      }
+      
+      // Delete events (and their divisions)
+      for (const event of events) {
+        // Delete subdivisions -> categories -> event
+        const { data: cats } = await supabase.from('division_categories').select('id').eq('event_id', event.id)
+        if (cats && cats.length > 0) {
+          for (const cat of cats) {
+            await supabase.from('division_subdivisions').delete().eq('category_id', cat.id)
+          }
+          await supabase.from('division_categories').delete().eq('event_id', event.id)
+        }
+        await supabase.from('events').delete().eq('id', event.id)
+      }
+      
+      // Unlink livestream events (don't delete, just remove org link)
+      if (livestreams.length > 0) {
+        await supabase.from('livestream_events').update({ organization_id: null }).eq('organization_id', orgId)
+      }
+      
+      // Finally delete the organization
+      const { error } = await supabase.from('organizations').delete().eq('id', orgId)
+      if (error) throw error
+      
+      loadOrganizations()
+      if (selectedOrg?.id === orgId) setSelectedOrg(null)
+      
+    } catch (err) {
+      console.error('Cascade delete error:', err)
+      alert(`Failed to delete: ${err.message}`)
     }
   }
 
