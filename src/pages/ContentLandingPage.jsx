@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { getDirectImageUrl } from '../lib/imageUtils'
 
 export default function ContentLandingPage() {
   const [organizations, setOrganizations] = useState([])
@@ -150,7 +151,7 @@ export default function ContentLandingPage() {
                 >
                   <div className="w-16 h-16 bg-gray-700 rounded-lg flex items-center justify-center text-2xl font-bold text-red-500 overflow-hidden">
                     {org.logo_url ? (
-                      <img src={org.logo_url} alt={org.name} className="w-full h-full object-contain p-1" />
+                      <img src={getDirectImageUrl(org.logo_url)} alt={org.name} className="w-full h-full object-contain p-1" />
                     ) : (
                       org.name.split(' ').map(w => w[0]).join('').slice(0, 3)
                     )}
