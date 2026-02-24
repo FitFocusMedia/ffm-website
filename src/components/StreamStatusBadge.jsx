@@ -4,59 +4,86 @@ import { supabase, getEventStreams } from '../lib/supabase'
 
 /**
  * Stream Status Badge Component
- * Shows MUX stream status: LIVE, IDLE, ERROR, or NO STREAM
- * Supports both single-stream and multi-stream events
+ * Shows real-time MUX stream status: LIVE, IDLE, or NO STREAM
+ * Works for both single-stream and multi-stream events
  */
 export default function StreamStatusBadge({ event, onStatusUpdate, compact = false }) {
   const [checking, setChecking] = useState(false)
-  const [lastChecked, setLastChecked] = useState(null)
+  const [isLive, setIsLive] = useState(false)
   const [streamCount, setStreamCount] = useState(0)
   const [liveStreamCount, setLiveStreamCount] = useState(0)
+  const [hasStream, setHasStream] = useState(false)
 
-  // For multi-stream events, check stream statuses
+  // Check MUX status on mount and periodically
   useEffect(() => {
-    if (!event?.is_multi_stream) return
+    if (!event?.id) return
 
-    const checkMultiStreamStatus = async () => {
+    const checkStatus = async () => {
       try {
-        const streams = await getEventStreams(event.id)
-        setStreamCount(streams?.length || 0)
+        if (event.is_multi_stream) {
+          // Multi-stream: check each stream's MUX status
+          const streams = await getEventStreams(event.id)
+          setStreamCount(streams?.length || 0)
+          setHasStream(streams && streams.length > 0)
 
-        // Check MUX status for each stream
-        if (streams && streams.length > 0) {
-          const streamsWithMux = streams.filter(s => s.mux_stream_id)
-          let liveCount = 0
+          if (streams && streams.length > 0) {
+            const streamsWithMux = streams.filter(s => s.mux_stream_id)
+            let liveCount = 0
 
-          for (const stream of streamsWithMux) {
+            for (const stream of streamsWithMux) {
+              try {
+                const { data, error } = await supabase.functions.invoke('mux-stream', {
+                  body: { action: 'stream-status', mux_stream_id: stream.mux_stream_id }
+                })
+                if (!error && data?.isLive) {
+                  liveCount++
+                }
+              } catch (err) {
+                console.warn('Stream status check failed:', err)
+              }
+            }
+            setLiveStreamCount(liveCount)
+            setIsLive(liveCount > 0)
+          }
+        } else {
+          // Single-stream: check event's MUX status directly
+          const muxStreamId = event.mux_stream_id || event.mux_live_stream_id
+          setHasStream(!!muxStreamId || !!event.mux_stream_key)
+
+          if (muxStreamId) {
             try {
               const { data, error } = await supabase.functions.invoke('mux-stream', {
-                body: { action: 'stream-status', mux_stream_id: stream.mux_stream_id }
+                body: { action: 'stream-status', mux_stream_id: muxStreamId }
               })
-              if (!error && data?.isLive) {
-                liveCount++
+              if (!error && data) {
+                setIsLive(data.isLive || false)
+                if (onStatusUpdate) {
+                  onStatusUpdate(data)
+                }
               }
             } catch (err) {
-              console.warn('Stream status check failed:', err)
+              console.warn('Single stream status check failed:', err)
+              setIsLive(false)
             }
+          } else {
+            setIsLive(false)
           }
-          setLiveStreamCount(liveCount)
         }
       } catch (err) {
-        console.error('Failed to check multi-stream status:', err)
+        console.error('Status check failed:', err)
       }
     }
 
-    checkMultiStreamStatus()
+    checkStatus()
     // Poll every 30 seconds
-    const interval = setInterval(checkMultiStreamStatus, 30000)
+    const interval = setInterval(checkStatus, 30000)
     return () => clearInterval(interval)
-  }, [event?.id, event?.is_multi_stream])
+  }, [event?.id, event?.is_multi_stream, event?.mux_stream_id])
 
-  const checkStatus = async () => {
-    if (event?.is_multi_stream) {
-      // For multi-stream, refresh the useEffect
-      setChecking(true)
-      try {
+  const manualCheck = async () => {
+    setChecking(true)
+    try {
+      if (event.is_multi_stream) {
         const streams = await getEventStreams(event.id)
         setStreamCount(streams?.length || 0)
         
@@ -77,51 +104,41 @@ export default function StreamStatusBadge({ event, onStatusUpdate, compact = fal
             }
           }
           setLiveStreamCount(liveCount)
+          setIsLive(liveCount > 0)
         }
-        setLastChecked(new Date())
-      } catch (err) {
-        console.error('Status check failed:', err)
-      } finally {
-        setChecking(false)
-      }
-      return
-    }
-
-    // Single stream check
-    if (!event?.mux_live_stream_id && !event?.mux_stream_id) return
-    
-    setChecking(true)
-    try {
-      const { data, error } = await supabase.functions.invoke('mux-stream', {
-        body: { action: 'status', event_id: event.id }
-      })
-      
-      if (!error && data) {
-        setLastChecked(new Date())
-        if (onStatusUpdate) {
-          onStatusUpdate(data)
+      } else {
+        const muxStreamId = event.mux_stream_id || event.mux_live_stream_id
+        if (muxStreamId) {
+          const { data, error } = await supabase.functions.invoke('mux-stream', {
+            body: { action: 'stream-status', mux_stream_id: muxStreamId }
+          })
+          if (!error && data) {
+            setIsLive(data.isLive || false)
+            if (onStatusUpdate) {
+              onStatusUpdate(data)
+            }
+          }
         }
       }
     } catch (err) {
-      console.error('Status check failed:', err)
+      console.error('Manual status check failed:', err)
     } finally {
       setChecking(false)
     }
   }
 
-  // Multi-stream event handling
-  if (event?.is_multi_stream) {
-    const isLive = liveStreamCount > 0
-    
-    if (streamCount === 0) {
-      return (
-        <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium bg-purple-500/20 text-purple-400 ${compact ? '' : 'mr-2'}`}>
-          <Wifi className="w-3 h-3" />
-          {!compact && 'Multi-Stream (0)'}
-        </span>
-      )
-    }
+  // No stream configured at all
+  if (!hasStream && !event?.mux_stream_key) {
+    return (
+      <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium bg-gray-500/20 text-gray-400 ${compact ? '' : 'mr-2'}`}>
+        <WifiOff className="w-3 h-3" />
+        {!compact && 'No Stream'}
+      </span>
+    )
+  }
 
+  // Multi-stream display
+  if (event?.is_multi_stream) {
     return (
       <div className={`inline-flex items-center gap-2 ${compact ? '' : 'mr-2'}`}>
         <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${
@@ -133,7 +150,7 @@ export default function StreamStatusBadge({ event, onStatusUpdate, compact = fal
         
         {!compact && (
           <button
-            onClick={checkStatus}
+            onClick={manualCheck}
             disabled={checking}
             className="p-1 text-gray-500 hover:text-white transition-colors disabled:opacity-50"
             title="Check stream status"
@@ -145,57 +162,19 @@ export default function StreamStatusBadge({ event, onStatusUpdate, compact = fal
     )
   }
 
-  // Single stream - No MUX stream configured
-  if (!event?.mux_live_stream_id && !event?.mux_stream_key && !event?.mux_stream_id) {
-    return (
-      <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium bg-gray-500/20 text-gray-400 ${compact ? '' : 'mr-2'}`}>
-        <WifiOff className="w-3 h-3" />
-        {!compact && 'No Stream'}
-      </span>
-    )
-  }
-
-  // Determine status display for single stream
-  const status = event?.stream_status === 'active' || event?.is_live ? 'active' : 'idle'
-  const isLive = status === 'active'
-
-  const statusConfig = {
-    active: {
-      bg: 'bg-red-500',
-      text: 'text-white',
-      icon: Radio,
-      label: 'LIVE',
-      pulse: true
-    },
-    idle: {
-      bg: 'bg-yellow-500/20',
-      text: 'text-yellow-500',
-      icon: Wifi,
-      label: 'Ready',
-      pulse: false
-    },
-    disabled: {
-      bg: 'bg-gray-500/20',
-      text: 'text-gray-400',
-      icon: WifiOff,
-      label: 'Offline',
-      pulse: false
-    }
-  }
-
-  const config = statusConfig[status] || statusConfig.idle
-  const Icon = config.icon
-
+  // Single-stream display
   return (
     <div className={`inline-flex items-center gap-2 ${compact ? '' : 'mr-2'}`}>
-      <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${config.bg} ${config.text}`}>
-        <Icon className={`w-3 h-3 ${config.pulse ? 'animate-pulse' : ''}`} />
-        {config.label}
+      <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${
+        isLive ? 'bg-red-500 text-white' : 'bg-yellow-500/20 text-yellow-500'
+      }`}>
+        <Radio className={`w-3 h-3 ${isLive ? 'animate-pulse' : ''}`} />
+        {isLive ? 'LIVE' : 'Ready'}
       </span>
       
       {!compact && (
         <button
-          onClick={checkStatus}
+          onClick={manualCheck}
           disabled={checking}
           className="p-1 text-gray-500 hover:text-white transition-colors disabled:opacity-50"
           title="Check stream status"
