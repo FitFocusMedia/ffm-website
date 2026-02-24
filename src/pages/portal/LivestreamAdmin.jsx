@@ -1477,11 +1477,36 @@ function MultiStreamManager({ eventId, event, onEventUpdate }) {
     if (!newStreamName.trim()) return
     setAdding(true)
     try {
+      // First, auto-create MUX stream
+      const muxResponse = await fetch('https://clawdbots-mini.tailcfdc1.ts.net/checkout/mux/create-stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          name: newStreamName.trim(),
+          event_id: eventId 
+        })
+      })
+      
+      let muxData = null
+      if (muxResponse.ok) {
+        muxData = await muxResponse.json()
+        console.log('MUX stream created:', muxData)
+      } else {
+        console.warn('Failed to auto-create MUX stream, creating without MUX')
+      }
+      
       const streamData = {
         event_id: eventId,
         name: newStreamName.trim(),
         display_order: streams.length,
-        is_default: streams.length === 0
+        is_default: streams.length === 0,
+        // Auto-populate MUX fields if created
+        ...(muxData && {
+          mux_stream_id: muxData.mux_stream_id,
+          mux_stream_key: muxData.mux_stream_key,
+          mux_playback_id: muxData.mux_playback_id,
+          status: 'idle'
+        })
       }
       await createEventStream(streamData)
       
@@ -1492,6 +1517,12 @@ function MultiStreamManager({ eventId, event, onEventUpdate }) {
       
       setNewStreamName('')
       await loadStreams()
+      
+      // Show success message with stream key if created
+      if (muxData?.mux_stream_key) {
+        navigator.clipboard.writeText(muxData.mux_stream_key)
+        alert(`✅ Stream "${newStreamName.trim()}" created!\n\nRTMP Server: rtmps://global-live.mux.com:443/app\nStream Key: ${muxData.mux_stream_key}\n\n(Stream key copied to clipboard)`)
+      }
     } catch (err) {
       console.error('Failed to add stream:', err)
       alert('Failed to add stream: ' + err.message)
@@ -1519,31 +1550,35 @@ function MultiStreamManager({ eventId, event, onEventUpdate }) {
 
   const handleGenerateStreamKey = async (stream) => {
     try {
-      const { data: muxData, error } = await supabase.functions.invoke('mux-stream', {
-        body: { 
-          action: 'create', 
-          event_id: eventId,
-          stream_id: stream.id,
-          stream_name: stream.name
-        }
+      const response = await fetch('https://clawdbots-mini.tailcfdc1.ts.net/checkout/mux/create-stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          name: stream.name,
+          event_id: eventId 
+        })
       })
       
-      if (error) {
-        alert('Failed to create MUX stream: ' + error.message)
+      if (!response.ok) {
+        const errorData = await response.json()
+        alert('Failed to create MUX stream: ' + (errorData.error || 'Unknown error'))
         return
       }
       
-      if (muxData?.stream_key) {
+      const muxData = await response.json()
+      
+      if (muxData?.mux_stream_key) {
         // Update stream with MUX credentials
         await updateEventStream(stream.id, {
-          mux_stream_key: muxData.stream_key,
-          mux_playback_id: muxData.playback_id,
-          mux_stream_id: muxData.stream_id
+          mux_stream_key: muxData.mux_stream_key,
+          mux_playback_id: muxData.mux_playback_id,
+          mux_stream_id: muxData.mux_stream_id,
+          status: 'idle'
         })
         
         // Copy to clipboard
-        navigator.clipboard.writeText(muxData.stream_key)
-        alert(`Stream Key for ${stream.name} created and copied!\n\nServer: rtmps://global-live.mux.com:443/app\nStream Key: ${muxData.stream_key}`)
+        navigator.clipboard.writeText(muxData.mux_stream_key)
+        alert(`✅ Stream Key for ${stream.name} created and copied!\n\nServer: rtmps://global-live.mux.com:443/app\nStream Key: ${muxData.mux_stream_key}`)
         
         await loadStreams()
       }
