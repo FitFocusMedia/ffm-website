@@ -24,6 +24,11 @@ export default function ContentAdmin() {
   // Division management
   const [selectedEventForDivisions, setSelectedEventForDivisions] = useState(null)
   const [expandedCategories, setExpandedCategories] = useState([])
+  
+  // Package import
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [allPackages, setAllPackages] = useState([])
+  const [selectedImportPackages, setSelectedImportPackages] = useState([])
 
   useEffect(() => {
     loadOrganizations()
@@ -68,6 +73,46 @@ export default function ContentAdmin() {
     } else {
       setDivisionCategories([])
       setDivisionSubdivisions([])
+    }
+  }
+
+  // Load all packages from other organizations for import
+  async function loadAllPackagesForImport() {
+    const { data, error } = await supabase
+      .from('packages')
+      .select('*, organizations(name, display_name)')
+      .neq('organization_id', selectedOrg?.id)
+      .order('name')
+    
+    if (!error && data) {
+      setAllPackages(data)
+    }
+  }
+
+  // Import selected packages to current organization
+  async function importSelectedPackages() {
+    if (selectedImportPackages.length === 0 || !selectedOrg) return
+    
+    const packagesToImport = allPackages.filter(p => selectedImportPackages.includes(p.id))
+    
+    // Create new packages with current org ID (exclude id, created_at, organization relation)
+    const newPackages = packagesToImport.map(pkg => ({
+      name: pkg.name,
+      description: pkg.description,
+      price: pkg.price,
+      sort_order: pkg.sort_order,
+      active: pkg.active,
+      organization_id: selectedOrg.id
+    }))
+    
+    const { error } = await supabase.from('packages').insert(newPackages)
+    
+    if (!error) {
+      setShowImportModal(false)
+      setSelectedImportPackages([])
+      loadOrgData(selectedOrg.id)
+    } else {
+      alert('Failed to import packages: ' + error.message)
     }
   }
 
@@ -465,17 +510,25 @@ export default function ContentAdmin() {
         <div>
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold">Content Packages</h2>
-            <button 
-              onClick={() => openModal('package')}
-              className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm"
-            >
-              + Add Package
-            </button>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => { loadAllPackagesForImport(); setShowImportModal(true) }}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm"
+              >
+                Import from...
+              </button>
+              <button 
+                onClick={() => openModal('package')}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm"
+              >
+                + Add Package
+              </button>
+            </div>
           </div>
           
           {orgPackages.length === 0 ? (
             <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-8 text-center text-gray-400">
-              No packages yet. Add one to get started.
+              No packages yet. Add one to get started, or import from another organization.
             </div>
           ) : (
             <div className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden">
@@ -772,6 +825,74 @@ export default function ContentAdmin() {
       )}
 
       {showModal && renderModal()}
+      
+      {/* Import Packages Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 rounded-xl border border-gray-700 p-6 w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
+            <h3 className="text-lg font-semibold mb-4">Import Packages from Other Organizations</h3>
+            
+            {allPackages.length === 0 ? (
+              <p className="text-gray-400 text-center py-8">No packages available to import from other organizations.</p>
+            ) : (
+              <div className="flex-1 overflow-y-auto mb-4 space-y-2">
+                {/* Group packages by organization */}
+                {Object.entries(
+                  allPackages.reduce((acc, pkg) => {
+                    const orgName = pkg.organizations?.display_name || pkg.organizations?.name || 'Unknown'
+                    if (!acc[orgName]) acc[orgName] = []
+                    acc[orgName].push(pkg)
+                    return acc
+                  }, {})
+                ).map(([orgName, packages]) => (
+                  <div key={orgName} className="border border-gray-700 rounded-lg overflow-hidden">
+                    <div className="bg-gray-800 px-3 py-2 font-medium text-sm">{orgName}</div>
+                    <div className="divide-y divide-gray-800">
+                      {packages.map(pkg => (
+                        <label key={pkg.id} className="flex items-center gap-3 px-3 py-2 hover:bg-gray-800/50 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedImportPackages.includes(pkg.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedImportPackages(prev => [...prev, pkg.id])
+                              } else {
+                                setSelectedImportPackages(prev => prev.filter(id => id !== pkg.id))
+                              }
+                            }}
+                            className="w-4 h-4 rounded"
+                          />
+                          <div className="flex-1">
+                            <div className="font-medium">{pkg.name}</div>
+                            {pkg.description && <div className="text-xs text-gray-400 truncate">{pkg.description}</div>}
+                          </div>
+                          <div className="text-green-400 font-semibold">${pkg.price}</div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            <div className="flex gap-3 pt-4 border-t border-gray-700">
+              <button
+                onClick={() => { setShowImportModal(false); setSelectedImportPackages([]) }}
+                className="flex-1 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={importSelectedPackages}
+                disabled={selectedImportPackages.length === 0}
+                className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Import {selectedImportPackages.length > 0 && `(${selectedImportPackages.length})`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 
