@@ -91,7 +91,7 @@ export default function PremiumCountdown({ targetDate, onComplete, className = '
   }
 
   const Separator = () => (
-    <div className="flex flex-col items-center justify-center gap-1.5 sm:gap-2 px-0.5 sm:px-1 md:px-3">
+    <div className="flex flex-col items-center justify-center gap-1.5 sm:gap-2 px-0.5 sm:px-1 md:px-3 h-16 sm:h-20 md:h-28">
       <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-500 animate-pulse"></div>
       <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-500 animate-pulse" style={{ animationDelay: '0.5s' }}></div>
     </div>
