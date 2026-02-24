@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { getDirectImageUrl } from '../../lib/imageUtils'
 
 export default function ContentAdmin() {
   const [organizations, setOrganizations] = useState([])
@@ -201,7 +202,7 @@ export default function ContentAdmin() {
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
                   {org.logo_url ? (
-                    <img src={org.logo_url} alt={org.name} className="w-12 h-12 rounded-lg object-cover" />
+                    <img src={getDirectImageUrl(org.logo_url)} alt={org.name} className="w-12 h-12 rounded-lg object-cover" />
                   ) : (
                     <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center text-xl font-bold">
                       {org.name.charAt(0)}
@@ -259,7 +260,7 @@ export default function ContentAdmin() {
         </button>
         <div className="flex items-center gap-3">
           {selectedOrg.logo_url ? (
-            <img src={selectedOrg.logo_url} alt={selectedOrg.name} className="w-10 h-10 rounded-lg object-cover" />
+            <img src={getDirectImageUrl(selectedOrg.logo_url)} alt={selectedOrg.name} className="w-10 h-10 rounded-lg object-cover" />
           ) : (
             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center text-lg font-bold">
               {selectedOrg.name.charAt(0)}
