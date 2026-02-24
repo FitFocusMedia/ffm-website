@@ -854,6 +854,43 @@ export default function ContentAdmin() {
                     rows={3}
                   />
                 </div>
+                <div className="border-t border-gray-700 pt-4 mt-4">
+                  <p className="text-sm text-gray-400 mb-3 font-medium">Contact / Organizer</p>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-1">Contact Name</label>
+                      <input
+                        type="text"
+                        value={formData.contact_name || ''}
+                        onChange={e => setFormData({ ...formData, contact_name: e.target.value })}
+                        placeholder="e.g., Phil Cassidy"
+                        className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm text-gray-400 mb-1">Contact Email</label>
+                        <input
+                          type="email"
+                          value={formData.contact_email || ''}
+                          onChange={e => setFormData({ ...formData, contact_email: e.target.value })}
+                          placeholder="email@example.com"
+                          className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-400 mb-1">Contact Phone</label>
+                        <input
+                          type="tel"
+                          value={formData.contact_phone || ''}
+                          onChange={e => setFormData({ ...formData, contact_phone: e.target.value })}
+                          placeholder="+61 400 000 000"
+                          className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </>
             )}
 
