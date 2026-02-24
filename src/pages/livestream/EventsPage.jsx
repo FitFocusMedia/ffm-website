@@ -622,7 +622,7 @@ export default function EventsPage() {
       {/* Events Section */}
       <div id="upcoming-events" className="bg-dark-950">
         {/* Search & Filters */}
-        <div className="sticky top-0 z-20 bg-dark-950/95 backdrop-blur-md border-b border-dark-800">
+        <div className="sticky top-16 sm:top-20 z-20 bg-dark-950/95 backdrop-blur-md border-b border-dark-800">
           <div className="max-w-7xl mx-auto px-4 py-4">
             <div className="flex flex-col md:flex-row gap-4">
               {/* Search */}
