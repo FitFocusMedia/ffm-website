@@ -83,7 +83,7 @@ export default function ContentAdmin() {
     setEditItem(item)
     
     if (type === 'org') {
-      setFormData(item || { name: '', slug: '', description: '', logo_url: '', active: true })
+      setFormData(item || { name: '', display_name: '', legal_name: '', slug: '', description: '', logo_url: '', active: true })
     } else if (type === 'event') {
       setFormData(item || { organization_id: selectedOrg?.id, name: '', date: '', location: '', status: 'upcoming', active: true })
     } else if (type === 'package') {
@@ -208,7 +208,10 @@ export default function ContentAdmin() {
                     </div>
                   )}
                   <div>
-                    <h3 className="font-bold text-lg group-hover:text-red-400 transition-colors">{org.name}</h3>
+                    <h3 className="font-bold text-lg group-hover:text-red-400 transition-colors">{org.display_name || org.name}</h3>
+                    {org.display_name && org.display_name !== org.name && (
+                      <p className="text-xs text-gray-400">{org.name}</p>
+                    )}
                     <p className="text-xs text-gray-500">/{org.slug}</p>
                   </div>
                 </div>
@@ -688,13 +691,38 @@ export default function ContentAdmin() {
             {modalType === 'org' && (
               <>
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1">Name</label>
+                  <label className="block text-sm text-gray-400 mb-1">Organization Name *</label>
                   <input
                     type="text"
                     value={formData.name || ''}
                     onChange={e => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="e.g., World Ninja Games"
                     className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg"
                   />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Display Name (Short)</label>
+                    <input
+                      type="text"
+                      value={formData.display_name || ''}
+                      onChange={e => setFormData({ ...formData, display_name: e.target.value })}
+                      placeholder="e.g., WNG"
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Shown on livestream cards & filters</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Legal Name</label>
+                    <input
+                      type="text"
+                      value={formData.legal_name || ''}
+                      onChange={e => setFormData({ ...formData, legal_name: e.target.value })}
+                      placeholder="e.g., World Ninja Games Pty Ltd"
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">For contracts & invoices</p>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm text-gray-400 mb-1">Slug (URL-friendly)</label>
