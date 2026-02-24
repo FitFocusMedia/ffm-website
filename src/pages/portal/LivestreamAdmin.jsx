@@ -856,13 +856,26 @@ export default function LivestreamAdmin() {
 
 function EventModal({ event: initialEvent, onClose, onSave }) {
   const [event, setEvent] = useState(initialEvent)
+  // Convert UTC ISO string to datetime-local format (local time)
+  const utcToLocalDateTimeString = (utcString) => {
+    if (!utcString) return ''
+    const date = new Date(utcString)
+    // Format as YYYY-MM-DDTHH:mm for datetime-local input
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    const hours = String(date.getHours()).padStart(2, '0')
+    const minutes = String(date.getMinutes()).padStart(2, '0')
+    return `${year}-${month}-${day}T${hours}:${minutes}`
+  }
+  
   const [formData, setFormData] = useState({
     title: initialEvent?.title || '',
     organization: initialEvent?.organization || '',
     organization_id: initialEvent?.organization_id || null,
     venue: initialEvent?.venue || '',
-    start_time: initialEvent?.start_time?.slice(0, 16) || '',
-    end_time: initialEvent?.end_time?.slice(0, 16) || '',
+    start_time: utcToLocalDateTimeString(initialEvent?.start_time),
+    end_time: utcToLocalDateTimeString(initialEvent?.end_time),
     price: initialEvent?.price || 29.99,
     description: initialEvent?.description || '',
     category: initialEvent?.category || '',
@@ -873,7 +886,7 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
     vod_asset_id: initialEvent?.vod_asset_id || '',
     vod_playback_id: initialEvent?.vod_playback_id || '',
     vod_price: initialEvent?.vod_price || '',
-    vod_available_until: initialEvent?.vod_available_until || '',
+    vod_available_until: utcToLocalDateTimeString(initialEvent?.vod_available_until),
     status: initialEvent?.status || 'draft',
     mux_playback_id: initialEvent?.mux_playback_id || '',
     mux_stream_key: initialEvent?.mux_stream_key || '',
@@ -994,8 +1007,22 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setSaving(true)
+    
+    // Convert datetime-local (local time) to UTC ISO string for Supabase
+    // datetime-local gives us "YYYY-MM-DDTHH:mm" in local time
+    // We need to convert it to UTC for proper storage
+    const localToUTC = (localDateTimeStr) => {
+      if (!localDateTimeStr) return null
+      // Parse as local time and convert to ISO (which is UTC)
+      const localDate = new Date(localDateTimeStr)
+      return localDate.toISOString()
+    }
+    
     const normalizedData = {
       ...formData,
+      start_time: localToUTC(formData.start_time),
+      end_time: localToUTC(formData.end_time),
+      vod_available_until: localToUTC(formData.vod_available_until),
       thumbnail_url: normalizeUrl(formData.thumbnail_url),
       ticket_url: normalizeUrl(formData.ticket_url)
     }
