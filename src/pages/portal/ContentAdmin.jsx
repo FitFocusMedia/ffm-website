@@ -236,6 +236,12 @@ export default function ContentAdmin() {
                 >
                   {org.active ? 'Deactivate' : 'Activate'}
                 </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); deleteItem('organizations', org.id) }}
+                  className="text-xs text-red-400 hover:text-red-300"
+                >
+                  Delete
+                </button>
               </div>
             </div>
           ))}
