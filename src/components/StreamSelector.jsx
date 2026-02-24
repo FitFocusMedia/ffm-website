@@ -1,9 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Radio, Check, Tv } from 'lucide-react'
-
-// Supabase edge function for MUX stream status
-const SUPABASE_URL = 'https://gonalgubgldgpkcekaxe.supabase.co'
-const STREAM_STATUS_API = `${SUPABASE_URL}/functions/v1/mux-stream/status`
+import { supabase } from '../lib/supabase'
 
 export default function StreamSelector({ streams, selectedStream, onSelect, isLive = false }) {
   const [liveStatuses, setLiveStatuses] = useState({})
@@ -21,9 +18,10 @@ export default function StreamSelector({ streams, selectedStream, onSelect, isLi
         const results = await Promise.all(
           streamsWithMuxId.map(async (stream) => {
             try {
-              const res = await fetch(`${STREAM_STATUS_API}/${stream.mux_stream_id}`)
-              if (res.ok) {
-                const data = await res.json()
+              const { data, error } = await supabase.functions.invoke('mux-stream', {
+                body: { action: 'stream-status', mux_stream_id: stream.mux_stream_id }
+              })
+              if (!error && data) {
                 return { id: stream.id, isLive: data.isLive, status: data.status }
               }
             } catch (err) {
