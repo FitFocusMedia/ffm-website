@@ -944,24 +944,30 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
     }
   }, [event])
 
+  // Helper to format date for datetime-local input (local time, not UTC)
+  const formatLocalDatetime = (date) => {
+    const pad = (n) => n.toString().padStart(2, '0')
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  }
+
   const handleImportEvent = (selectedId) => {
     if (!selectedId) return
     
     const selected = existingEvents.find(e => e.id === selectedId)
     if (!selected) return
     
-    // Format date for datetime-local input
+    // Format date for datetime-local input (must be LOCAL time, not UTC)
     let startTime = ''
     let endTime = ''
     if (selected.date) {
       const date = new Date(selected.date)
       if (!isNaN(date.getTime())) {
-        // Set default start time to 6pm
-        date.setHours(18, 0, 0)
-        startTime = date.toISOString().slice(0, 16)
-        // Set end time to 4 hours later
-        date.setHours(22, 0, 0)
-        endTime = date.toISOString().slice(0, 16)
+        // Set default start time to 6pm LOCAL
+        date.setHours(18, 0, 0, 0)
+        startTime = formatLocalDatetime(date)
+        // Set end time to 4 hours later (10pm LOCAL)
+        date.setHours(22, 0, 0, 0)
+        endTime = formatLocalDatetime(date)
       }
     }
     
