@@ -1041,7 +1041,7 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
               <input
                 type="text"
                 value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
                 className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
                 required
               />
@@ -1051,7 +1051,7 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
               <input
                 type="text"
                 value={formData.organization}
-                onChange={(e) => setFormData({ ...formData, organization: e.target.value })}
+                onChange={(e) => setFormData(prev => ({ ...prev, organization: e.target.value }))}
                 className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
                 placeholder="Queensland Brazilian Jiu Jitsu Circuit Pty Ltd"
                 required
@@ -1065,7 +1065,7 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
             <input
               type="text"
               value={formData.venue}
-              onChange={(e) => setFormData({ ...formData, venue: e.target.value })}
+              onChange={(e) => setFormData(prev => ({ ...prev, venue: e.target.value }))}
               className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
               required
             />
@@ -1077,7 +1077,7 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
               <input
                 type="datetime-local"
                 value={formData.start_time}
-                onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+                onChange={(e) => setFormData(prev => ({ ...prev, start_time: e.target.value }))}
                 className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
                 required
               />
@@ -1087,7 +1087,7 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
               <input
                 type="datetime-local"
                 value={formData.end_time}
-                onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
+                onChange={(e) => setFormData(prev => ({ ...prev, end_time: e.target.value }))}
                 className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
                 required
               />
@@ -1101,7 +1101,7 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
                 type="number"
                 step="0.01"
                 value={formData.price}
-                onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })}
+                onChange={(e) => setFormData(prev => ({ ...prev, price: parseFloat(e.target.value) }))}
                 className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
                 required
               />
@@ -1110,7 +1110,7 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
               <label className="block text-sm font-medium text-gray-400 mb-1">Status</label>
               <select
                 value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
                 className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
               >
                 <option value="draft">Draft</option>
@@ -1126,7 +1126,7 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
               <label className="block text-sm font-medium text-gray-400 mb-1">Category</label>
               <select
                 value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
                 className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
               >
                 <option value="">Select Category</option>
@@ -1144,7 +1144,7 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
                 <input
                   type="checkbox"
                   checked={formData.vod_enabled}
-                  onChange={(e) => setFormData({ ...formData, vod_enabled: e.target.checked })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, vod_enabled: e.target.checked }))}
                   className="sr-only peer"
                 />
                 <div className="w-11 h-6 bg-dark-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-red-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-500"></div>
@@ -1170,7 +1170,7 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
                     type="number"
                     step="0.01"
                     value={formData.vod_price}
-                    onChange={(e) => setFormData({ ...formData, vod_price: e.target.value })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, vod_price: e.target.value }))}
                     className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
                     placeholder="e.g., 19.99"
                   />
@@ -1180,7 +1180,7 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
                   <input
                     type="datetime-local"
                     value={formData.vod_available_until ? formData.vod_available_until.slice(0, 16) : ''}
-                    onChange={(e) => setFormData({ ...formData, vod_available_until: e.target.value ? new Date(e.target.value).toISOString() : '' })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, vod_available_until: e.target.value ? new Date(e.target.value).toISOString() : '' }))}
                     className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
                   />
                 </div>
@@ -1191,7 +1191,7 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
                   <input
                     type="text"
                     value={formData.vod_asset_id}
-                    onChange={(e) => setFormData({ ...formData, vod_asset_id: e.target.value })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, vod_asset_id: e.target.value }))}
                     className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
                     placeholder="Auto-linked after event ends"
                   />
@@ -1201,7 +1201,7 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
                   <input
                     type="text"
                     value={formData.vod_playback_id}
-                    onChange={(e) => setFormData({ ...formData, vod_playback_id: e.target.value })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, vod_playback_id: e.target.value }))}
                     className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
                     placeholder="Auto-linked after event ends"
                   />
@@ -1220,7 +1220,7 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
               <input
                 type="text"
                 value={formData.mux_playback_id}
-                onChange={(e) => setFormData({ ...formData, mux_playback_id: e.target.value })}
+                onChange={(e) => setFormData(prev => ({ ...prev, mux_playback_id: e.target.value }))}
                 className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
                 placeholder="Auto-generated on create"
               />
@@ -1285,7 +1285,7 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
             <label className="block text-sm font-medium text-gray-400 mb-1">Description</label>
             <textarea
               value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
               className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
               rows={3}
             />
@@ -1297,7 +1297,7 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
               <input
                 type="text"
                 value={formData.thumbnail_url}
-                onChange={(e) => setFormData({ ...formData, thumbnail_url: e.target.value })}
+                onChange={(e) => setFormData(prev => ({ ...prev, thumbnail_url: e.target.value }))}
                 className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
                 placeholder="For event cards"
               />
@@ -1308,7 +1308,7 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
               <input
                 type="text"
                 value={formData.player_poster_url}
-                onChange={(e) => setFormData({ ...formData, player_poster_url: e.target.value })}
+                onChange={(e) => setFormData(prev => ({ ...prev, player_poster_url: e.target.value }))}
                 className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
                 placeholder="For video player (optional)"
               />
@@ -1321,7 +1321,7 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
             <input
               type="text"
               value={formData.ticket_url}
-              onChange={(e) => setFormData({ ...formData, ticket_url: e.target.value })}
+              onChange={(e) => setFormData(prev => ({ ...prev, ticket_url: e.target.value }))}
               className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
               placeholder="www.instagram.com/fitfocusmedia"
             />
@@ -1338,7 +1338,7 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
                 <input
                   type="checkbox"
                   checked={formData.geo_blocking_enabled}
-                  onChange={(e) => setFormData({ ...formData, geo_blocking_enabled: e.target.checked })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, geo_blocking_enabled: e.target.checked }))}
                   className="sr-only peer"
                 />
                 <div className="w-11 h-6 bg-dark-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-red-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-500"></div>
@@ -1363,7 +1363,7 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
                   })
                 }}
                 onRadiusChange={(radius) => {
-                  setFormData({ ...formData, geo_radius_km: radius })
+                  setFormData(prev => ({ ...prev, geo_radius_km: radius }))
                 }}
               />
             )}
