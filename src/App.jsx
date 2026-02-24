@@ -1,4 +1,4 @@
-import { Routes, Route, useLocation } from 'react-router-dom'
+import { Routes, Route, useLocation, Navigate } from 'react-router-dom'
 import { useEffect } from 'react'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
@@ -84,7 +84,8 @@ function App() {
       <ScrollToTop />
       <Routes>
         {/* Public Routes with Navbar/Footer */}
-        <Route path="/" element={<PublicLayout><HomePage /></PublicLayout>} />
+        <Route path="/" element={<PublicLayout><EventsPage /></PublicLayout>} />
+        <Route path="/work-with-us" element={<PublicLayout><HomePage /></PublicLayout>} />
         <Route path="/services" element={<PublicLayout><ServicesPage /></PublicLayout>} />
         <Route path="/work" element={<PublicLayout><WorkPage /></PublicLayout>} />
         <Route path="/proposal" element={<PublicLayout><ProposalPage /></PublicLayout>} />
@@ -101,7 +102,7 @@ function App() {
         <Route path="/terms" element={<PublicLayout><TermsPage /></PublicLayout>} />
 
         {/* Livestream Routes - Public */}
-        <Route path="/live" element={<PublicLayout><EventsPage /></PublicLayout>} />
+        <Route path="/live" element={<Navigate to="/" replace />} />
         <Route path="/live/:eventId" element={<PublicLayout><EventPage /></PublicLayout>} />
         
         {/* Watch Page - NO Navbar/Footer for fullscreen experience */}
