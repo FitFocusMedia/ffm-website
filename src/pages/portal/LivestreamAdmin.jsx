@@ -344,7 +344,7 @@ export default function LivestreamAdmin() {
                         </span>
                       )}
                     </div>
-                    <p className="text-gray-400 mb-2">{event.organization}</p>
+                    <p className="text-gray-400 mb-2">{event.display_name || event.organization}</p>
                     <div className="flex flex-wrap gap-4 text-sm text-gray-500">
                       <span>{new Date(event.start_time).toLocaleDateString('en-AU')}</span>
                       <span>{event.venue}</span>
@@ -851,6 +851,7 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
   const [formData, setFormData] = useState({
     title: initialEvent?.title || '',
     organization: initialEvent?.organization || '',
+    display_name: initialEvent?.display_name || '',
     venue: initialEvent?.venue || '',
     start_time: initialEvent?.start_time?.slice(0, 16) || '',
     end_time: initialEvent?.end_time?.slice(0, 16) || '',
@@ -1060,14 +1061,26 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1">Organization *</label>
+              <label className="block text-sm font-medium text-gray-400 mb-1">Organization (Legal Name) *</label>
               <input
                 type="text"
                 value={formData.organization}
                 onChange={(e) => setFormData({ ...formData, organization: e.target.value })}
                 className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
+                placeholder="Queensland Brazilian Jiu Jitsu Circuit Pty Ltd"
                 required
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-400 mb-1">Display Name (Short)</label>
+              <input
+                type="text"
+                value={formData.display_name}
+                onChange={(e) => setFormData({ ...formData, display_name: e.target.value })}
+                className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
+                placeholder="QBJJC, Inception, JMMAC, etc."
+              />
+              <p className="text-xs text-gray-500 mt-1">Shown on event cards and filters. Leave blank to use organization name.</p>
             </div>
           </div>
 

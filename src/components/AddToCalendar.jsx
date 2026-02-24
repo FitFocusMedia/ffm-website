@@ -25,7 +25,7 @@ export default function AddToCalendar({ event, className = '' }) {
 
   const title = encodeURIComponent(event.title)
   const description = encodeURIComponent(
-    `${event.organization}\n\nWatch live at: https://fitfocusmedia.com.au/#/live/${event.id}`
+    `${event.display_name || event.organization}\n\nWatch live at: https://fitfocusmedia.com.au/#/live/${event.id}`
   )
   const location = encodeURIComponent(event.venue || 'Online')
 
@@ -44,7 +44,7 @@ DTSTAMP:${formatICSDate(new Date())}
 DTSTART:${formatICSDate(startDate)}
 DTEND:${formatICSDate(endDate)}
 SUMMARY:${event.title}
-DESCRIPTION:${event.organization}\\n\\nWatch live at: https://fitfocusmedia.com.au/#/live/${event.id}
+DESCRIPTION:${event.display_name || event.organization}\\n\\nWatch live at: https://fitfocusmedia.com.au/#/live/${event.id}
 LOCATION:${event.venue || 'Online'}
 END:VEVENT
 END:VCALENDAR`

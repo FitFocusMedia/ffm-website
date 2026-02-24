@@ -141,7 +141,7 @@ function EventCard({ event, featured = false, compact = false }) {
             </div>
             
             {/* Event Info */}
-            <p className="text-red-400 font-semibold text-sm md:text-base mb-1">{event.organization}</p>
+            <p className="text-red-400 font-semibold text-sm md:text-base mb-1">{event.display_name || event.organization}</p>
             <h2 className="text-2xl md:text-4xl lg:text-5xl font-bold text-white mb-3 group-hover:text-red-400 transition-colors">
               {event.title}
             </h2>
@@ -239,8 +239,8 @@ function EventCard({ event, featured = false, compact = false }) {
         </div>
         
         {/* Organization Badge */}
-        <div className="absolute bottom-3 left-3 px-2.5 py-1 bg-dark-900/80 backdrop-blur-sm text-gray-300 text-xs font-medium rounded-lg">
-          {event.organization}
+        <div className="absolute bottom-3 left-3 px-2.5 py-1 bg-dark-900/80 backdrop-blur-sm text-gray-300 text-xs font-medium rounded-lg truncate max-w-[60%]">
+          {event.display_name || event.organization}
         </div>
       </div>
 
@@ -288,19 +288,30 @@ export default function EventsPage() {
     }
   }
 
-  // Get unique organizations
+  // Get unique organizations (prefer display_name over organization)
   const organizations = useMemo(() => {
-    const orgs = [...new Set(events.map(e => e.organization).filter(Boolean))]
-    return orgs.sort()
+    const orgMap = new Map()
+    events.forEach(e => {
+      const displayName = e.display_name || e.organization
+      if (displayName && !orgMap.has(displayName)) {
+        orgMap.set(displayName, { display: displayName, original: e.organization })
+      }
+    })
+    return Array.from(orgMap.keys()).sort()
   }, [events])
+  
+  // Helper to get display name for an event
+  const getOrgDisplay = (event) => event.display_name || event.organization
 
   // Filter events
   const filteredEvents = useMemo(() => {
     let filtered = events
     
-    // Filter by organization
+    // Filter by organization (match against display_name or organization)
     if (selectedOrg !== 'all') {
-      filtered = filtered.filter(e => e.organization === selectedOrg)
+      filtered = filtered.filter(e => 
+        (e.display_name || e.organization) === selectedOrg
+      )
     }
     
     // Filter by search query
@@ -309,6 +320,7 @@ export default function EventsPage() {
       filtered = filtered.filter(e => 
         e.title?.toLowerCase().includes(query) ||
         e.organization?.toLowerCase().includes(query) ||
+        e.display_name?.toLowerCase().includes(query) ||
         e.venue?.toLowerCase().includes(query)
       )
     }
