@@ -869,11 +869,11 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
     thumbnail_url: initialEvent?.thumbnail_url || '',
     player_poster_url: initialEvent?.player_poster_url || '',
     ticket_url: initialEvent?.ticket_url || '',
-    vod_enabled: initialEvent?.vod_enabled || false,
+    vod_enabled: initialEvent?.vod_enabled ?? true,  // Default ON for new events
     vod_asset_id: initialEvent?.vod_asset_id || '',
     vod_playback_id: initialEvent?.vod_playback_id || '',
     vod_price: initialEvent?.vod_price || '',
-    vod_available_until: initialEvent?.vod_available_until || '',
+    vod_available_until: initialEvent?.vod_available_until || '',  // Auto-calculated from end_time
     status: initialEvent?.status || 'draft',
     mux_playback_id: initialEvent?.mux_playback_id || '',
     mux_stream_key: initialEvent?.mux_stream_key || '',
@@ -1087,7 +1087,21 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
               <input
                 type="datetime-local"
                 value={formData.end_time}
-                onChange={(e) => setFormData(prev => ({ ...prev, end_time: e.target.value }))}
+                onChange={(e) => {
+                  const endTime = e.target.value
+                  // Auto-calculate VOD expiry as 7 days after end time
+                  let vodExpiry = ''
+                  if (endTime) {
+                    const endDate = new Date(endTime)
+                    endDate.setDate(endDate.getDate() + 7)
+                    vodExpiry = endDate.toISOString()
+                  }
+                  setFormData(prev => ({ 
+                    ...prev, 
+                    end_time: endTime,
+                    vod_available_until: prev.vod_available_until || vodExpiry  // Only set if not already set
+                  }))
+                }}
                 className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
                 required
               />
