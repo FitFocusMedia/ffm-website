@@ -46,6 +46,7 @@ import OrderManagement from './pages/portal/OrderManagement'
 import PricingCalculator from './pages/portal/PricingCalculator'
 import CrewManagement from './pages/portal/CrewManagement'
 import LivestreamAdmin from './pages/portal/LivestreamAdmin'
+import LivestreamAnalytics from './pages/portal/LivestreamAnalytics'
 import ProposalAdmin from './pages/portal/ProposalAdmin'
 import ProposalView from './pages/ProposalView'
 
@@ -300,6 +301,18 @@ function App() {
             <ProtectedRoute>
               <PortalLayout>
                 <LivestreamAdmin />
+              </PortalLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Livestream Analytics */}
+        <Route
+          path="/portal/livestream/analytics"
+          element={
+            <ProtectedRoute>
+              <PortalLayout>
+                <LivestreamAnalytics />
               </PortalLayout>
             </ProtectedRoute>
           }
