@@ -5,7 +5,7 @@ import Step2Profile from '../components/proposal/Step2Profile'
 import StepAnalysis from '../components/proposal/StepAnalysis'
 import Step2Contact from '../components/proposal/Step2Contact'
 import Step6Contact from '../components/proposal/Step6Contact'
-import { submitLead, markLeadCompleted } from '../lib/supabase'
+import { submitLead } from '../lib/supabase'
 
 const ProposalPage = () => {
   const [currentStep, setCurrentStep] = useState(1)
@@ -35,13 +35,7 @@ const ProposalPage = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [currentStep])
 
-  // Mark lead as completed when they reach the final step
-  useEffect(() => {
-    if (currentStep === totalSteps && leadIdRef.current) {
-      markLeadCompleted(leadIdRef.current, { ...formData, ...contactData, analysis, selectedAddOns })
-        .catch(err => console.error('Error marking lead completed:', err))
-    }
-  }, [currentStep])
+  // Lead completion is now handled in submitLead (all data in one INSERT)
 
   const nextStep = () => {
     if (currentStep < totalSteps) {
@@ -73,13 +67,14 @@ const ProposalPage = () => {
     setFormData(data)
   }
 
-  // Submit contact info to Supabase, then advance
+  // Submit contact info + all form data to Supabase, then advance
   const handleContactSubmit = async () => {
     const lead = await submitLead({
       name: contactData.name,
       email: contactData.email,
       phone: contactData.phone,
-      orgName: formData.orgName || ''
+      orgName: formData.orgName || '',
+      formData: { ...formData, ...contactData, analysis, selectedAddOns }
     })
     if (lead?.id) {
       leadIdRef.current = lead.id

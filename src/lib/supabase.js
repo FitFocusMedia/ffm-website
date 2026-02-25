@@ -9,21 +9,26 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey)
 /**
  * Submit a lead to Supabase
  */
-export async function submitLead({ name, email, phone, orgName }) {
-  const { data, error } = await supabase
+export async function submitLead({ name, email, phone, orgName, formData = null }) {
+  // Generate UUID client-side so we don't need SELECT after INSERT
+  const id = crypto.randomUUID()
+  
+  const { error } = await supabase
     .from('leads')
     .insert([{
+      id,
       name,
       email,
       phone,
       org_name: orgName,
-      completed_form: false,
+      completed_form: !!formData,
+      form_data: formData,
       source: 'combat-sports-proposal'
     }])
-    .select()
 
   if (error) throw error
-  return data?.[0]
+  // Return the ID we generated (no SELECT needed - avoids RLS exposure)
+  return { id, name, email, phone, org_name: orgName }
 }
 
 /**
