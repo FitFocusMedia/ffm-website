@@ -131,7 +131,7 @@ export default function ContentAdmin() {
     if (type === 'org') {
       setFormData(item || { name: '', display_name: '', legal_name: '', slug: '', description: '', logo_url: '', active: true })
     } else if (type === 'event') {
-      setFormData(item || { organization_id: selectedOrg?.id, name: '', date: '', location: '', address: '', status: 'upcoming', active: true, divisions_required: false })
+      setFormData(item || { organization_id: selectedOrg?.id, name: '', date: '', location: '', status: 'upcoming', active: true, divisions_required: false })
     } else if (type === 'package') {
       setFormData(item || { organization_id: selectedOrg?.id, name: '', description: '', price: '', sort_order: 0, active: true })
     } else if (type === 'division-cat') {
@@ -1037,26 +1037,14 @@ export default function ContentAdmin() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm text-gray-400 mb-1">Location (City/Region)</label>
+                    <label className="block text-sm text-gray-400 mb-1">Location</label>
                     <input
                       type="text"
                       value={formData.location || ''}
                       onChange={e => setFormData({ ...formData, location: e.target.value })}
-                      placeholder="e.g. Caloundra, QLD"
                       className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg"
                     />
                   </div>
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1">Full Venue Address</label>
-                  <input
-                    type="text"
-                    value={formData.address || ''}
-                    onChange={e => setFormData({ ...formData, address: e.target.value })}
-                    placeholder="e.g. 123 Beach Road, Caloundra QLD 4551"
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Used for geo-blocking in livestreams</p>
                 </div>
                 <div>
                   <label className="block text-sm text-gray-400 mb-1">Status</label>

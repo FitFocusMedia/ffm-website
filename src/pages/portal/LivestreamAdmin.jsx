@@ -925,7 +925,6 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
           organization: evt.org_display_name,
           organizationId: evt.organization_id,
           venue: evt.location || '',
-          address: evt.address || '',
           date: evt.date,
           status: evt.status
         }))
@@ -978,7 +977,6 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
       organization: selected.organization || prev.organization,
       organization_id: selected.organizationId || prev.organization_id,
       venue: selected.venue || prev.venue,
-      geo_venue_address: selected.address || selected.venue || prev.geo_venue_address,
       start_time: startTime || prev.start_time,
       end_time: endTime || prev.end_time
     }))
