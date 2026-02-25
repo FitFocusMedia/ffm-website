@@ -42,27 +42,31 @@ serve(async (req) => {
 
         // Fetch order with related data
         const { data: order, error: orderFetchError } = await supabase
-          .from('orders')
+          .from('content_orders')
           .select('*, organizations(*), events(*), packages(*)')
           .eq('stripe_session_id', session.id)
           .single()
 
         if (orderFetchError || !order) {
-          console.error('[Content Webhook] Order not found for session:', session.id)
+          console.error('[Content Webhook] Order not found for session:', session.id, orderFetchError)
           return new Response(JSON.stringify({ received: true }), { headers: { 'Content-Type': 'application/json' } })
         }
 
-        // Update order status to completed
-        await supabase
-          .from('orders')
+        // Update order status to paid (matching schema constraint)
+        const { error: updateError } = await supabase
+          .from('content_orders')
           .update({
-            status: 'completed',
-            completed_at: new Date().toISOString(),
-            stripe_payment_intent: session.payment_intent
+            status: 'paid',
+            paid_at: new Date().toISOString(),
+            stripe_payment_id: session.payment_intent
           })
           .eq('stripe_session_id', session.id)
 
-        console.log('[Content Webhook] Order updated to completed:', order.id)
+        if (updateError) {
+          console.error('[Content Webhook] Failed to update order:', updateError)
+        } else {
+          console.log('[Content Webhook] Order updated to paid:', order.id)
+        }
 
         // Send confirmation email via Postmark
         const postmarkToken = Deno.env.get('POSTMARK_SERVER_TOKEN')
@@ -73,7 +77,7 @@ serve(async (req) => {
           const amount = order.amount || 0
 
           try {
-            await fetch('https://api.postmarkapp.com/email', {
+            const emailRes = await fetch('https://api.postmarkapp.com/email', {
               method: 'POST',
               headers: {
                 'Accept': 'application/json',
@@ -92,7 +96,7 @@ serve(async (req) => {
                     <div style="background: #f7f7f7; padding: 20px; border-radius: 8px; margin: 20px 0;">
                       <p style="margin: 0; font-size: 18px; font-weight: bold;">${packageName}</p>
                       <p style="margin: 5px 0 0; color: #666;">${eventName} • ${orgName}</p>
-                      <p style="margin: 10px 0 0; font-size: 24px; font-weight: bold; color: #e53e3e;">$${amount.toFixed(2)} AUD</p>
+                      <p style="margin: 10px 0 0; font-size: 24px; font-weight: bold; color: #e53e3e;">$${Number(amount).toFixed(2)} AUD</p>
                     </div>
                     
                     <h3>Order Details</h3>
@@ -101,7 +105,6 @@ serve(async (req) => {
                       <li><strong>Email:</strong> ${order.email}</li>
                       <li><strong>Phone:</strong> ${order.phone || 'N/A'}</li>
                       ${order.division ? `<li><strong>Division:</strong> ${order.division}</li>` : ''}
-                      ${order.instagram ? `<li><strong>Instagram:</strong> @${order.instagram}</li>` : ''}
                     </ul>
                     
                     <h3>What's Next?</h3>
@@ -113,11 +116,17 @@ serve(async (req) => {
                     </p>
                   </div>
                 `,
-                TextBody: `Thanks for your order, ${order.first_name}!\n\nPackage: ${packageName}\nEvent: ${eventName}\nAmount: $${amount.toFixed(2)} AUD\n\nOrder ID: ${order.id}\n\nOur team will prepare your content package after the event.`,
+                TextBody: `Thanks for your order, ${order.first_name}!\n\nPackage: ${packageName}\nEvent: ${eventName}\nAmount: $${Number(amount).toFixed(2)} AUD\n\nOrder ID: ${order.id}\n\nOur team will prepare your content package after the event.`,
                 MessageStream: 'outbound'
               })
             })
-            console.log('[Content Webhook] Confirmation email sent to:', order.email)
+            console.log('[Content Webhook] Email API response:', emailRes.status)
+            if (emailRes.ok) {
+              console.log('[Content Webhook] Confirmation email sent to:', order.email)
+            } else {
+              const errBody = await emailRes.text()
+              console.error('[Content Webhook] Postmark error:', errBody)
+            }
           } catch (emailErr) {
             console.error('[Content Webhook] Failed to send email:', emailErr)
           }
@@ -142,32 +151,41 @@ serve(async (req) => {
       email, 
       phone,
       division,
-      instagram,
-      coach_name,
-      coach_instagram,
       amount,
       success_url,
       cancel_url
     } = await req.json()
 
+    console.log('[Content Checkout] Received request:', { event_id, package_id, email, amount })
+
     if (!event_id || !package_id || !email || !amount) {
-      return new Response(JSON.stringify({ error: 'Missing required fields' }), {
+      console.error('[Content Checkout] Missing required fields')
+      return new Response(JSON.stringify({ error: 'Missing required fields: event_id, package_id, email, amount' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
     // Get event and package details
-    const { data: event } = await supabase.from('events').select('*').eq('id', event_id).single()
-    const { data: pkg } = await supabase.from('packages').select('*').eq('id', package_id).single()
+    const { data: event, error: eventError } = await supabase.from('events').select('*').eq('id', event_id).single()
+    const { data: pkg, error: pkgError } = await supabase.from('packages').select('*').eq('id', package_id).single()
 
-    if (!event || !pkg) {
-      return new Response(JSON.stringify({ error: 'Event or package not found' }), {
+    if (eventError || !event) {
+      console.error('[Content Checkout] Event not found:', event_id, eventError)
+      return new Response(JSON.stringify({ error: 'Event not found' }), {
+        status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    if (pkgError || !pkg) {
+      console.error('[Content Checkout] Package not found:', package_id, pkgError)
+      return new Response(JSON.stringify({ error: 'Package not found' }), {
         status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
     const stripeKey = Deno.env.get('STRIPE_SECRET_KEY')
     if (!stripeKey) {
+      console.error('[Content Checkout] STRIPE_SECRET_KEY not configured')
       return new Response(JSON.stringify({ error: 'Stripe not configured' }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
@@ -176,6 +194,7 @@ serve(async (req) => {
     const stripe = new Stripe(stripeKey, { apiVersion: '2023-10-16' })
 
     // Create Stripe checkout session
+    console.log('[Content Checkout] Creating Stripe session for amount:', amount)
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [{
@@ -195,26 +214,25 @@ serve(async (req) => {
       customer_email: email,
       metadata: {
         event_id,
-        organization_id,
+        organization_id: organization_id || '',
         package_id,
         customer_email: email,
         customer_name: `${first_name} ${last_name}`
       }
     })
 
-    // Create pending order
-    const { error: insertError } = await supabase.from('orders').insert({
+    console.log('[Content Checkout] Stripe session created:', session.id)
+
+    // Create pending order - ONLY columns that exist in schema
+    const { error: insertError } = await supabase.from('content_orders').insert({
       event_id,
       organization_id,
       package_id,
       first_name,
       last_name,
       email: email.toLowerCase(),
-      phone,
-      division,
-      instagram,
-      coach_name,
-      coach_instagram,
+      phone: phone || null,
+      division: division || null,
       amount,
       stripe_session_id: session.id,
       status: 'pending'
@@ -222,7 +240,13 @@ serve(async (req) => {
 
     if (insertError) {
       console.error('[Content Checkout] Failed to create order:', insertError)
+      // Return error - don't proceed without order record
+      return new Response(JSON.stringify({ error: 'Failed to create order: ' + insertError.message }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
+
+    console.log('[Content Checkout] Order created, returning Stripe URL')
 
     return new Response(JSON.stringify({ 
       url: session.url,
