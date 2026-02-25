@@ -913,21 +913,35 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
   }
 
   // Load existing events from Content Management (events table)
+  // Also check livestream_events for existing venue data (ONE SOURCE OF TRUTH)
   useEffect(() => {
     const loadExistingEvents = async () => {
       try {
         const contentEvents = await getContentManagementEvents()
         
-        const events = contentEvents.map(evt => ({
-          id: `content-${evt.id}`,
-          source: 'Content',
-          title: evt.name,
-          organization: evt.org_display_name,
-          organizationId: evt.organization_id,
-          venue: evt.location || '',
-          date: evt.date,
-          status: evt.status
-        }))
+        // Also load existing livestream events to get their venue data
+        const livestreamEvents = await getAllLivestreamEvents()
+        
+        const events = contentEvents.map(evt => {
+          // Check if there's an existing livestream event with matching title
+          // Use its venue data if found (it's the source of truth for full addresses)
+          const existingLivestream = livestreamEvents.find(le => 
+            le.title?.toLowerCase().trim() === evt.name?.toLowerCase().trim()
+          )
+          
+          return {
+            id: `content-${evt.id}`,
+            source: 'Content',
+            title: evt.name,
+            organization: evt.org_display_name,
+            organizationId: evt.organization_id,
+            // Use venue from existing livestream event if available, otherwise fall back to content location
+            venue: existingLivestream?.venue || evt.location || '',
+            geo_venue_address: existingLivestream?.geo_venue_address || '',
+            date: evt.date,
+            status: evt.status
+          }
+        })
         
         setExistingEvents(events)
       } catch (err) {
@@ -977,6 +991,7 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
       organization: selected.organization || prev.organization,
       organization_id: selected.organizationId || prev.organization_id,
       venue: selected.venue || prev.venue,
+      geo_venue_address: selected.geo_venue_address || selected.venue || prev.geo_venue_address,
       start_time: startTime || prev.start_time,
       end_time: endTime || prev.end_time
     }))
