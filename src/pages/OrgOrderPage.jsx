@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://scarlet-sales-api-vercel.vercel.app'
+// Use Supabase Edge Function for checkout (replaces legacy Vercel API)
+const SUPABASE_URL = 'https://gonalgubgldgpkcekaxe.supabase.co'
+const API_URL = `${SUPABASE_URL}/functions/v1/content-checkout`
 
 export default function OrgOrderPage() {
   const { orgSlug } = useParams()
@@ -227,38 +229,13 @@ export default function OrgOrderPage() {
 
       const totalPrice = pkg.price * selectedEvents.length
       
-      const response = await fetch(`${API_URL}/api/create-checkout`, {
+      // Call Supabase Edge Function for checkout (handles order creation + Stripe)
+      const response = await fetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          packageType: pkg.name,
-          packagePrice: totalPrice,
-          showNames: selectedEventNames,
-          customerName: `${formData.firstName} ${formData.lastName}`,
-          customerEmail: formData.email,
-          metadata: {
-            organizationId: organization.id,
-            organizationSlug: orgSlug,
-            eventIds: selectedEvents.join(','),
-            packageId: selectedPackage,
-            firstName: formData.firstName,
-            lastName: formData.lastName,
-            phone: formData.phone,
-            divisions: formData.divisions.join(', '),
-            instagram: formData.instagram,
-            coachName: formData.coachName,
-            coachInstagram: formData.coachInstagram
-          }
-        })
-      })
-
-      const data = await response.json()
-      
-      if (data.url) {
-        // Save order to Supabase before redirecting
-        const { error: insertError } = await supabase.from('content_orders').insert({
+          event_id: selectedEvents[0],
           organization_id: organization.id,
-          event_id: selectedEvents[0], // Primary event
           package_id: selectedPackage,
           first_name: formData.firstName,
           last_name: formData.lastName,
@@ -269,12 +246,17 @@ export default function OrgOrderPage() {
           coach_name: formData.coachName,
           coach_instagram: formData.coachInstagram,
           amount: totalPrice,
-          stripe_session_id: data.sessionId,
-          status: 'pending'
+          success_url: `${window.location.origin}/#/order/${orgSlug}?success=true`,
+          cancel_url: `${window.location.origin}/#/order/${orgSlug}?canceled=true`
         })
+      })
 
-        if (insertError) {
-          console.error('Failed to save order:', insertError)
+      const data = await response.json()
+      
+      if (data.url) {
+        // Order is created by Edge Function, just log for debugging
+        if (data.sessionId) {
+          console.log('Checkout session created:', data.sessionId)
           // Continue anyway - payment is more important
         }
 
