@@ -116,15 +116,27 @@ export default function OrgOrderPage() {
     return selectedPackage && selectedEvents.length > 0
   }
 
+  // Check if any selected event requires divisions
+  function divisionsRequired() {
+    return events
+      .filter(e => selectedEvents.includes(e.id))
+      .some(e => e.divisions_required === true)
+  }
+
   function canProceedStep2() {
-    return formData.firstName && 
+    const baseRequired = formData.firstName && 
            formData.lastName && 
            formData.email && 
            formData.phone &&
-           formData.divisions.length > 0 &&
            formData.instagram &&
            formData.coachName &&
            formData.coachInstagram
+    
+    // Only require divisions if an event has divisions_required = true
+    if (divisionsRequired()) {
+      return baseRequired && formData.divisions.length > 0
+    }
+    return baseRequired
   }
 
   // Division state - loaded from database based on selected events
@@ -567,18 +579,29 @@ export default function OrgOrderPage() {
               </div>
             </div>
 
-            {/* Division Selection - Accordion Style */}
+            {/* Division Selection - Accordion Style (only show if divisions exist OR required) */}
+            {(divisionCategories.length > 0 || divisionsRequired()) && (
             <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
-              <h2 className="text-xl font-semibold mb-2">Division/Category *</h2>
-              <p className="text-sm text-gray-400 mb-4">Click a category to expand, then select your divisions</p>
+              <h2 className="text-xl font-semibold mb-2">
+                Division/Category {divisionsRequired() ? '*' : '(Optional)'}
+              </h2>
+              <p className="text-sm text-gray-400 mb-4">
+                {divisionCategories.length > 0 
+                  ? 'Click a category to expand, then select your divisions'
+                  : 'No divisions configured for this event'}
+              </p>
               
               {divisionsLoading ? (
                 <div className="text-center text-gray-400 py-8">Loading divisions...</div>
               ) : divisionCategories.length === 0 ? (
                 <div className="text-center text-gray-400 py-8 border border-gray-700 rounded-lg">
-                  No divisions configured for the selected event(s) yet.
-                  <br />
-                  <span className="text-sm">Contact the organizer to set up divisions.</span>
+                  No divisions configured for the selected event(s).
+                  {divisionsRequired() && (
+                    <>
+                      <br />
+                      <span className="text-sm text-red-400">Contact the organizer to set up divisions.</span>
+                    </>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -693,6 +716,7 @@ export default function OrgOrderPage() {
                 </div>
               )}
             </div>
+            )}
 
             {/* Order Summary */}
             <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">

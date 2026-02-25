@@ -131,7 +131,7 @@ export default function ContentAdmin() {
     if (type === 'org') {
       setFormData(item || { name: '', display_name: '', legal_name: '', slug: '', description: '', logo_url: '', active: true })
     } else if (type === 'event') {
-      setFormData(item || { organization_id: selectedOrg?.id, name: '', date: '', location: '', status: 'upcoming', active: true })
+      setFormData(item || { organization_id: selectedOrg?.id, name: '', date: '', location: '', status: 'upcoming', active: true, divisions_required: false })
     } else if (type === 'package') {
       setFormData(item || { organization_id: selectedOrg?.id, name: '', description: '', price: '', sort_order: 0, active: true })
     } else if (type === 'division-cat') {
@@ -1057,6 +1057,21 @@ export default function ContentAdmin() {
                     <option value="active">Active</option>
                     <option value="completed">Completed</option>
                   </select>
+                </div>
+                <div className="flex items-center gap-3 mt-2">
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.divisions_required || false}
+                      onChange={e => setFormData({ ...formData, divisions_required: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
+                  </label>
+                  <div>
+                    <span className="text-sm text-white">Require Divisions</span>
+                    <p className="text-xs text-gray-500">Athletes must select a division when ordering</p>
+                  </div>
                 </div>
               </>
             )}
