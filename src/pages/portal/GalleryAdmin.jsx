@@ -1085,15 +1085,19 @@ function PricingTiersEditor({ gallery, onUpdate }) {
         </>
       )}
 
-      {/* Save Button */}
-      {edited && (
+      {/* Save Button - always visible when enabled */}
+      {enabled && (
         <button
           onClick={saveTiers}
-          disabled={saving}
-          className="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+          disabled={saving || !edited}
+          className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
+            edited 
+              ? 'bg-red-600 hover:bg-red-700 text-white' 
+              : 'bg-dark-600 text-gray-400 cursor-not-allowed'
+          }`}
         >
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-          Save Pricing
+          {edited ? 'Save Pricing' : 'Saved ✓'}
         </button>
       )}
     </div>
