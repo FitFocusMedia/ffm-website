@@ -23,9 +23,9 @@ async function applyWatermark(file) {
       ctx.translate(img.width / 2, img.height / 2)
       ctx.rotate(-30 * Math.PI / 180)
       
-      // Tight spacing for full coverage
-      const spacingY = fontSize * 2.5
-      const spacingX = fontSize * 6
+      // Balanced spacing - visible but not overwhelming
+      const spacingY = fontSize * 3.5
+      const spacingX = fontSize * 7
       
       for (let y = -img.height; y < img.height * 2; y += spacingY) {
         for (let x = -img.width; x < img.width * 2; x += spacingX) {
@@ -563,13 +563,17 @@ function GalleryEditor({ gallery, organization, onBack }) {
       try {
         const photoId = crypto.randomUUID()
         const ext = file.name.split('.').pop() || 'jpg'
+        // Keep original filename (sanitized) for storage paths
+        const baseName = file.name.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_')
+        const timestamp = Date.now()
+        const safeFileName = `${baseName}_${timestamp}`
 
         const watermarkedBlob = await applyWatermark(file)
         const thumbnailBlob = await createThumbnail(file)
 
-        const originalPath = `${gallery.id}/originals/${photoId}.${ext}`
-        const watermarkedPath = `${gallery.id}/watermarked/${photoId}_wm.jpg`
-        const thumbnailPath = `${gallery.id}/thumbnails/${photoId}_thumb.jpg`
+        const originalPath = `${gallery.id}/originals/${safeFileName}.${ext}`
+        const watermarkedPath = `${gallery.id}/watermarked/${safeFileName}_wm.jpg`
+        const thumbnailPath = `${gallery.id}/thumbnails/${safeFileName}_thumb.jpg`
 
         // Upload files and CHECK FOR ERRORS
         const { error: origError } = await supabase.storage.from('galleries').upload(originalPath, file, { contentType: file.type })
