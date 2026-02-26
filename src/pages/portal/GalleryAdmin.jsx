@@ -526,6 +526,8 @@ function GalleryEditor({ gallery, organization, onBack }) {
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 })
   const [dragActive, setDragActive] = useState(false)
+  const [selectedPhotos, setSelectedPhotos] = useState(new Set())
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     loadPhotos()
@@ -652,8 +654,53 @@ function GalleryEditor({ gallery, organization, onBack }) {
       await supabase.from('gallery_photos').delete().eq('id', photoId)
 
       setPhotos(photos.filter(p => p.id !== photoId))
+      setSelectedPhotos(prev => { prev.delete(photoId); return new Set(prev) })
     } catch (err) {
       console.error('Delete photo error:', err)
+    }
+  }
+
+  // Selection functions
+  const toggleSelect = (photoId) => {
+    setSelectedPhotos(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(photoId)) {
+        newSet.delete(photoId)
+      } else {
+        newSet.add(photoId)
+      }
+      return newSet
+    })
+  }
+
+  const selectAll = () => setSelectedPhotos(new Set(photos.map(p => p.id)))
+  const deselectAll = () => setSelectedPhotos(new Set())
+
+  const deleteSelected = async () => {
+    if (selectedPhotos.size === 0) return
+    if (!confirm(`Delete ${selectedPhotos.size} selected photos?`)) return
+
+    setDeleting(true)
+    try {
+      const toDelete = photos.filter(p => selectedPhotos.has(p.id))
+      
+      // Delete from storage
+      const allPaths = toDelete.flatMap(p => 
+        [p.original_path, p.watermarked_path, p.thumbnail_path].filter(Boolean)
+      )
+      await supabase.storage.from('galleries').remove(allPaths)
+      
+      // Delete from DB
+      const ids = toDelete.map(p => p.id)
+      await supabase.from('gallery_photos').delete().in('id', ids)
+
+      setPhotos(photos.filter(p => !selectedPhotos.has(p.id)))
+      setSelectedPhotos(new Set())
+    } catch (err) {
+      console.error('Delete selected error:', err)
+      alert('Failed to delete some photos')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -803,28 +850,66 @@ function GalleryEditor({ gallery, organization, onBack }) {
           No photos yet. Upload some photos to get started!
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          {photos.map(photo => (
-            <div key={photo.id} className="relative group">
-              <img
-                src={photo.thumbnail_url}
-                alt={photo.filename}
-                className="w-full aspect-square object-cover rounded-lg bg-dark-700"
-              />
-              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+        <>
+          {/* Selection Controls */}
+          <div className="flex items-center gap-3 mb-4">
+            <button
+              onClick={selectedPhotos.size === photos.length ? deselectAll : selectAll}
+              className="px-3 py-1.5 bg-dark-600 hover:bg-dark-500 text-white text-sm rounded-lg"
+            >
+              {selectedPhotos.size === photos.length ? 'Deselect All' : 'Select All'}
+            </button>
+            {selectedPhotos.size > 0 && (
+              <>
+                <span className="text-gray-400 text-sm">{selectedPhotos.size} selected</span>
                 <button
-                  onClick={() => deletePhoto(photo.id)}
-                  className="bg-red-600 hover:bg-red-700 text-white p-2 rounded-lg"
+                  onClick={deleteSelected}
+                  disabled={deleting}
+                  className="px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white text-sm rounded-lg flex items-center gap-2"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  {deleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                  Delete Selected
                 </button>
+              </>
+            )}
+          </div>
+          
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {photos.map(photo => (
+              <div 
+                key={photo.id} 
+                className={`relative group cursor-pointer ${selectedPhotos.has(photo.id) ? 'ring-2 ring-red-500' : ''}`}
+                onClick={() => toggleSelect(photo.id)}
+              >
+                <img
+                  src={photo.thumbnail_url}
+                  alt={photo.filename}
+                  className="w-full aspect-square object-cover rounded-lg bg-dark-700"
+                />
+                {/* Selection checkbox */}
+                <div className={`absolute top-2 left-2 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                  selectedPhotos.has(photo.id) 
+                    ? 'bg-red-500 border-red-500' 
+                    : 'border-white/50 bg-black/30 group-hover:border-white'
+                }`}>
+                  {selectedPhotos.has(photo.id) && (
+                    <Check className="w-3 h-3 text-white" />
+                  )}
+                </div>
+                {/* Delete single button */}
+                <button
+                  onClick={(e) => { e.stopPropagation(); deletePhoto(photo.id) }}
+                  className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white p-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+                <div className="absolute bottom-1 left-1 right-1 text-xs text-white truncate bg-black/50 px-1 rounded">
+                  {photo.filename}
+                </div>
               </div>
-              <div className="absolute bottom-1 left-1 right-1 text-xs text-white truncate bg-black/50 px-1 rounded">
-                {photo.filename}
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </>
       )}
 
       {/* Gallery Settings */}
