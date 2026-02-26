@@ -72,7 +72,6 @@ export default function GalleryPage() {
   
   // Tutorial state (mobile only)
   const [tutorialStep, setTutorialStep] = useState(0) // 0=not started, 1=tap image, 2=swipe, 3=double-tap, 4=done
-  const [tutorialPhotoId, setTutorialPhotoId] = useState(null) // Track which photo was added during tutorial
 
   // Check for cancelled checkout
   const cancelled = searchParams.get('cancelled')
@@ -509,38 +508,24 @@ export default function GalleryPage() {
               // If closing during tutorial, reset
               if (tutorialStep > 0 && tutorialStep < 4) {
                 setTutorialStep(0)
-                // Remove tutorial photo from cart if added
-                if (tutorialPhotoId && selectedPhotos.has(tutorialPhotoId)) {
-                  const newSelected = new Set(selectedPhotos)
-                  newSelected.delete(tutorialPhotoId)
-                  setSelectedPhotos(newSelected)
-                  setTutorialPhotoId(null)
-                }
               }
             }}
             onNavigate={setLightboxPhoto}
-            onToggleSelect={(photoId) => {
-              // Track if this is a tutorial add
-              if (tutorialStep === 3 && !selectedPhotos.has(photoId)) {
-                setTutorialPhotoId(photoId)
-              }
-              togglePhoto(photoId)
-            }}
+            onToggleSelect={togglePhoto}
             pricePerPhoto={gallery.price_per_photo}
             tutorialStep={tutorialStep}
-            onTutorialStep={(step) => {
+            onTutorialStep={(step, photoId) => {
               setTutorialStep(step)
               // Tutorial complete - save to localStorage and cleanup
-              if (step === 4) {
+              if (step === 4 && photoId) {
                 localStorage.setItem('gallery_tutorial_seen', 'true')
-                // Remove tutorial photo after a short delay
+                // Remove tutorial photo after showing success message
                 setTimeout(() => {
-                  if (tutorialPhotoId) {
-                    const newSelected = new Set(selectedPhotos)
-                    newSelected.delete(tutorialPhotoId)
-                    setSelectedPhotos(newSelected)
-                    setTutorialPhotoId(null)
-                  }
+                  setSelectedPhotos(prev => {
+                    const newSelected = new Set(prev)
+                    newSelected.delete(photoId)
+                    return newSelected
+                  })
                   setTutorialStep(0)
                 }, 1500)
               }
@@ -767,9 +752,9 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
       setShowHeartAnimation(true)
       if (!selectedPhotos.has(currentPhoto.id)) {
         onToggleSelect(currentPhoto.id)
-        // Tutorial: user double-tapped to add, complete tutorial
+        // Tutorial: user double-tapped to add, complete tutorial (pass photo ID for cleanup)
         if (tutorialStep === 3) {
-          onTutorialStep?.(4)
+          onTutorialStep?.(4, currentPhoto.id)
         }
       }
       setTimeout(() => setShowHeartAnimation(false), 800)
