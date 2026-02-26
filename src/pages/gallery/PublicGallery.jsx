@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { ShoppingCart, Download, Check, X, Loader2, Tag, ChevronLeft, ChevronRight, Plus, Minus } from 'lucide-react'
+import { ShoppingCart, Download, Check, X, Loader2, Tag, ChevronLeft, ChevronRight, Plus, Minus, Heart, ChevronUp, ChevronDown } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 
 // Tiered pricing calculation (matches backend logic)
@@ -310,14 +310,14 @@ export default function GalleryPage() {
         </div>
 
         {/* Photo Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 md:gap-4 mb-24 md:mb-8">
           {photos.map(photo => (
             <div
               key={photo.id}
-              className={`relative group cursor-pointer rounded-lg overflow-hidden ${
+              className={`relative group cursor-pointer rounded-lg overflow-hidden transition-transform active:scale-98 ${
                 selectedPhotos.has(photo.id) ? 'ring-2 ring-red-500' : ''
               }`}
-              onClick={() => togglePhoto(photo.id)}
+              onClick={() => setLightboxPhoto(photo)}
             >
               <img
                 src={photo.thumbnail_url || photo.watermarked_url}
@@ -327,82 +327,132 @@ export default function GalleryPage() {
               />
               
               {/* Selection Indicator */}
-              <div className={`absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center transition-all ${
+              <div className={`absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center transition-all ${
                 selectedPhotos.has(photo.id)
                   ? 'bg-red-500 text-white'
-                  : 'bg-black/50 text-white opacity-0 group-hover:opacity-100'
+                  : 'bg-black/40 text-white md:opacity-0 md:group-hover:opacity-100'
               }`}>
                 {selectedPhotos.has(photo.id) ? (
                   <Check className="w-4 h-4" />
                 ) : (
-                  <span className="text-xs">+</span>
+                  <Plus className="w-4 h-4" />
                 )}
               </div>
-
-              {/* Zoom Button */}
+              
+              {/* Quick add button (tap without opening fullscreen) */}
               <button
                 onClick={(e) => {
                   e.stopPropagation()
-                  setLightboxPhoto(photo)
+                  togglePhoto(photo.id)
                 }}
-                className="absolute bottom-2 right-2 bg-black/50 text-white px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                className={`absolute top-2 left-2 w-7 h-7 rounded-full flex items-center justify-center transition-all md:opacity-0 md:group-hover:opacity-100 ${
+                  selectedPhotos.has(photo.id)
+                    ? 'bg-green-500 text-white'
+                    : 'bg-black/40 text-white'
+                }`}
               >
-                View
+                <ShoppingCart className="w-3.5 h-3.5" />
               </button>
 
               {/* Price */}
-              <div className="absolute bottom-2 left-2 bg-black/50 text-white px-2 py-1 rounded text-xs">
+              <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm text-white px-2 py-1 rounded-full text-xs font-medium">
                 ${(photo.price / 100).toFixed(2)}
               </div>
             </div>
           ))}
         </div>
 
-        {/* Floating Cart */}
+        {/* Sleek Floating Cart - Mobile Optimized */}
         {(selectedPhotos.size > 0 || gallery.package_enabled) && (
-          <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-8 md:w-96 bg-dark-800 rounded-xl shadow-2xl p-4 border border-dark-700 z-40">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <ShoppingCart className="w-5 h-5 text-red-500" />
-                <span className="text-white font-semibold">
-                  {selectedPhotos.size} photos selected
-                </span>
+          <div className="fixed bottom-0 left-0 right-0 md:bottom-4 md:left-auto md:right-8 md:w-96 z-40">
+            {/* Mobile: Slim pill bar */}
+            <div className="md:hidden bg-dark-900/95 backdrop-blur-lg border-t border-dark-700 px-4 py-3 safe-area-pb">
+              <div className="flex items-center gap-3">
+                {/* Cart indicator pill */}
+                <div className="flex items-center gap-2 bg-dark-700 rounded-full px-3 py-1.5">
+                  <ShoppingCart className="w-4 h-4 text-red-500" />
+                  <span className="text-white font-semibold text-sm">{selectedPhotos.size}</span>
+                </div>
+                
+                {/* Price */}
+                <div className="flex-1 text-right">
+                  {priceCalc.savings > 0 && (
+                    <span className="text-gray-500 text-xs line-through mr-2">
+                      ${(priceCalc.flatTotal / 100).toFixed(2)}
+                    </span>
+                  )}
+                  <span className="text-white font-bold">${(priceCalc.total / 100).toFixed(2)}</span>
+                </div>
+                
+                {/* Checkout button */}
+                <button
+                  onClick={() => setShowCheckout(true)}
+                  disabled={selectedPhotos.size === 0}
+                  className="bg-red-500 hover:bg-red-600 disabled:bg-gray-600 text-white font-semibold px-5 py-2 rounded-full transition-all active:scale-95"
+                >
+                  Checkout
+                </button>
               </div>
-              <span className="text-white font-bold">
-                ${(priceCalc.total / 100).toFixed(2)}
-              </span>
+              
+              {/* Buy All option */}
+              {gallery.package_enabled && gallery.package_price && (
+                <button
+                  onClick={() => {
+                    selectAll()
+                    setShowCheckout(true)
+                  }}
+                  className="w-full mt-2 bg-green-600/20 border border-green-500/50 text-green-400 font-semibold py-2 rounded-full text-sm transition-all active:scale-98"
+                >
+                  Buy All {photos.length} Photos - ${(gallery.package_price / 100).toFixed(2)}
+                </button>
+              )}
             </div>
             
-            {priceCalc.savings > 0 && (
-              <div className="flex items-center justify-between mb-3 text-sm">
-                <span className="text-gray-400">
-                  <span className="line-through">${(priceCalc.flatTotal / 100).toFixed(2)}</span>
-                </span>
-                <span className="text-green-400 font-semibold">
-                  Volume discount: -${(priceCalc.savings / 100).toFixed(2)}
+            {/* Desktop: Card style */}
+            <div className="hidden md:block bg-dark-800 rounded-xl shadow-2xl p-4 border border-dark-700">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <ShoppingCart className="w-5 h-5 text-red-500" />
+                  <span className="text-white font-semibold">
+                    {selectedPhotos.size} photos selected
+                  </span>
+                </div>
+                <span className="text-white font-bold">
+                  ${(priceCalc.total / 100).toFixed(2)}
                 </span>
               </div>
-            )}
+              
+              {priceCalc.savings > 0 && (
+                <div className="flex items-center justify-between mb-3 text-sm">
+                  <span className="text-gray-400">
+                    <span className="line-through">${(priceCalc.flatTotal / 100).toFixed(2)}</span>
+                  </span>
+                  <span className="text-green-400 font-semibold">
+                    Volume discount: -${(priceCalc.savings / 100).toFixed(2)}
+                  </span>
+                </div>
+              )}
 
-            <button
-              onClick={() => setShowCheckout(true)}
-              disabled={selectedPhotos.size === 0}
-              className="w-full bg-red-500 hover:bg-red-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-lg transition-colors"
-            >
-              Checkout
-            </button>
-
-            {gallery.package_enabled && gallery.package_price && (
               <button
-                onClick={() => {
-                  selectAll()
-                  setShowCheckout(true)
-                }}
-                className="w-full mt-2 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition-colors"
+                onClick={() => setShowCheckout(true)}
+                disabled={selectedPhotos.size === 0}
+                className="w-full bg-red-500 hover:bg-red-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-lg transition-colors"
               >
-                Buy All Photos - ${(gallery.package_price / 100).toFixed(2)}
+                Checkout
               </button>
-            )}
+
+              {gallery.package_enabled && gallery.package_price && (
+                <button
+                  onClick={() => {
+                    selectAll()
+                    setShowCheckout(true)
+                  }}
+                  className="w-full mt-2 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition-colors"
+                >
+                  Buy All Photos - ${(gallery.package_price / 100).toFixed(2)}
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -542,15 +592,24 @@ function CheckoutModal({ gallery, selectedCount, priceCalc, isPackage, packagePr
   )
 }
 
-// Full-screen lightbox with navigation and cart controls
+// TikTok-style fullscreen viewer with vertical swipe and double-tap to cart
 function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, onToggleSelect, pricePerPhoto }) {
   const currentIndex = photos.findIndex(p => p.id === currentPhoto.id)
   const isSelected = selectedPhotos.has(currentPhoto.id)
   
-  // Touch handling for swipe
-  const [touchStart, setTouchStart] = useState(null)
-  const [touchEnd, setTouchEnd] = useState(null)
-  const minSwipeDistance = 50
+  // Touch handling for vertical swipe
+  const [touchStartY, setTouchStartY] = useState(null)
+  const [touchEndY, setTouchEndY] = useState(null)
+  const [touchStartX, setTouchStartX] = useState(null)
+  const [touchEndX, setTouchEndX] = useState(null)
+  const [dragOffset, setDragOffset] = useState(0)
+  const [isDragging, setIsDragging] = useState(false)
+  const minSwipeDistance = 80
+  
+  // Double-tap detection
+  const [lastTap, setLastTap] = useState(0)
+  const [showHeartAnimation, setShowHeartAnimation] = useState(false)
+  const [heartPosition, setHeartPosition] = useState({ x: 0, y: 0 })
   
   const goNext = useCallback(() => {
     if (currentIndex < photos.length - 1) {
@@ -593,58 +652,123 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [goNext, goPrev, onClose, onToggleSelect, currentPhoto.id])
   
-  // Touch handlers for swipe
+  // Touch handlers for TikTok-style vertical swipe
   const onTouchStart = (e) => {
-    setTouchEnd(null)
-    setTouchStart(e.targetTouches[0].clientX)
+    setTouchEndY(null)
+    setTouchEndX(null)
+    setTouchStartY(e.targetTouches[0].clientY)
+    setTouchStartX(e.targetTouches[0].clientX)
+    setIsDragging(true)
   }
   
   const onTouchMove = (e) => {
-    setTouchEnd(e.targetTouches[0].clientX)
+    if (!touchStartY) return
+    const currentY = e.targetTouches[0].clientY
+    const currentX = e.targetTouches[0].clientX
+    setTouchEndY(currentY)
+    setTouchEndX(currentX)
+    
+    // Calculate vertical offset for smooth drag effect
+    const deltaY = currentY - touchStartY
+    const deltaX = Math.abs(currentX - touchStartX)
+    
+    // Only apply vertical drag if mostly vertical movement
+    if (Math.abs(deltaY) > deltaX) {
+      setDragOffset(deltaY * 0.3) // Dampen the drag
+    }
   }
   
   const onTouchEnd = () => {
-    if (!touchStart || !touchEnd) return
-    const distance = touchStart - touchEnd
-    const isLeftSwipe = distance > minSwipeDistance
-    const isRightSwipe = distance < -minSwipeDistance
+    setIsDragging(false)
+    setDragOffset(0)
     
-    if (isLeftSwipe) goNext()
-    if (isRightSwipe) goPrev()
+    if (!touchStartY || !touchEndY) return
+    
+    const distanceY = touchStartY - touchEndY
+    const distanceX = touchStartX && touchEndX ? Math.abs(touchStartX - touchEndX) : 0
+    
+    // Only trigger if mostly vertical swipe
+    if (Math.abs(distanceY) > distanceX && Math.abs(distanceY) > minSwipeDistance) {
+      if (distanceY > 0) {
+        // Swipe up = next photo
+        goNext()
+      } else {
+        // Swipe down = previous photo
+        goPrev()
+      }
+    }
+    
+    setTouchStartY(null)
+    setTouchStartX(null)
   }
   
+  // Double-tap handler
+  const handleTap = (e) => {
+    const now = Date.now()
+    const DOUBLE_TAP_DELAY = 300
+    
+    if (now - lastTap < DOUBLE_TAP_DELAY) {
+      // Double tap detected!
+      const rect = e.currentTarget.getBoundingClientRect()
+      const x = e.clientX || (e.touches && e.touches[0]?.clientX) || rect.width / 2
+      const y = e.clientY || (e.touches && e.touches[0]?.clientY) || rect.height / 2
+      
+      setHeartPosition({ x: x - rect.left, y: y - rect.top })
+      setShowHeartAnimation(true)
+      
+      // Add to cart if not already selected
+      if (!selectedPhotos.has(currentPhoto.id)) {
+        onToggleSelect(currentPhoto.id)
+      }
+      
+      // Hide heart after animation
+      setTimeout(() => setShowHeartAnimation(false), 800)
+    }
+    setLastTap(now)
+  }
+  
+  // Preload adjacent images
+  useEffect(() => {
+    const preloadImages = []
+    if (currentIndex > 0) {
+      const img = new Image()
+      img.src = photos[currentIndex - 1].watermarked_url
+      preloadImages.push(img)
+    }
+    if (currentIndex < photos.length - 1) {
+      const img = new Image()
+      img.src = photos[currentIndex + 1].watermarked_url
+      preloadImages.push(img)
+    }
+  }, [currentIndex, photos])
+  
   return (
-    <div 
-      className="fixed inset-0 bg-black z-50 flex flex-col"
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 bg-black/50">
-        <div className="text-white font-medium">
-          {currentIndex + 1} of {photos.length}
+    <div className="fixed inset-0 bg-black z-50 flex flex-col overflow-hidden">
+      {/* Header - Minimal floating */}
+      <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-4 bg-gradient-to-b from-black/70 to-transparent">
+        <div className="text-white/80 font-medium text-sm bg-black/30 px-3 py-1 rounded-full backdrop-blur-sm">
+          {currentIndex + 1} / {photos.length}
         </div>
         <button
           onClick={onClose}
-          className="text-white hover:text-gray-300 p-2"
+          className="text-white bg-black/30 hover:bg-black/50 p-2 rounded-full backdrop-blur-sm transition-colors"
         >
-          <X className="w-6 h-6" />
+          <X className="w-5 h-5" />
         </button>
       </div>
       
-      {/* Image Container */}
-      <div className="flex-1 relative flex items-center justify-center overflow-hidden">
-        {/* Previous Button */}
-        {currentIndex > 0 && (
-          <button
-            onClick={(e) => { e.stopPropagation(); goPrev() }}
-            className="absolute left-2 md:left-4 z-10 bg-black/50 hover:bg-black/70 text-white p-2 md:p-3 rounded-full transition-colors"
-          >
-            <ChevronLeft className="w-6 h-6 md:w-8 md:h-8" />
-          </button>
-        )}
-        
+      {/* Main Image Area - Full screen, swipeable */}
+      <div 
+        className="flex-1 relative flex items-center justify-center overflow-hidden"
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        onClick={handleTap}
+        style={{
+          transform: `translateY(${dragOffset}px)`,
+          transition: isDragging ? 'none' : 'transform 0.3s ease-out'
+        }}
+      >
         {/* Image */}
         <img
           src={currentPhoto.watermarked_url}
@@ -653,53 +777,157 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
           draggable={false}
         />
         
-        {/* Next Button */}
+        {/* Heart Animation (Instagram-style) */}
+        {showHeartAnimation && (
+          <div 
+            className="absolute pointer-events-none"
+            style={{ 
+              left: heartPosition.x, 
+              top: heartPosition.y,
+              transform: 'translate(-50%, -50%)'
+            }}
+          >
+            <Heart 
+              className="w-24 h-24 text-red-500 fill-red-500 animate-heart-burst" 
+              style={{
+                animation: 'heartBurst 0.8s ease-out forwards'
+              }}
+            />
+          </div>
+        )}
+        
+        {/* Navigation hints on edges (desktop) */}
+        {currentIndex > 0 && (
+          <button
+            onClick={(e) => { e.stopPropagation(); goPrev() }}
+            className="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 z-10 bg-black/40 hover:bg-black/60 text-white p-3 rounded-full transition-all opacity-50 hover:opacity-100"
+          >
+            <ChevronLeft className="w-6 h-6" />
+          </button>
+        )}
+        
         {currentIndex < photos.length - 1 && (
           <button
             onClick={(e) => { e.stopPropagation(); goNext() }}
-            className="absolute right-2 md:right-4 z-10 bg-black/50 hover:bg-black/70 text-white p-2 md:p-3 rounded-full transition-colors"
+            className="hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 z-10 bg-black/40 hover:bg-black/60 text-white p-3 rounded-full transition-all opacity-50 hover:opacity-100"
           >
-            <ChevronRight className="w-6 h-6 md:w-8 md:h-8" />
+            <ChevronRight className="w-6 h-6" />
           </button>
         )}
+        
+        {/* Mobile swipe hint (shows briefly) */}
+        <div className="md:hidden absolute bottom-24 left-1/2 -translate-x-1/2 flex flex-col items-center text-white/40 text-xs pointer-events-none animate-fade-out">
+          <ChevronUp className="w-5 h-5 animate-bounce" />
+          <span>Swipe to browse</span>
+        </div>
       </div>
       
-      {/* Footer with Add to Cart */}
-      <div className="p-4 bg-black/50 flex items-center justify-between">
+      {/* Right side action buttons (TikTok style) - Mobile */}
+      <div className="md:hidden absolute right-3 bottom-32 flex flex-col items-center gap-5 z-20">
+        {/* Add to Cart */}
+        <button
+          onClick={() => onToggleSelect(currentPhoto.id)}
+          className="flex flex-col items-center gap-1"
+        >
+          <div className={`p-3 rounded-full transition-all ${
+            isSelected 
+              ? 'bg-red-500 text-white scale-110' 
+              : 'bg-black/40 text-white backdrop-blur-sm'
+          }`}>
+            {isSelected ? (
+              <Check className="w-6 h-6" />
+            ) : (
+              <ShoppingCart className="w-6 h-6" />
+            )}
+          </div>
+          <span className="text-white text-xs font-medium">
+            {isSelected ? 'Added' : 'Add'}
+          </span>
+        </button>
+        
+        {/* Favorite indicator (if in cart) */}
+        <div className="flex flex-col items-center gap-1">
+          <div className={`p-3 rounded-full transition-all ${
+            isSelected 
+              ? 'bg-black/40 text-red-500 backdrop-blur-sm' 
+              : 'bg-black/40 text-white/50 backdrop-blur-sm'
+          }`}>
+            <Heart className={`w-6 h-6 ${isSelected ? 'fill-red-500' : ''}`} />
+          </div>
+          <span className="text-white/70 text-xs">
+            ${(pricePerPhoto / 100).toFixed(0)}
+          </span>
+        </div>
+      </div>
+      
+      {/* Bottom bar - Desktop only */}
+      <div className="hidden md:flex p-4 bg-gradient-to-t from-black/70 to-transparent items-center justify-between absolute bottom-0 left-0 right-0">
         <div className="text-gray-400 text-sm truncate max-w-[50%]">
           {currentPhoto.filename}
         </div>
         
         <button
           onClick={() => onToggleSelect(currentPhoto.id)}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-colors ${
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold transition-all ${
             isSelected
-              ? 'bg-green-600 hover:bg-green-700 text-white'
+              ? 'bg-green-500 hover:bg-green-600 text-white'
               : 'bg-red-500 hover:bg-red-600 text-white'
           }`}
         >
           {isSelected ? (
             <>
               <Check className="w-5 h-5" />
-              <span className="hidden sm:inline">In Cart</span>
-              <span className="sm:hidden">✓</span>
+              In Cart
             </>
           ) : (
             <>
               <Plus className="w-5 h-5" />
-              <span className="hidden sm:inline">Add ${(pricePerPhoto / 100).toFixed(2)}</span>
-              <span className="sm:hidden">+${(pricePerPhoto / 100).toFixed(2)}</span>
+              Add ${(pricePerPhoto / 100).toFixed(2)}
             </>
           )}
         </button>
       </div>
       
       {/* Keyboard hints (desktop only) */}
-      <div className="hidden md:flex absolute bottom-20 left-1/2 -translate-x-1/2 text-gray-500 text-xs gap-4">
-        <span>← → Navigate</span>
-        <span>Space/Enter: Add to cart</span>
+      <div className="hidden md:flex absolute bottom-16 left-1/2 -translate-x-1/2 text-gray-500 text-xs gap-4">
+        <span>↑ ↓ Navigate</span>
+        <span>Space: Add to cart</span>
         <span>Esc: Close</span>
       </div>
+      
+      {/* Double-tap hint (mobile, shows once) */}
+      <div className="md:hidden absolute bottom-20 left-1/2 -translate-x-1/2 text-white/30 text-xs text-center pointer-events-none">
+        Double-tap to add to cart
+      </div>
+      
+      {/* Heart burst animation styles */}
+      <style>{`
+        @keyframes heartBurst {
+          0% {
+            transform: translate(-50%, -50%) scale(0);
+            opacity: 1;
+          }
+          50% {
+            transform: translate(-50%, -50%) scale(1.2);
+            opacity: 1;
+          }
+          100% {
+            transform: translate(-50%, -50%) scale(1);
+            opacity: 0;
+          }
+        }
+        @keyframes fadeOut {
+          0% { opacity: 1; }
+          70% { opacity: 1; }
+          100% { opacity: 0; }
+        }
+        .animate-fade-out {
+          animation: fadeOut 3s ease-out forwards;
+        }
+        .safe-area-pb {
+          padding-bottom: max(12px, env(safe-area-inset-bottom));
+        }
+      `}</style>
     </div>
   )
 }
