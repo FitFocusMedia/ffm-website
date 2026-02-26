@@ -965,17 +965,16 @@ function PricingTiersEditor({ gallery, onUpdate }) {
         <h3 className="text-md font-semibold text-white flex items-center gap-2">
           📊 Volume Discount Tiers
         </h3>
-        <label className="flex items-center gap-2 text-sm cursor-pointer">
-          <input
-            type="checkbox"
-            checked={enabled}
-            onChange={toggleEnabled}
-            className="w-4 h-4 rounded"
-          />
-          <span className={enabled ? 'text-green-400' : 'text-gray-400'}>
-            {enabled ? 'Enabled' : 'Disabled'}
-          </span>
-        </label>
+        <button
+          onClick={toggleEnabled}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            enabled 
+              ? 'bg-green-600 hover:bg-green-700 text-white' 
+              : 'bg-dark-600 hover:bg-dark-500 text-gray-300'
+          }`}
+        >
+          {enabled ? '✓ Enabled' : 'Enable Discounts'}
+        </button>
       </div>
       
       <p className="text-gray-400 text-sm mb-4">
