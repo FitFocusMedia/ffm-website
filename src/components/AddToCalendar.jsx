@@ -10,17 +10,38 @@ export default function AddToCalendar({ event, className = '' }) {
 
   if (!event) return null
 
-  const startDate = new Date(event.start_time)
-  const endDate = event.end_time ? new Date(event.end_time) : new Date(startDate.getTime() + 3 * 60 * 60 * 1000) // Default 3 hours
+  // Parse as local time (strip Z/timezone suffix since DB stores AEST as naive)
+  const parseAsLocalTime = (dateStr) => {
+    if (!dateStr) return new Date()
+    const stripped = dateStr.replace(/[Z+].*$/, '').replace(/\.000$/, '')
+    return new Date(stripped)
+  }
+  
+  const startDate = parseAsLocalTime(event.start_time)
+  const endDate = event.end_time ? parseAsLocalTime(event.end_time) : new Date(startDate.getTime() + 3 * 60 * 60 * 1000) // Default 3 hours
 
-  // Format for Google Calendar
+  // Format for Google Calendar (YYYYMMDDTHHMMSS in local time)
   const formatGoogleDate = (date) => {
-    return date.toISOString().replace(/-|:|\.\d+/g, '')
+    const pad = (n) => String(n).padStart(2, '0')
+    const y = date.getFullYear()
+    const m = pad(date.getMonth() + 1)
+    const d = pad(date.getDate())
+    const h = pad(date.getHours())
+    const min = pad(date.getMinutes())
+    const s = pad(date.getSeconds())
+    return `${y}${m}${d}T${h}${min}${s}`
   }
 
-  // Format for ICS file
+  // Format for ICS file (local time, no Z suffix = floating time)
   const formatICSDate = (date) => {
-    return date.toISOString().replace(/-|:|\.\d+/g, '').slice(0, 15) + 'Z'
+    const pad = (n) => String(n).padStart(2, '0')
+    const y = date.getFullYear()
+    const m = pad(date.getMonth() + 1)
+    const d = pad(date.getDate())
+    const h = pad(date.getHours())
+    const min = pad(date.getMinutes())
+    const s = pad(date.getSeconds())
+    return `${y}${m}${d}T${h}${min}${s}`
   }
 
   const title = encodeURIComponent(event.title)
@@ -31,7 +52,19 @@ export default function AddToCalendar({ event, className = '' }) {
 
   const googleUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${formatGoogleDate(startDate)}/${formatGoogleDate(endDate)}&details=${description}&location=${location}`
 
-  const outlookUrl = `https://outlook.live.com/calendar/0/deeplink/compose?subject=${title}&startdt=${startDate.toISOString()}&enddt=${endDate.toISOString()}&body=${description}&location=${location}`
+  // Format for Outlook (ISO 8601 local time without Z)
+  const formatOutlookDate = (date) => {
+    const pad = (n) => String(n).padStart(2, '0')
+    const y = date.getFullYear()
+    const m = pad(date.getMonth() + 1)
+    const d = pad(date.getDate())
+    const h = pad(date.getHours())
+    const min = pad(date.getMinutes())
+    const s = pad(date.getSeconds())
+    return `${y}-${m}-${d}T${h}:${min}:${s}`
+  }
+  
+  const outlookUrl = `https://outlook.live.com/calendar/0/deeplink/compose?subject=${title}&startdt=${encodeURIComponent(formatOutlookDate(startDate))}&enddt=${encodeURIComponent(formatOutlookDate(endDate))}&body=${description}&location=${location}`
 
   // Generate ICS file content
   const generateICS = () => {
