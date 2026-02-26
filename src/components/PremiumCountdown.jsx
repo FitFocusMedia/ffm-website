@@ -65,7 +65,7 @@ export default function PremiumCountdown({ targetDate, onComplete, className = '
       <div className="flex flex-col items-center">
         <div className="relative">
           {/* Card Container */}
-          <div className="relative w-14 h-16 sm:w-16 sm:h-20 md:w-24 md:h-28 perspective-1000">
+          <div className="relative w-12 h-14 sm:w-16 sm:h-20 md:w-24 md:h-28 perspective-1000">
             {/* Static Background */}
             <div className="absolute inset-0 bg-gradient-to-b from-dark-700 to-dark-800 rounded-lg shadow-xl border border-dark-600">
               {/* Divider Line */}
@@ -74,7 +74,7 @@ export default function PremiumCountdown({ targetDate, onComplete, className = '
             
             {/* Number Display */}
             <div className={`relative z-10 w-full h-full flex items-center justify-center ${isFlipping ? 'animate-flip' : ''}`}>
-              <span className="text-2xl sm:text-3xl md:text-5xl font-bold text-white tabular-nums tracking-tight">
+              <span className="text-xl sm:text-3xl md:text-5xl font-bold text-white tabular-nums tracking-tight">
                 {String(value).padStart(2, '0')}
               </span>
             </div>
@@ -83,7 +83,7 @@ export default function PremiumCountdown({ targetDate, onComplete, className = '
             <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent rounded-lg pointer-events-none"></div>
           </div>
         </div>
-        <span className="text-[10px] sm:text-xs md:text-sm text-gray-500 mt-1.5 sm:mt-2 uppercase tracking-wider sm:tracking-widest font-medium">
+        <span className="text-[9px] sm:text-xs md:text-sm text-gray-500 mt-1 sm:mt-2 uppercase tracking-normal sm:tracking-widest font-medium">
           {label}
         </span>
       </div>
@@ -91,9 +91,9 @@ export default function PremiumCountdown({ targetDate, onComplete, className = '
   }
 
   const Separator = () => (
-    <div className="flex flex-col items-center justify-center gap-1.5 sm:gap-2 px-0.5 sm:px-1 md:px-3 h-16 sm:h-20 md:h-28">
-      <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-500 animate-pulse"></div>
-      <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-500 animate-pulse" style={{ animationDelay: '0.5s' }}></div>
+    <div className="flex flex-col items-center justify-center gap-1 sm:gap-2 px-0.5 sm:px-1 md:px-3 h-14 sm:h-20 md:h-28">
+      <div className="w-1 h-1 sm:w-2 sm:h-2 rounded-full bg-red-500 animate-pulse"></div>
+      <div className="w-1 h-1 sm:w-2 sm:h-2 rounded-full bg-red-500 animate-pulse" style={{ animationDelay: '0.5s' }}></div>
     </div>
   )
 
