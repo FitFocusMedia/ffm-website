@@ -100,7 +100,7 @@ export default function GalleryAdmin() {
         .select(`
           *,
           gallery_photos(count),
-          livestream_events(id, title)
+          events(id, name)
         `)
         .eq('organization_id', orgId)
         .order('created_at', { ascending: false })
@@ -230,10 +230,10 @@ function GalleryCard({ gallery, onClick }) {
           <span className="text-gray-400 text-sm">{photoCount} photos</span>
         </div>
         <h3 className="text-white font-semibold">{gallery.title}</h3>
-        {gallery.livestream_events && (
+        {gallery.events && (
           <p className="text-gray-400 text-sm mt-1 flex items-center gap-1">
             <Calendar className="w-3 h-3" />
-            {gallery.livestream_events.title}
+            {gallery.events.name}
           </p>
         )}
         <p className="text-gray-500 text-sm mt-2">
@@ -264,10 +264,10 @@ function CreateGalleryModal({ organization, onClose, onCreate }) {
   const loadEvents = async () => {
     try {
       const { data, error } = await supabase
-        .from('livestream_events')
-        .select('id, title, start_time')
+        .from('events')
+        .select('id, name, date')
         .eq('organization_id', organization.id)
-        .order('start_time', { ascending: false })
+        .order('date', { ascending: false })
       
       if (error) throw error
       setEvents(data || [])
@@ -346,7 +346,7 @@ function CreateGalleryModal({ organization, onClose, onCreate }) {
                 <option value="">No specific event (org-wide gallery)</option>
                 {events.map(event => (
                   <option key={event.id} value={event.id}>
-                    {event.title} ({new Date(event.start_time).toLocaleDateString()})
+                    {event.name} ({new Date(event.date).toLocaleDateString()})
                   </option>
                 ))}
               </select>
