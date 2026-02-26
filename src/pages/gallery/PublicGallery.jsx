@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { ShoppingCart, Download, Check, X, Loader2, Tag } from 'lucide-react'
+import { ShoppingCart, Download, Check, X, Loader2, Tag, ChevronLeft, ChevronRight, Plus, Minus } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 
 // Tiered pricing calculation (matches backend logic)
@@ -429,23 +429,15 @@ export default function GalleryPage() {
 
         {/* Lightbox */}
         {lightboxPhoto && (
-          <div
-            className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
-            onClick={() => setLightboxPhoto(null)}
-          >
-            <button
-              className="absolute top-4 right-4 text-white hover:text-gray-300"
-              onClick={() => setLightboxPhoto(null)}
-            >
-              <X className="w-8 h-8" />
-            </button>
-            <img
-              src={lightboxPhoto.watermarked_url}
-              alt={lightboxPhoto.filename}
-              className="max-w-full max-h-full object-contain"
-              onClick={(e) => e.stopPropagation()}
-            />
-          </div>
+          <Lightbox
+            photos={photos}
+            currentPhoto={lightboxPhoto}
+            selectedPhotos={selectedPhotos}
+            onClose={() => setLightboxPhoto(null)}
+            onNavigate={setLightboxPhoto}
+            onToggleSelect={togglePhoto}
+            pricePerPhoto={gallery.price_per_photo}
+          />
         )}
       </div>
     </div>
@@ -551,6 +543,168 @@ function CheckoutModal({ gallery, selectedCount, priceCalc, isPackage, packagePr
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  )
+}
+
+// Full-screen lightbox with navigation and cart controls
+function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, onToggleSelect, pricePerPhoto }) {
+  const currentIndex = photos.findIndex(p => p.id === currentPhoto.id)
+  const isSelected = selectedPhotos.has(currentPhoto.id)
+  
+  // Touch handling for swipe
+  const [touchStart, setTouchStart] = useState(null)
+  const [touchEnd, setTouchEnd] = useState(null)
+  const minSwipeDistance = 50
+  
+  const goNext = useCallback(() => {
+    if (currentIndex < photos.length - 1) {
+      onNavigate(photos[currentIndex + 1])
+    }
+  }, [currentIndex, photos, onNavigate])
+  
+  const goPrev = useCallback(() => {
+    if (currentIndex > 0) {
+      onNavigate(photos[currentIndex - 1])
+    }
+  }, [currentIndex, photos, onNavigate])
+  
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      switch (e.key) {
+        case 'ArrowRight':
+        case 'ArrowDown':
+          e.preventDefault()
+          goNext()
+          break
+        case 'ArrowLeft':
+        case 'ArrowUp':
+          e.preventDefault()
+          goPrev()
+          break
+        case 'Escape':
+          onClose()
+          break
+        case ' ':
+        case 'Enter':
+          e.preventDefault()
+          onToggleSelect(currentPhoto.id)
+          break
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [goNext, goPrev, onClose, onToggleSelect, currentPhoto.id])
+  
+  // Touch handlers for swipe
+  const onTouchStart = (e) => {
+    setTouchEnd(null)
+    setTouchStart(e.targetTouches[0].clientX)
+  }
+  
+  const onTouchMove = (e) => {
+    setTouchEnd(e.targetTouches[0].clientX)
+  }
+  
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return
+    const distance = touchStart - touchEnd
+    const isLeftSwipe = distance > minSwipeDistance
+    const isRightSwipe = distance < -minSwipeDistance
+    
+    if (isLeftSwipe) goNext()
+    if (isRightSwipe) goPrev()
+  }
+  
+  return (
+    <div 
+      className="fixed inset-0 bg-black z-50 flex flex-col"
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 bg-black/50">
+        <div className="text-white font-medium">
+          {currentIndex + 1} of {photos.length}
+        </div>
+        <button
+          onClick={onClose}
+          className="text-white hover:text-gray-300 p-2"
+        >
+          <X className="w-6 h-6" />
+        </button>
+      </div>
+      
+      {/* Image Container */}
+      <div className="flex-1 relative flex items-center justify-center overflow-hidden">
+        {/* Previous Button */}
+        {currentIndex > 0 && (
+          <button
+            onClick={(e) => { e.stopPropagation(); goPrev() }}
+            className="absolute left-2 md:left-4 z-10 bg-black/50 hover:bg-black/70 text-white p-2 md:p-3 rounded-full transition-colors"
+          >
+            <ChevronLeft className="w-6 h-6 md:w-8 md:h-8" />
+          </button>
+        )}
+        
+        {/* Image */}
+        <img
+          src={currentPhoto.watermarked_url}
+          alt={currentPhoto.filename}
+          className="max-w-full max-h-full object-contain select-none"
+          draggable={false}
+        />
+        
+        {/* Next Button */}
+        {currentIndex < photos.length - 1 && (
+          <button
+            onClick={(e) => { e.stopPropagation(); goNext() }}
+            className="absolute right-2 md:right-4 z-10 bg-black/50 hover:bg-black/70 text-white p-2 md:p-3 rounded-full transition-colors"
+          >
+            <ChevronRight className="w-6 h-6 md:w-8 md:h-8" />
+          </button>
+        )}
+      </div>
+      
+      {/* Footer with Add to Cart */}
+      <div className="p-4 bg-black/50 flex items-center justify-between">
+        <div className="text-gray-400 text-sm truncate max-w-[50%]">
+          {currentPhoto.filename}
+        </div>
+        
+        <button
+          onClick={() => onToggleSelect(currentPhoto.id)}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-colors ${
+            isSelected
+              ? 'bg-green-600 hover:bg-green-700 text-white'
+              : 'bg-red-500 hover:bg-red-600 text-white'
+          }`}
+        >
+          {isSelected ? (
+            <>
+              <Check className="w-5 h-5" />
+              <span className="hidden sm:inline">In Cart</span>
+              <span className="sm:hidden">✓</span>
+            </>
+          ) : (
+            <>
+              <Plus className="w-5 h-5" />
+              <span className="hidden sm:inline">Add ${(pricePerPhoto / 100).toFixed(2)}</span>
+              <span className="sm:hidden">+${(pricePerPhoto / 100).toFixed(2)}</span>
+            </>
+          )}
+        </button>
+      </div>
+      
+      {/* Keyboard hints (desktop only) */}
+      <div className="hidden md:flex absolute bottom-20 left-1/2 -translate-x-1/2 text-gray-500 text-xs gap-4">
+        <span>← → Navigate</span>
+        <span>Space/Enter: Add to cart</span>
+        <span>Esc: Close</span>
       </div>
     </div>
   )
