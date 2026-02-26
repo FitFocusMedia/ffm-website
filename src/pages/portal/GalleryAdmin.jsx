@@ -66,10 +66,45 @@ export default function GalleryAdmin() {
   const urlParams = new URLSearchParams(window.location.hash.split('?')[1] || '')
   const orgIdFromUrl = urlParams.get('org')
   const shouldOpenCreate = urlParams.get('create') === 'true'
+  const editGalleryId = urlParams.get('edit')
 
   useEffect(() => {
-    loadOrganizations()
+    // If we have an edit param, load that gallery directly
+    if (editGalleryId) {
+      loadGalleryForEdit(editGalleryId)
+    } else {
+      loadOrganizations()
+    }
   }, [])
+  
+  // Load a specific gallery for editing (from ?edit= param)
+  const loadGalleryForEdit = async (galleryId) => {
+    try {
+      // Load the gallery
+      const { data: gallery, error: galleryError } = await supabase
+        .from('galleries')
+        .select('*, organizations(*)')
+        .eq('id', galleryId)
+        .single()
+      
+      if (galleryError || !gallery) {
+        console.error('Gallery not found:', galleryError)
+        setLoading(false)
+        return
+      }
+      
+      // Set the org and gallery
+      if (gallery.organizations) {
+        setSelectedOrg(gallery.organizations)
+        setOrganizations([gallery.organizations])
+      }
+      setSelectedGallery(gallery)
+      setLoading(false)
+    } catch (err) {
+      console.error('Load gallery for edit error:', err)
+      setLoading(false)
+    }
+  }
   
   // Auto-open create modal if ?create=true is in URL (after org is loaded)
   useEffect(() => {
@@ -161,16 +196,14 @@ export default function GalleryAdmin() {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-4">
-          {/* Back button - goes to Content Admin with org context */}
-          {orgIdFromUrl && (
-            <a 
-              href={`/#/portal/content-admin?org=${orgIdFromUrl}`}
-              className="text-gray-400 hover:text-white transition-colors"
-              title="Back to Content Admin"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </a>
-          )}
+          {/* Back button - always show, goes to Content Admin with org context if available */}
+          <a 
+            href={selectedOrg ? `/#/portal/content-admin?org=${selectedOrg.id}` : '/#/portal/content-admin'}
+            className="text-gray-400 hover:text-white transition-colors"
+            title="Back to Content Admin"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </a>
           <h1 className="text-2xl font-bold text-white">Photo Galleries</h1>
           {selectedOrg && (
             <span className="text-gray-400 text-lg">— {selectedOrg.display_name || selectedOrg.name}</span>
