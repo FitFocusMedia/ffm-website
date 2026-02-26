@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { ShoppingCart, Download, Check, X, Loader2, Tag, ChevronLeft, ChevronRight, Plus, Minus, Heart, ChevronUp, ChevronDown } from 'lucide-react'
+import { ShoppingCart, Download, Check, X, Loader2, Tag, ChevronLeft, ChevronRight, Plus, Minus, Heart, ChevronUp, ChevronDown, LayoutGrid } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 
 // Tiered pricing calculation (matches backend logic)
@@ -843,7 +843,7 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
           {currentIndex + 1} / {photos.length}
         </div>
         <button onClick={onClose} className="text-white bg-black/40 hover:bg-black/60 p-2.5 rounded-full backdrop-blur-sm transition-colors">
-          <X className="w-5 h-5" />
+          <LayoutGrid className="w-5 h-5" />
         </button>
       </div>
       
@@ -947,6 +947,10 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
             <div className="text-4xl mb-2">✅</div>
             <p className="text-white text-lg font-semibold">You're all set!</p>
             <p className="text-white/70 text-sm mt-1">Swipe to browse, double-tap to add</p>
+            <div className="flex items-center justify-center gap-2 mt-3 text-white/60 text-sm">
+              <LayoutGrid className="w-4 h-4" />
+              <span>Tap grid icon to return to gallery</span>
+            </div>
           </div>
         </div>
       )}
