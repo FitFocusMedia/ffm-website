@@ -488,13 +488,13 @@ export default function EventPage() {
               </div>
 
               {/* Title & Actions */}
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="min-w-0 flex-1">
-                  <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-2 break-words">
+              <div className="space-y-4">
+                <div>
+                  <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-2">
                     {event.title}
                   </h1>
                   <div className="flex items-center gap-3 text-gray-400">
-                    <Users className="w-4 h-4" />
+                    <Users className="w-4 h-4 flex-shrink-0" />
                     <span>{event.org_display_name || event.organization}</span>
                     {geoInfo?.crew_bypass && (
                       <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs font-medium rounded-full">
