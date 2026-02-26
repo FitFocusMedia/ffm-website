@@ -29,7 +29,8 @@ export default function GalleryPage() {
         .from('galleries')
         .select(`
           id, title, description, slug, price_per_photo, package_price, package_enabled,
-          livestream_events(id, title)
+          pricing_tiers, tiered_pricing_enabled,
+          organizations(id, name, display_name)
         `)
         .eq('slug', slug)
         .eq('status', 'published')
