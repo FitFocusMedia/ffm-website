@@ -449,11 +449,11 @@ export default function EventPage() {
       
       <div className="py-12 md:py-16 px-4">
         <div className="max-w-6xl mx-auto">
-          <div className="grid lg:grid-cols-5 gap-6 lg:gap-12">
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-12">
             {/* Event Details - Left Column */}
-            <div className="lg:col-span-3 space-y-6">
+            <div className="col-span-1 lg:col-span-3 space-y-6">
               {/* Hero Thumbnail */}
-              <div className="relative aspect-video bg-dark-800 rounded-2xl overflow-hidden group">
+              <div className="relative w-full aspect-video bg-dark-800 rounded-2xl overflow-hidden group">
                 {event.thumbnail_url ? (
                   <img 
                     src={getDirectImageUrl(event.thumbnail_url)} 
@@ -579,8 +579,8 @@ export default function EventPage() {
             </div>
 
             {/* Purchase Card - Right Column */}
-            <div className="lg:col-span-2">
-              <div className="sticky top-24">
+            <div className="col-span-1 lg:col-span-2">
+              <div className="lg:sticky lg:top-24">
                 <PremiumPurchaseCard
                   price={isVodAvailable ? vodPrice : event.price}
                   currency="AUD"
