@@ -103,24 +103,18 @@ export default function GalleryPage() {
 
       if (photosError) throw photosError
 
-      // Generate signed URLs
+      // Generate signed URLs - PUBLIC gallery uses watermarked images ONLY
       const photosWithUrls = await Promise.all(photosData.map(async (photo) => {
         const { data: wmUrl } = await supabase.storage
           .from('galleries')
           .createSignedUrl(photo.watermarked_path, 3600)
-        
-        let thumbnailUrl = wmUrl?.signedUrl
-        if (photo.thumbnail_path) {
-          const { data: thumbUrl } = await supabase.storage
-            .from('galleries')
-            .createSignedUrl(photo.thumbnail_path, 3600)
-          thumbnailUrl = thumbUrl?.signedUrl
-        }
 
         return {
           ...photo,
           watermarked_url: wmUrl?.signedUrl,
-          thumbnail_url: thumbnailUrl,
+          // Public gallery: use watermarked for both grid and lightbox
+          // Clean thumbnails are admin-only
+          thumbnail_url: wmUrl?.signedUrl,
           price: photo.price || galleryData.price_per_photo
         }
       }))
