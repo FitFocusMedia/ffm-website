@@ -964,15 +964,11 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
         </div>
       )}
       
-      {/* Step 5: Point to grid icon */}
+      {/* Step 5: Subtle hint about grid icon - informational, not a CTA */}
       {tutorialStep === 5 && (
-        <div className="md:hidden absolute top-16 right-2 z-50 pointer-events-none">
-          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 text-center animate-bounce-slow">
-            <div className="flex items-center gap-2 text-white">
-              <LayoutGrid className="w-5 h-5" />
-              <span className="text-sm font-medium">Tap to return to gallery</span>
-            </div>
-            <div className="absolute -top-2 right-6 w-0 h-0 border-l-8 border-r-8 border-b-8 border-transparent border-b-white/10"></div>
+        <div className="md:hidden absolute top-14 right-14 z-50 pointer-events-none animate-fade-hint">
+          <div className="bg-black/40 backdrop-blur-sm rounded-lg px-3 py-1.5">
+            <span className="text-white/60 text-xs">Grid view</span>
           </div>
         </div>
       )}
@@ -1020,6 +1016,15 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
         }
         .animate-double-tap {
           animation: double-tap 1.5s ease-in-out infinite;
+        }
+        @keyframes fade-hint {
+          0% { opacity: 0; }
+          15% { opacity: 1; }
+          85% { opacity: 1; }
+          100% { opacity: 0; }
+        }
+        .animate-fade-hint {
+          animation: fade-hint 2.5s ease-in-out forwards;
         }
       `}</style>
     </div>
