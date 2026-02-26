@@ -387,19 +387,14 @@ export default function GalleryPage() {
                   e.stopPropagation()
                   togglePhoto(photo.id)
                 }}
-                className={`absolute top-2 left-2 w-7 h-7 rounded-full flex items-center justify-center transition-all md:opacity-0 md:group-hover:opacity-100 ${
+                className={`absolute bottom-2 left-2 px-3 py-1 rounded-full text-xs font-semibold transition-all md:opacity-0 md:group-hover:opacity-100 ${
                   selectedPhotos.has(photo.id)
                     ? 'bg-green-500 text-white'
-                    : 'bg-black/40 text-white'
+                    : 'bg-black/60 backdrop-blur-sm text-white'
                 }`}
               >
-                <ShoppingCart className="w-3.5 h-3.5" />
+                {selectedPhotos.has(photo.id) ? 'Added' : 'Add'}
               </button>
-
-              {/* Price */}
-              <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm text-white px-2 py-1 rounded-full text-xs font-medium">
-                ${(photo.price / 100).toFixed(2)}
-              </div>
             </div>
           ))}
         </div>
@@ -891,7 +886,7 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
           </span>
         </button>
         
-        {/* Price indicator */}
+        {/* Heart / Add indicator */}
         <div className="flex flex-col items-center gap-1">
           <div className={`p-3 rounded-full shadow-lg ${
             isSelected ? 'bg-black/60 text-red-500' : 'bg-black/60 text-white/70'
@@ -899,7 +894,7 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
             <Heart className={`w-6 h-6 ${isSelected ? 'fill-red-500' : ''}`} />
           </div>
           <span className="text-white/80 text-xs font-medium drop-shadow">
-            ${(pricePerPhoto / 100).toFixed(0)}
+            {isSelected ? 'Added' : 'Add'}
           </span>
         </div>
       </div>
