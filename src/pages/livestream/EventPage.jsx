@@ -447,9 +447,9 @@ export default function EventPage() {
         type="video.other"
       />
       
-      <div className="py-12 md:py-16 px-4 w-full box-border">
-        <div className="max-w-6xl mx-auto w-full">
-          <div className="grid lg:grid-cols-5 gap-4 md:gap-8 lg:gap-12 w-full">
+      <div className="py-12 md:py-16 px-4">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid lg:grid-cols-5 gap-6 lg:gap-12">
             {/* Event Details - Left Column */}
             <div className="lg:col-span-3 space-y-6">
               {/* Hero Thumbnail */}

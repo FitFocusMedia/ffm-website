@@ -76,9 +76,9 @@ function ScrollToTop() {
 // Public layout wrapper
 function PublicLayout({ children }) {
   return (
-    <div className="min-h-screen bg-dark-950 flex flex-col w-full max-w-[100vw] overflow-x-hidden box-border">
+    <div className="min-h-screen bg-dark-950 flex flex-col">
       <Navbar />
-      <main className="flex-1 w-full max-w-[100vw] box-border">{children}</main>
+      <main className="flex-1">{children}</main>
       <Footer />
     </div>
   )
