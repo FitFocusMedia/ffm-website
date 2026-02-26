@@ -14,6 +14,7 @@ export default function OrgOrderPage() {
   const [organization, setOrganization] = useState(null)
   const [events, setEvents] = useState([])
   const [packages, setPackages] = useState([])
+  const [galleries, setGalleries] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   
@@ -96,6 +97,16 @@ export default function OrgOrderPage() {
       .order('sort_order')
 
     setPackages(packagesData || [])
+    
+    // Load published galleries for this org
+    const { data: galleriesData } = await supabase
+      .from('galleries')
+      .select('id, title, slug, event_id, price_per_photo, package_price, package_enabled, pricing_tiers, tiered_pricing_enabled')
+      .eq('organization_id', orgData.id)
+      .eq('status', 'published')
+      .order('created_at', { ascending: false })
+
+    setGalleries(galleriesData || [])
     setLoading(false)
   }
 
@@ -457,6 +468,53 @@ export default function OrgOrderPage() {
                 </div>
               )}
             </div>
+
+            {/* Photo Galleries Section - Show if selected events have galleries */}
+            {selectedEvents.length > 0 && galleries.filter(g => selectedEvents.includes(g.event_id)).length > 0 && (
+              <div className="bg-gradient-to-br from-purple-900/30 to-pink-900/30 rounded-xl p-6 border border-purple-500/30">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 bg-purple-500/20 rounded-full flex items-center justify-center">
+                    <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-semibold text-white">📸 Photo Galleries Available</h2>
+                    <p className="text-purple-300 text-sm">Professional event photos ready to purchase</p>
+                  </div>
+                </div>
+                
+                <div className="space-y-3">
+                  {galleries
+                    .filter(g => selectedEvents.includes(g.event_id))
+                    .map(gallery => {
+                      const event = events.find(e => e.id === gallery.event_id)
+                      return (
+                        <div 
+                          key={gallery.id}
+                          className="bg-black/30 rounded-lg p-4 border border-purple-500/20 flex justify-between items-center"
+                        >
+                          <div>
+                            <div className="font-semibold text-white">{gallery.title}</div>
+                            <div className="text-sm text-purple-300">
+                              {event?.name} • From ${(gallery.price_per_photo / 100).toFixed(2)}/photo
+                              {gallery.tiered_pricing_enabled && (
+                                <span className="ml-2 text-green-400">• Volume discounts available</span>
+                              )}
+                            </div>
+                          </div>
+                          <Link
+                            to={`/gallery/${gallery.slug}`}
+                            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors"
+                          >
+                            View Gallery →
+                          </Link>
+                        </div>
+                      )
+                    })}
+                </div>
+              </div>
+            )}
 
             {/* Continue Button */}
             <button
