@@ -10,6 +10,7 @@ export default function ContentAdmin() {
   const [divisionCategories, setDivisionCategories] = useState([])
   const [divisionSubdivisions, setDivisionSubdivisions] = useState([])
   const [orders, setOrders] = useState([])
+  const [galleries, setGalleries] = useState([])
   const [loading, setLoading] = useState(true)
   
   // Sub-tab within org view
@@ -48,15 +49,17 @@ export default function ContentAdmin() {
   }
 
   async function loadOrgData(orgId) {
-    const [eventsRes, packagesRes, ordersRes] = await Promise.all([
+    const [eventsRes, packagesRes, ordersRes, galleriesRes] = await Promise.all([
       supabase.from('events').select('*').eq('organization_id', orgId).order('date', { ascending: true }),
       supabase.from('packages').select('*').eq('organization_id', orgId).order('sort_order'),
-      supabase.from('content_orders').select('*, events(name), packages(name)').eq('organization_id', orgId).order('created_at', { ascending: false }).limit(50)
+      supabase.from('content_orders').select('*, events(name), packages(name)').eq('organization_id', orgId).order('created_at', { ascending: false }).limit(50),
+      supabase.from('galleries').select('*, events(name), gallery_photos(count)').eq('organization_id', orgId).order('created_at', { ascending: false })
     ])
     
     setOrgEvents(eventsRes.data || [])
     setOrgPackages(packagesRes.data || [])
     setOrders(ordersRes.data || [])
+    setGalleries(galleriesRes.data || [])
     
     // Load divisions for all events
     const eventIds = (eventsRes.data || []).map(e => e.id)
@@ -421,7 +424,7 @@ export default function ContentAdmin() {
 
       {/* Sub-tabs */}
       <div className="flex gap-2 mb-6 border-b border-gray-700 pb-2">
-        {['events', 'packages', 'divisions', 'orders'].map(tab => (
+        {['events', 'packages', 'divisions', 'galleries', 'orders'].map(tab => (
           <button
             key={tab}
             onClick={() => setOrgTab(tab)}
@@ -433,6 +436,7 @@ export default function ContentAdmin() {
           >
             {tab} {tab === 'events' && `(${orgEvents.length})`}
             {tab === 'packages' && `(${orgPackages.length})`}
+            {tab === 'galleries' && `(${galleries.length})`}
             {tab === 'orders' && `(${orders.length})`}
           </button>
         ))}
@@ -772,6 +776,66 @@ export default function ContentAdmin() {
               </>
             )}
           </div>
+        </div>
+      )}
+
+      {/* GALLERIES TAB */}
+      {orgTab === 'galleries' && (
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold">Photo Galleries</h2>
+            <a 
+              href={`/#/portal/galleries?org=${selectedOrg.id}`}
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm"
+            >
+              + Manage Galleries
+            </a>
+          </div>
+          
+          {galleries.length === 0 ? (
+            <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-8 text-center text-gray-400">
+              No galleries yet. Create one to start selling event photos.
+            </div>
+          ) : (
+            <div className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-800">
+                  <tr>
+                    <th className="text-left p-3">Gallery Name</th>
+                    <th className="text-left p-3">Event</th>
+                    <th className="text-center p-3">Photos</th>
+                    <th className="text-right p-3">Price/Photo</th>
+                    <th className="text-center p-3">Status</th>
+                    <th className="text-right p-3">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {galleries.map(gallery => (
+                    <tr key={gallery.id} className="border-t border-gray-800">
+                      <td className="p-3 font-medium">{gallery.title}</td>
+                      <td className="p-3 text-gray-400">{gallery.events?.name || '—'}</td>
+                      <td className="p-3 text-center">{gallery.gallery_photos?.[0]?.count || 0}</td>
+                      <td className="p-3 text-right font-semibold text-green-400">${(gallery.price_per_photo / 100).toFixed(2)}</td>
+                      <td className="p-3 text-center">
+                        <span className={`px-2 py-1 rounded text-xs ${
+                          gallery.status === 'published' ? 'bg-green-600' :
+                          gallery.status === 'draft' ? 'bg-yellow-600' : 'bg-gray-600'
+                        }`}>
+                          {gallery.status}
+                        </span>
+                      </td>
+                      <td className="p-3 text-right space-x-2">
+                        <a href={`/#/portal/galleries?edit=${gallery.id}`} className="text-blue-400 hover:text-blue-300">Edit</a>
+                        {gallery.status === 'published' && (
+                          <a href={`/#/gallery/${gallery.slug}`} target="_blank" className="text-green-400 hover:text-green-300">View</a>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
