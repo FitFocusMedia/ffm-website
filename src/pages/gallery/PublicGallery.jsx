@@ -1,7 +1,62 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { ShoppingCart, Download, Check, X, Loader2 } from 'lucide-react'
+import { ShoppingCart, Download, Check, X, Loader2, Tag } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+
+// Tiered pricing calculation (matches backend logic)
+function calculateTieredPrice(quantity, pricingTiers, defaultPrice) {
+  if (!pricingTiers || !Array.isArray(pricingTiers) || pricingTiers.length === 0) {
+    return {
+      total: quantity * defaultPrice,
+      breakdown: [{ qty: quantity, price: defaultPrice, subtotal: quantity * defaultPrice }],
+      savings: 0
+    }
+  }
+  
+  const sortedTiers = [...pricingTiers].sort((a, b) => a.min_qty - b.min_qty)
+  let remaining = quantity
+  let total = 0
+  const breakdown = []
+  
+  for (const tier of sortedTiers) {
+    if (remaining <= 0) break
+    
+    const tierMin = tier.min_qty
+    const tierMax = tier.max_qty || Infinity
+    const tierPrice = tier.price_per_photo
+    
+    const tierCapacity = tierMax === Infinity ? remaining : (tierMax - tierMin + 1)
+    const qtyInTier = Math.min(remaining, tierCapacity)
+    
+    if (qtyInTier > 0) {
+      const subtotal = qtyInTier * tierPrice
+      total += subtotal
+      breakdown.push({
+        tier: `${tierMin}-${tierMax === Infinity ? '+' : tierMax}`,
+        qty: qtyInTier,
+        price: tierPrice,
+        subtotal
+      })
+      remaining -= qtyInTier
+    }
+  }
+  
+  if (remaining > 0) {
+    const subtotal = remaining * defaultPrice
+    total += subtotal
+    breakdown.push({
+      tier: 'standard',
+      qty: remaining,
+      price: defaultPrice,
+      subtotal
+    })
+  }
+  
+  const flatTotal = quantity * defaultPrice
+  const savings = flatTotal - total
+  
+  return { total, breakdown, savings, flatTotal }
+}
 
 export default function GalleryPage() {
   const { slug } = useParams()
@@ -97,12 +152,24 @@ export default function GalleryPage() {
     setSelectedPhotos(new Set())
   }
 
-  const getTotal = () => {
-    return Array.from(selectedPhotos).reduce((sum, id) => {
-      const photo = photos.find(p => p.id === id)
-      return sum + (photo?.price || gallery?.price_per_photo || 0)
-    }, 0)
-  }
+  // Calculate pricing with tiered discounts
+  const priceCalc = useMemo(() => {
+    const quantity = selectedPhotos.size
+    if (quantity === 0 || !gallery) {
+      return { total: 0, savings: 0, breakdown: [], flatTotal: 0 }
+    }
+    
+    // Check if tiered pricing is enabled
+    if (gallery.tiered_pricing_enabled && gallery.pricing_tiers?.length > 0) {
+      return calculateTieredPrice(quantity, gallery.pricing_tiers, gallery.price_per_photo)
+    }
+    
+    // Flat pricing
+    const total = quantity * gallery.price_per_photo
+    return { total, savings: 0, breakdown: [], flatTotal: total }
+  }, [selectedPhotos.size, gallery])
+
+  const getTotal = () => priceCalc.total
 
   const handleCheckout = async (email, customerName, isPackage = false) => {
     setPurchasing(true)
@@ -178,20 +245,44 @@ export default function GalleryPage() {
         )}
 
         {/* Pricing Info */}
-        <div className="mb-6 flex flex-wrap gap-4 text-sm">
-          <div className="bg-dark-800 px-4 py-2 rounded-lg">
-            <span className="text-gray-400">Per Photo:</span>
-            <span className="text-white ml-2 font-semibold">
-              ${(gallery.price_per_photo / 100).toFixed(2)}
-            </span>
-          </div>
-          {gallery.package_enabled && gallery.package_price && (
+        <div className="mb-6 space-y-3">
+          <div className="flex flex-wrap gap-4 text-sm">
             <div className="bg-dark-800 px-4 py-2 rounded-lg">
-              <span className="text-gray-400">All Photos:</span>
-              <span className="text-green-400 ml-2 font-semibold">
-                ${(gallery.package_price / 100).toFixed(2)}
+              <span className="text-gray-400">Per Photo:</span>
+              <span className="text-white ml-2 font-semibold">
+                ${(gallery.price_per_photo / 100).toFixed(2)}
               </span>
-              <span className="text-gray-500 ml-1">(save ${((photos.length * gallery.price_per_photo - gallery.package_price) / 100).toFixed(2)})</span>
+            </div>
+            {gallery.package_enabled && gallery.package_price && (
+              <div className="bg-dark-800 px-4 py-2 rounded-lg">
+                <span className="text-gray-400">All Photos:</span>
+                <span className="text-green-400 ml-2 font-semibold">
+                  ${(gallery.package_price / 100).toFixed(2)}
+                </span>
+                <span className="text-gray-500 ml-1">(save ${((photos.length * gallery.price_per_photo - gallery.package_price) / 100).toFixed(2)})</span>
+              </div>
+            )}
+          </div>
+          
+          {/* Volume Discounts */}
+          {gallery.tiered_pricing_enabled && gallery.pricing_tiers?.length > 0 && (
+            <div className="bg-gradient-to-r from-green-500/10 to-green-500/5 border border-green-500/30 rounded-lg p-4">
+              <div className="flex items-center gap-2 text-green-400 font-semibold mb-3">
+                <Tag className="w-4 h-4" />
+                Volume Discounts
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 text-sm">
+                {gallery.pricing_tiers.map((tier, i) => (
+                  <div key={i} className="bg-dark-800/50 rounded px-3 py-2">
+                    <span className="text-gray-400">
+                      {tier.max_qty ? `${tier.min_qty}-${tier.max_qty}` : `${tier.min_qty}+`} photos:
+                    </span>
+                    <span className="text-white ml-2 font-semibold">
+                      ${(tier.price_per_photo / 100).toFixed(2)} each
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -213,7 +304,12 @@ export default function GalleryPage() {
                 Clear Selection
               </button>
               <span className="text-white">
-                {selectedPhotos.size} selected · ${(getTotal() / 100).toFixed(2)}
+                {selectedPhotos.size} selected · ${(priceCalc.total / 100).toFixed(2)}
+                {priceCalc.savings > 0 && (
+                  <span className="text-green-400 ml-2">
+                    (saving ${(priceCalc.savings / 100).toFixed(2)})
+                  </span>
+                )}
               </span>
             </>
           )}
@@ -271,7 +367,7 @@ export default function GalleryPage() {
         {/* Floating Cart */}
         {(selectedPhotos.size > 0 || gallery.package_enabled) && (
           <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-8 md:w-96 bg-dark-800 rounded-xl shadow-2xl p-4 border border-dark-700 z-40">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <ShoppingCart className="w-5 h-5 text-red-500" />
                 <span className="text-white font-semibold">
@@ -279,9 +375,20 @@ export default function GalleryPage() {
                 </span>
               </div>
               <span className="text-white font-bold">
-                ${(getTotal() / 100).toFixed(2)}
+                ${(priceCalc.total / 100).toFixed(2)}
               </span>
             </div>
+            
+            {priceCalc.savings > 0 && (
+              <div className="flex items-center justify-between mb-3 text-sm">
+                <span className="text-gray-400">
+                  <span className="line-through">${(priceCalc.flatTotal / 100).toFixed(2)}</span>
+                </span>
+                <span className="text-green-400 font-semibold">
+                  Volume discount: -${(priceCalc.savings / 100).toFixed(2)}
+                </span>
+              </div>
+            )}
 
             <button
               onClick={() => setShowCheckout(true)}
@@ -310,7 +417,7 @@ export default function GalleryPage() {
           <CheckoutModal
             gallery={gallery}
             selectedCount={selectedPhotos.size}
-            total={getTotal()}
+            priceCalc={priceCalc}
             isPackage={selectedPhotos.size === photos.length && gallery.package_enabled}
             packagePrice={gallery.package_price}
             onClose={() => setShowCheckout(false)}
@@ -345,11 +452,11 @@ export default function GalleryPage() {
   )
 }
 
-function CheckoutModal({ gallery, selectedCount, total, isPackage, packagePrice, onClose, onCheckout, purchasing, error }) {
+function CheckoutModal({ gallery, selectedCount, priceCalc, isPackage, packagePrice, onClose, onCheckout, purchasing, error }) {
   const [email, setEmail] = useState('')
   const [customerName, setCustomerName] = useState('')
 
-  const finalTotal = isPackage && packagePrice ? packagePrice : total
+  const finalTotal = isPackage && packagePrice ? packagePrice : priceCalc.total
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -364,14 +471,25 @@ function CheckoutModal({ gallery, selectedCount, total, isPackage, packagePrice,
         <div className="mb-6 p-4 bg-dark-700 rounded-lg">
           <div className="flex justify-between text-gray-300 mb-2">
             <span>{selectedCount} photos</span>
-            <span>${(total / 100).toFixed(2)}</span>
+            <span>${(priceCalc.flatTotal / 100).toFixed(2)}</span>
           </div>
-          {isPackage && packagePrice && total > packagePrice && (
-            <div className="flex justify-between text-green-400">
-              <span>Package Discount</span>
-              <span>-${((total - packagePrice) / 100).toFixed(2)}</span>
+          
+          {/* Volume Discount */}
+          {priceCalc.savings > 0 && !isPackage && (
+            <div className="flex justify-between text-green-400 mb-2">
+              <span>Volume Discount</span>
+              <span>-${(priceCalc.savings / 100).toFixed(2)}</span>
             </div>
           )}
+          
+          {/* Package Discount */}
+          {isPackage && packagePrice && priceCalc.flatTotal > packagePrice && (
+            <div className="flex justify-between text-green-400 mb-2">
+              <span>Package Discount</span>
+              <span>-${((priceCalc.flatTotal - packagePrice) / 100).toFixed(2)}</span>
+            </div>
+          )}
+          
           <div className="flex justify-between text-white font-bold mt-2 pt-2 border-t border-dark-600">
             <span>Total</span>
             <span>${(finalTotal / 100).toFixed(2)} AUD</span>
