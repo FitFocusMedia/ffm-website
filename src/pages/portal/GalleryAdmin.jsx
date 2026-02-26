@@ -61,10 +61,25 @@ export default function GalleryAdmin() {
   const [selectedGallery, setSelectedGallery] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  
+  // Get URL params for org pre-selection and back navigation
+  const urlParams = new URLSearchParams(window.location.hash.split('?')[1] || '')
+  const orgIdFromUrl = urlParams.get('org')
+  const shouldOpenCreate = urlParams.get('create') === 'true'
 
   useEffect(() => {
     loadOrganizations()
   }, [])
+  
+  // Auto-open create modal if ?create=true is in URL (after org is loaded)
+  useEffect(() => {
+    if (shouldOpenCreate && selectedOrg && !showCreateModal) {
+      setShowCreateModal(true)
+      // Clear the create param from URL to prevent re-opening on refresh
+      const newUrl = window.location.hash.replace('&create=true', '').replace('?create=true', '')
+      window.history.replaceState(null, '', newUrl || '#/portal/galleries')
+    }
+  }, [selectedOrg, shouldOpenCreate])
 
   useEffect(() => {
     if (selectedOrg) {
@@ -82,7 +97,16 @@ export default function GalleryAdmin() {
       if (error) throw error
       setOrganizations(data || [])
       
-      // Auto-select first org if only one
+      // Auto-select org from URL param if provided
+      if (orgIdFromUrl && data) {
+        const orgFromUrl = data.find(o => o.id === orgIdFromUrl)
+        if (orgFromUrl) {
+          setSelectedOrg(orgFromUrl)
+          return
+        }
+      }
+      
+      // Otherwise auto-select first org if only one
       if (data && data.length === 1) {
         setSelectedOrg(data[0])
       }
@@ -136,7 +160,22 @@ export default function GalleryAdmin() {
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-white">Photo Galleries</h1>
+        <div className="flex items-center gap-4">
+          {/* Back button - goes to Content Admin with org context */}
+          {orgIdFromUrl && (
+            <a 
+              href={`/#/portal/content-admin?org=${orgIdFromUrl}`}
+              className="text-gray-400 hover:text-white transition-colors"
+              title="Back to Content Admin"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </a>
+          )}
+          <h1 className="text-2xl font-bold text-white">Photo Galleries</h1>
+          {selectedOrg && (
+            <span className="text-gray-400 text-lg">— {selectedOrg.display_name || selectedOrg.name}</span>
+          )}
+        </div>
         {selectedOrg && (
           <button
             onClick={() => setShowCreateModal(true)}
@@ -726,7 +765,7 @@ function GalleryEditor({ gallery, organization, onBack }) {
       {/* Gallery Settings */}
       <div className="mt-8 bg-dark-800 rounded-xl p-6">
         <h2 className="text-lg font-semibold text-white mb-4">Gallery Settings</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-6">
           <div>
             <span className="text-gray-400">Price per Photo:</span>
             <span className="text-white ml-2">${(currentGallery.price_per_photo / 100).toFixed(2)}</span>
@@ -746,7 +785,222 @@ function GalleryEditor({ gallery, organization, onBack }) {
             <span className="text-white ml-2">/gallery/{currentGallery.slug}</span>
           </div>
         </div>
+        
+        {/* Tiered Pricing Section */}
+        <PricingTiersEditor 
+          gallery={currentGallery} 
+          onUpdate={(updates) => {
+            updateGallery(updates)
+            setCurrentGallery({ ...currentGallery, ...updates })
+          }} 
+        />
       </div>
+    </div>
+  )
+}
+
+// Tiered Pricing Editor Component
+function PricingTiersEditor({ gallery, onUpdate }) {
+  const [tiers, setTiers] = useState(gallery.pricing_tiers || [])
+  const [enabled, setEnabled] = useState(gallery.tiered_pricing_enabled || false)
+  const [saving, setSaving] = useState(false)
+  const [edited, setEdited] = useState(false)
+
+  const addTier = () => {
+    const lastTier = tiers[tiers.length - 1]
+    const newMin = lastTier ? (lastTier.max_qty || lastTier.min_qty) + 1 : 1
+    setTiers([...tiers, { 
+      min_qty: newMin, 
+      max_qty: newMin + 9, 
+      price_per_photo: gallery.price_per_photo 
+    }])
+    setEdited(true)
+  }
+
+  const updateTier = (index, field, value) => {
+    const newTiers = [...tiers]
+    newTiers[index] = { ...newTiers[index], [field]: value }
+    setTiers(newTiers)
+    setEdited(true)
+  }
+
+  const removeTier = (index) => {
+    setTiers(tiers.filter((_, i) => i !== index))
+    setEdited(true)
+  }
+
+  const saveTiers = async () => {
+    setSaving(true)
+    try {
+      // Format tiers: convert max_qty empty to null (unlimited)
+      const formattedTiers = tiers.map(t => ({
+        min_qty: parseInt(t.min_qty) || 1,
+        max_qty: t.max_qty ? parseInt(t.max_qty) : null,
+        price_per_photo: parseInt(t.price_per_photo) || gallery.price_per_photo
+      }))
+      
+      await onUpdate({ 
+        pricing_tiers: formattedTiers, 
+        tiered_pricing_enabled: enabled 
+      })
+      setEdited(false)
+    } catch (err) {
+      console.error('Save tiers error:', err)
+      alert('Failed to save pricing tiers')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const toggleEnabled = () => {
+    setEnabled(!enabled)
+    setEdited(true)
+  }
+
+  // Calculate example pricing for preview
+  const calculateExample = (qty) => {
+    if (!enabled || tiers.length === 0) {
+      return qty * gallery.price_per_photo
+    }
+    
+    let remaining = qty
+    let total = 0
+    const sortedTiers = [...tiers].sort((a, b) => a.min_qty - b.min_qty)
+    
+    for (const tier of sortedTiers) {
+      if (remaining <= 0) break
+      const tierMax = tier.max_qty || Infinity
+      const tierCapacity = tierMax === Infinity ? remaining : (tierMax - tier.min_qty + 1)
+      const qtyInTier = Math.min(remaining, tierCapacity)
+      total += qtyInTier * tier.price_per_photo
+      remaining -= qtyInTier
+    }
+    
+    if (remaining > 0) total += remaining * gallery.price_per_photo
+    return total
+  }
+
+  return (
+    <div className="border-t border-dark-600 pt-4 mt-4">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-md font-semibold text-white flex items-center gap-2">
+          📊 Volume Discount Tiers
+        </h3>
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={toggleEnabled}
+            className="w-4 h-4 rounded"
+          />
+          <span className={enabled ? 'text-green-400' : 'text-gray-400'}>
+            {enabled ? 'Enabled' : 'Disabled'}
+          </span>
+        </label>
+      </div>
+      
+      <p className="text-gray-400 text-sm mb-4">
+        Set volume discounts that automatically apply when customers buy more photos.
+        Pricing is incremental (first 10 at tier 1 price, next 10 at tier 2, etc.)
+      </p>
+
+      {enabled && (
+        <>
+          {/* Tier List */}
+          <div className="space-y-3 mb-4">
+            {tiers.map((tier, idx) => (
+              <div key={idx} className="flex items-center gap-3 bg-dark-700 p-3 rounded-lg">
+                <div className="flex-1 grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">From Qty</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={tier.min_qty}
+                      onChange={(e) => updateTier(idx, 'min_qty', e.target.value)}
+                      className="w-full bg-dark-600 text-white rounded px-3 py-2 text-sm border border-dark-500 focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">To Qty (blank=∞)</label>
+                    <input
+                      type="number"
+                      min={tier.min_qty}
+                      value={tier.max_qty || ''}
+                      placeholder="∞"
+                      onChange={(e) => updateTier(idx, 'max_qty', e.target.value || null)}
+                      className="w-full bg-dark-600 text-white rounded px-3 py-2 text-sm border border-dark-500 focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Price per Photo</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-gray-400">$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={(tier.price_per_photo / 100).toFixed(2)}
+                        onChange={(e) => updateTier(idx, 'price_per_photo', Math.round(parseFloat(e.target.value || 0) * 100))}
+                        className="w-full bg-dark-600 text-white rounded pl-7 pr-3 py-2 text-sm border border-dark-500 focus:border-red-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => removeTier(idx)}
+                  className="text-red-400 hover:text-red-300 p-2"
+                  title="Remove tier"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <button
+            onClick={addTier}
+            className="text-red-400 hover:text-red-300 text-sm flex items-center gap-1 mb-4"
+          >
+            <Plus className="w-4 h-4" /> Add Tier
+          </button>
+
+          {/* Pricing Preview */}
+          {tiers.length > 0 && (
+            <div className="bg-dark-700 rounded-lg p-4 mb-4">
+              <h4 className="text-sm font-medium text-white mb-2">Preview Calculator</h4>
+              <div className="grid grid-cols-4 gap-4 text-sm">
+                {[5, 10, 15, 25].map(qty => {
+                  const tieredTotal = calculateExample(qty)
+                  const flatTotal = qty * gallery.price_per_photo
+                  const savings = flatTotal - tieredTotal
+                  return (
+                    <div key={qty} className="text-center">
+                      <div className="text-gray-400">{qty} photos</div>
+                      <div className="text-white font-medium">${(tieredTotal / 100).toFixed(2)}</div>
+                      {savings > 0 && (
+                        <div className="text-green-400 text-xs">Save ${(savings / 100).toFixed(2)}</div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Save Button */}
+      {edited && (
+        <button
+          onClick={saveTiers}
+          disabled={saving}
+          className="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+        >
+          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+          Save Pricing
+        </button>
+      )}
     </div>
   )
 }

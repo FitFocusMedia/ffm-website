@@ -31,6 +31,10 @@ export default function ContentAdmin() {
   const [allPackages, setAllPackages] = useState([])
   const [selectedImportPackages, setSelectedImportPackages] = useState([])
 
+  // Get URL params for org pre-selection (when coming back from galleries page)
+  const urlParams = new URLSearchParams(window.location.hash.split('?')[1] || '')
+  const orgIdFromUrl = urlParams.get('org')
+
   useEffect(() => {
     loadOrganizations()
   }, [])
@@ -45,6 +49,19 @@ export default function ContentAdmin() {
     setLoading(true)
     const { data } = await supabase.from('organizations').select('*').order('name')
     setOrganizations(data || [])
+    
+    // Auto-select org from URL param if provided
+    if (orgIdFromUrl && data) {
+      const orgFromUrl = data.find(o => o.id === orgIdFromUrl)
+      if (orgFromUrl) {
+        setSelectedOrg(orgFromUrl)
+        // Also set galleries tab if coming from gallery management
+        if (window.location.hash.includes('galleries')) {
+          setOrgTab('galleries')
+        }
+      }
+    }
+    
     setLoading(false)
   }
 
@@ -784,12 +801,22 @@ export default function ContentAdmin() {
         <div>
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold">Photo Galleries</h2>
-            <a 
-              href={`/#/portal/galleries?org=${selectedOrg.id}`}
-              className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm"
-            >
-              + Manage Galleries
-            </a>
+            <div className="flex gap-2">
+              <a 
+                href={`/#/portal/galleries?org=${selectedOrg.id}&create=true`}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm"
+              >
+                + New Gallery
+              </a>
+              {galleries.length > 0 && (
+                <a 
+                  href={`/#/portal/galleries?org=${selectedOrg.id}`}
+                  className="px-4 py-2 bg-dark-600 hover:bg-dark-500 rounded-lg text-sm"
+                >
+                  Manage All
+                </a>
+              )}
+            </div>
           </div>
           
           {galleries.length === 0 ? (
