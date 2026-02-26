@@ -1,29 +1,25 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useDropzone } from 'react-dropzone'
+import { Plus, Trash2, ArrowLeft, Loader2, Check, ExternalLink, Upload, Image, Building2, Calendar } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
-import { Plus, Trash2, Eye, Upload, Image, ArrowLeft, Loader2, Check, ExternalLink } from 'lucide-react'
 
 // Apply watermark using canvas (client-side)
 async function applyWatermark(file) {
   return new Promise((resolve) => {
-    const img = new Image()
+    const img = new window.Image()
     img.onload = () => {
       const canvas = document.createElement('canvas')
       canvas.width = img.width
       canvas.height = img.height
       const ctx = canvas.getContext('2d')
       
-      // Draw original image
       ctx.drawImage(img, 0, 0)
       
-      // Apply watermark pattern
       const text = 'FIT FOCUS MEDIA'
       const fontSize = Math.max(Math.floor(img.width / 20), 24)
       ctx.font = `bold ${fontSize}px Arial`
       ctx.fillStyle = 'rgba(255, 255, 255, 0.3)'
       ctx.textAlign = 'center'
       
-      // Rotate and tile watermark
       ctx.save()
       ctx.translate(img.width / 2, img.height / 2)
       ctx.rotate(-30 * Math.PI / 180)
@@ -36,19 +32,15 @@ async function applyWatermark(file) {
       }
       ctx.restore()
       
-      // Convert to blob
-      canvas.toBlob((blob) => {
-        resolve(blob)
-      }, 'image/jpeg', 0.85)
+      canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.85)
     }
     img.src = URL.createObjectURL(file)
   })
 }
 
-// Create thumbnail
 async function createThumbnail(file, maxWidth = 400) {
   return new Promise((resolve) => {
-    const img = new Image()
+    const img = new window.Image()
     img.onload = () => {
       const ratio = maxWidth / img.width
       const canvas = document.createElement('canvas')
@@ -56,54 +48,88 @@ async function createThumbnail(file, maxWidth = 400) {
       canvas.height = img.height * ratio
       const ctx = canvas.getContext('2d')
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-      
-      canvas.toBlob((blob) => {
-        resolve(blob)
-      }, 'image/jpeg', 0.8)
+      canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.8)
     }
     img.src = URL.createObjectURL(file)
   })
 }
 
 export default function GalleryAdmin() {
+  const [organizations, setOrganizations] = useState([])
+  const [selectedOrg, setSelectedOrg] = useState(null)
   const [galleries, setGalleries] = useState([])
   const [selectedGallery, setSelectedGallery] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
 
   useEffect(() => {
-    loadGalleries()
+    loadOrganizations()
   }, [])
 
-  const loadGalleries = async () => {
+  useEffect(() => {
+    if (selectedOrg) {
+      loadGalleries(selectedOrg.id)
+    }
+  }, [selectedOrg])
+
+  const loadOrganizations = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('organizations')
+        .select('*')
+        .order('name')
+      
+      if (error) throw error
+      setOrganizations(data || [])
+      
+      // Auto-select first org if only one
+      if (data && data.length === 1) {
+        setSelectedOrg(data[0])
+      }
+    } catch (err) {
+      console.error('Load organizations error:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadGalleries = async (orgId) => {
     try {
       const { data, error } = await supabase
         .from('galleries')
         .select(`
           *,
           gallery_photos(count),
-          livestream_events(title)
+          livestream_events(id, title)
         `)
+        .eq('organization_id', orgId)
         .order('created_at', { ascending: false })
 
       if (error) throw error
       setGalleries(data || [])
     } catch (err) {
       console.error('Load galleries error:', err)
-    } finally {
-      setLoading(false)
     }
   }
 
   if (selectedGallery) {
     return (
       <GalleryEditor
-        galleryId={selectedGallery.id}
+        gallery={selectedGallery}
+        organization={selectedOrg}
         onBack={() => {
           setSelectedGallery(null)
-          loadGalleries()
+          if (selectedOrg) loadGalleries(selectedOrg.id)
         }}
       />
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="p-8 text-center">
+        <Loader2 className="w-8 h-8 text-red-500 animate-spin mx-auto" />
+      </div>
     )
   }
 
@@ -111,22 +137,47 @@ export default function GalleryAdmin() {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-white">Photo Galleries</h1>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          New Gallery
-        </button>
+        {selectedOrg && (
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            New Gallery
+          </button>
+        )}
       </div>
 
-      {loading ? (
-        <div className="text-center py-12">
-          <Loader2 className="w-8 h-8 text-red-500 animate-spin mx-auto" />
+      {/* Organization Selector */}
+      <div className="mb-6">
+        <label className="block text-gray-400 mb-2">Organization</label>
+        <select
+          value={selectedOrg?.id || ''}
+          onChange={(e) => {
+            const org = organizations.find(o => o.id === e.target.value)
+            setSelectedOrg(org || null)
+            setGalleries([])
+          }}
+          className="w-full md:w-64 bg-dark-700 text-white rounded-lg px-4 py-3 border border-dark-600 focus:border-red-500 focus:outline-none"
+        >
+          <option value="">Select Organization...</option>
+          {organizations.map(org => (
+            <option key={org.id} value={org.id}>
+              {org.display_name || org.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {!selectedOrg ? (
+        <div className="text-center py-12 text-gray-400">
+          <Building2 className="w-12 h-12 mx-auto mb-4 opacity-50" />
+          Select an organization to manage galleries
         </div>
       ) : galleries.length === 0 ? (
         <div className="text-center py-12 text-gray-400">
-          No galleries yet. Create your first gallery!
+          <Image className="w-12 h-12 mx-auto mb-4 opacity-50" />
+          No galleries yet for {selectedOrg.display_name || selectedOrg.name}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -140,8 +191,9 @@ export default function GalleryAdmin() {
         </div>
       )}
 
-      {showCreateModal && (
+      {showCreateModal && selectedOrg && (
         <CreateGalleryModal
+          organization={selectedOrg}
           onClose={() => setShowCreateModal(false)}
           onCreate={(gallery) => {
             setGalleries([gallery, ...galleries])
@@ -179,7 +231,8 @@ function GalleryCard({ gallery, onClick }) {
         </div>
         <h3 className="text-white font-semibold">{gallery.title}</h3>
         {gallery.livestream_events && (
-          <p className="text-gray-400 text-sm mt-1">
+          <p className="text-gray-400 text-sm mt-1 flex items-center gap-1">
+            <Calendar className="w-3 h-3" />
             {gallery.livestream_events.title}
           </p>
         )}
@@ -191,22 +244,45 @@ function GalleryCard({ gallery, onClick }) {
   )
 }
 
-function CreateGalleryModal({ onClose, onCreate }) {
+function CreateGalleryModal({ organization, onClose, onCreate }) {
+  const [events, setEvents] = useState([])
+  const [loadingEvents, setLoadingEvents] = useState(true)
   const [formData, setFormData] = useState({
     title: '',
     description: '',
+    event_id: '',
     price_per_photo: 5.00,
     package_price: '',
     package_enabled: false
   })
   const [creating, setCreating] = useState(false)
 
+  useEffect(() => {
+    loadEvents()
+  }, [organization.id])
+
+  const loadEvents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('livestream_events')
+        .select('id, title, start_time')
+        .eq('organization_id', organization.id)
+        .order('start_time', { ascending: false })
+      
+      if (error) throw error
+      setEvents(data || [])
+    } catch (err) {
+      console.error('Load events error:', err)
+    } finally {
+      setLoadingEvents(false)
+    }
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setCreating(true)
 
     try {
-      // Generate slug from title
       const slug = formData.title
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
@@ -215,6 +291,8 @@ function CreateGalleryModal({ onClose, onCreate }) {
       const { data, error } = await supabase
         .from('galleries')
         .insert({
+          organization_id: organization.id,
+          event_id: formData.event_id || null,
           title: formData.title,
           description: formData.description,
           slug,
@@ -238,8 +316,10 @@ function CreateGalleryModal({ onClose, onCreate }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-dark-800 rounded-xl p-6 w-full max-w-md">
-        <h2 className="text-xl font-bold text-white mb-4">Create Gallery</h2>
+      <div className="bg-dark-800 rounded-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <h2 className="text-xl font-bold text-white mb-4">
+          Create Gallery for {organization.display_name || organization.name}
+        </h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-gray-400 mb-1">Title *</label>
@@ -248,9 +328,31 @@ function CreateGalleryModal({ onClose, onCreate }) {
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
               className="w-full bg-dark-700 text-white rounded-lg px-4 py-3 border border-dark-600 focus:border-red-500 focus:outline-none"
+              placeholder="e.g. South East Qld Championship Photos"
               required
             />
           </div>
+
+          <div>
+            <label className="block text-gray-400 mb-1">Link to Event (Optional)</label>
+            {loadingEvents ? (
+              <div className="text-gray-500 py-2">Loading events...</div>
+            ) : (
+              <select
+                value={formData.event_id}
+                onChange={(e) => setFormData({ ...formData, event_id: e.target.value })}
+                className="w-full bg-dark-700 text-white rounded-lg px-4 py-3 border border-dark-600 focus:border-red-500 focus:outline-none"
+              >
+                <option value="">No specific event (org-wide gallery)</option>
+                {events.map(event => (
+                  <option key={event.id} value={event.id}>
+                    {event.title} ({new Date(event.start_time).toLocaleDateString()})
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
           <div>
             <label className="block text-gray-400 mb-1">Description</label>
             <textarea
@@ -258,18 +360,22 @@ function CreateGalleryModal({ onClose, onCreate }) {
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               className="w-full bg-dark-700 text-white rounded-lg px-4 py-3 border border-dark-600 focus:border-red-500 focus:outline-none"
               rows={3}
+              placeholder="Optional description for the gallery"
             />
           </div>
+
           <div>
             <label className="block text-gray-400 mb-1">Price per Photo ($)</label>
             <input
               type="number"
               step="0.01"
+              min="0"
               value={formData.price_per_photo}
               onChange={(e) => setFormData({ ...formData, price_per_photo: parseFloat(e.target.value) || 0 })}
               className="w-full bg-dark-700 text-white rounded-lg px-4 py-3 border border-dark-600 focus:border-red-500 focus:outline-none"
             />
           </div>
+
           <div>
             <label className="flex items-center gap-2 text-gray-400 cursor-pointer">
               <input
@@ -278,22 +384,25 @@ function CreateGalleryModal({ onClose, onCreate }) {
                 onChange={(e) => setFormData({ ...formData, package_enabled: e.target.checked })}
                 className="w-4 h-4 rounded"
               />
-              Enable "Buy All" Package
+              Enable "Buy All" Package Deal
             </label>
           </div>
+
           {formData.package_enabled && (
             <div>
               <label className="block text-gray-400 mb-1">Package Price ($)</label>
               <input
                 type="number"
                 step="0.01"
+                min="0"
                 value={formData.package_price}
                 onChange={(e) => setFormData({ ...formData, package_price: e.target.value })}
                 className="w-full bg-dark-700 text-white rounded-lg px-4 py-3 border border-dark-600 focus:border-red-500 focus:outline-none"
-                placeholder="e.g. 49.99"
+                placeholder="e.g. 49.99 for all photos"
               />
             </div>
           )}
+
           <div className="flex gap-3 pt-4">
             <button
               type="button"
@@ -308,7 +417,7 @@ function CreateGalleryModal({ onClose, onCreate }) {
               className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white py-3 rounded-lg flex items-center justify-center gap-2"
             >
               {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              Create
+              Create Gallery
             </button>
           </div>
         </form>
@@ -317,116 +426,87 @@ function CreateGalleryModal({ onClose, onCreate }) {
   )
 }
 
-function GalleryEditor({ galleryId, onBack }) {
-  const [gallery, setGallery] = useState(null)
+function GalleryEditor({ gallery, organization, onBack }) {
+  const [currentGallery, setCurrentGallery] = useState(gallery)
   const [photos, setPhotos] = useState([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 })
+  const [dragActive, setDragActive] = useState(false)
 
   useEffect(() => {
-    loadGallery()
-  }, [galleryId])
+    loadPhotos()
+  }, [gallery.id])
 
-  const loadGallery = async () => {
+  const loadPhotos = async () => {
     try {
-      // Get gallery
-      const { data: galleryData, error: galleryError } = await supabase
-        .from('galleries')
-        .select('*, livestream_events(id, title)')
-        .eq('id', galleryId)
-        .single()
-
-      if (galleryError) throw galleryError
-      setGallery(galleryData)
-
-      // Get photos
-      const { data: photosData, error: photosError } = await supabase
+      const { data, error } = await supabase
         .from('gallery_photos')
         .select('*')
-        .eq('gallery_id', galleryId)
+        .eq('gallery_id', gallery.id)
         .order('sort_order', { ascending: true })
 
-      if (photosError) throw photosError
+      if (error) throw error
 
-      // Get signed URLs for photos
-      const photosWithUrls = await Promise.all(photosData.map(async (photo) => {
+      // Get signed URLs for thumbnails
+      const photosWithUrls = await Promise.all((data || []).map(async (photo) => {
         const { data: thumbUrl } = await supabase.storage
           .from('galleries')
           .createSignedUrl(photo.thumbnail_path || photo.watermarked_path, 3600)
-        return {
-          ...photo,
-          thumbnail_url: thumbUrl?.signedUrl
-        }
+        return { ...photo, thumbnail_url: thumbUrl?.signedUrl }
       }))
 
       setPhotos(photosWithUrls)
     } catch (err) {
-      console.error('Load gallery error:', err)
+      console.error('Load photos error:', err)
     } finally {
       setLoading(false)
     }
   }
 
-  const onDrop = useCallback(async (acceptedFiles) => {
-    if (acceptedFiles.length === 0) return
+  const handleFiles = async (files) => {
+    const imageFiles = Array.from(files).filter(f => 
+      f.type.startsWith('image/') && f.size <= 50 * 1024 * 1024
+    )
+    
+    if (imageFiles.length === 0) return
 
     setUploading(true)
-    setUploadProgress({ current: 0, total: acceptedFiles.length })
+    setUploadProgress({ current: 0, total: imageFiles.length })
 
     const uploadedPhotos = []
     let sortOrder = photos.length
 
-    for (let i = 0; i < acceptedFiles.length; i++) {
-      const file = acceptedFiles[i]
-      setUploadProgress({ current: i + 1, total: acceptedFiles.length })
+    for (let i = 0; i < imageFiles.length; i++) {
+      const file = imageFiles[i]
+      setUploadProgress({ current: i + 1, total: imageFiles.length })
 
       try {
         const photoId = crypto.randomUUID()
         const ext = file.name.split('.').pop() || 'jpg'
 
-        // Create watermarked version (client-side)
         const watermarkedBlob = await applyWatermark(file)
-        
-        // Create thumbnail
         const thumbnailBlob = await createThumbnail(file)
 
-        // Paths in storage
-        const originalPath = `${galleryId}/originals/${photoId}.${ext}`
-        const watermarkedPath = `${galleryId}/watermarked/${photoId}_wm.jpg`
-        const thumbnailPath = `${galleryId}/thumbnails/${photoId}_thumb.jpg`
+        const originalPath = `${gallery.id}/originals/${photoId}.${ext}`
+        const watermarkedPath = `${gallery.id}/watermarked/${photoId}_wm.jpg`
+        const thumbnailPath = `${gallery.id}/thumbnails/${photoId}_thumb.jpg`
 
-        // Upload original
-        const { error: origError } = await supabase.storage
-          .from('galleries')
-          .upload(originalPath, file, { contentType: file.type })
-        if (origError) throw origError
+        await supabase.storage.from('galleries').upload(originalPath, file, { contentType: file.type })
+        await supabase.storage.from('galleries').upload(watermarkedPath, watermarkedBlob, { contentType: 'image/jpeg' })
+        await supabase.storage.from('galleries').upload(thumbnailPath, thumbnailBlob, { contentType: 'image/jpeg' })
 
-        // Upload watermarked
-        const { error: wmError } = await supabase.storage
-          .from('galleries')
-          .upload(watermarkedPath, watermarkedBlob, { contentType: 'image/jpeg' })
-        if (wmError) throw wmError
-
-        // Upload thumbnail
-        const { error: thumbError } = await supabase.storage
-          .from('galleries')
-          .upload(thumbnailPath, thumbnailBlob, { contentType: 'image/jpeg' })
-        if (thumbError) throw thumbError
-
-        // Get image dimensions
         const img = await new Promise((resolve) => {
-          const img = new Image()
+          const img = new window.Image()
           img.onload = () => resolve(img)
           img.src = URL.createObjectURL(file)
         })
 
-        // Save to database
         const { data: photo, error: dbError } = await supabase
           .from('gallery_photos')
           .insert({
             id: photoId,
-            gallery_id: galleryId,
+            gallery_id: gallery.id,
             original_path: originalPath,
             watermarked_path: watermarkedPath,
             thumbnail_path: thumbnailPath,
@@ -441,17 +521,11 @@ function GalleryEditor({ galleryId, onBack }) {
 
         if (dbError) throw dbError
 
-        // Get signed URL for display
         const { data: thumbUrl } = await supabase.storage
           .from('galleries')
           .createSignedUrl(thumbnailPath, 3600)
 
-        uploadedPhotos.push({
-          ...photo,
-          thumbnail_url: thumbUrl?.signedUrl
-        })
-
-        console.log(`Uploaded: ${file.name}`)
+        uploadedPhotos.push({ ...photo, thumbnail_url: thumbUrl?.signedUrl })
       } catch (err) {
         console.error(`Failed to upload ${file.name}:`, err)
       }
@@ -460,18 +534,7 @@ function GalleryEditor({ galleryId, onBack }) {
     setPhotos([...photos, ...uploadedPhotos])
     setUploading(false)
     setUploadProgress({ current: 0, total: 0 })
-  }, [galleryId, photos])
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: {
-      'image/jpeg': ['.jpg', '.jpeg'],
-      'image/png': ['.png'],
-      'image/webp': ['.webp']
-    },
-    maxSize: 50 * 1024 * 1024,
-    disabled: uploading
-  })
+  }
 
   const deletePhoto = async (photoId) => {
     if (!confirm('Delete this photo?')) return
@@ -480,11 +543,8 @@ function GalleryEditor({ galleryId, onBack }) {
       const photo = photos.find(p => p.id === photoId)
       if (!photo) return
 
-      // Delete from storage
       const paths = [photo.original_path, photo.watermarked_path, photo.thumbnail_path].filter(Boolean)
       await supabase.storage.from('galleries').remove(paths)
-
-      // Delete from database
       await supabase.from('gallery_photos').delete().eq('id', photoId)
 
       setPhotos(photos.filter(p => p.id !== photoId))
@@ -498,12 +558,12 @@ function GalleryEditor({ galleryId, onBack }) {
       const { data, error } = await supabase
         .from('galleries')
         .update(updates)
-        .eq('id', galleryId)
+        .eq('id', gallery.id)
         .select()
         .single()
 
       if (error) throw error
-      setGallery(data)
+      setCurrentGallery(data)
     } catch (err) {
       console.error('Update gallery error:', err)
     }
@@ -511,6 +571,23 @@ function GalleryEditor({ galleryId, onBack }) {
 
   const publishGallery = () => updateGallery({ status: 'published', published_at: new Date().toISOString() })
   const unpublishGallery = () => updateGallery({ status: 'draft' })
+
+  const handleDrop = (e) => {
+    e.preventDefault()
+    setDragActive(false)
+    if (e.dataTransfer.files) {
+      handleFiles(e.dataTransfer.files)
+    }
+  }
+
+  const handleDragOver = (e) => {
+    e.preventDefault()
+    setDragActive(true)
+  }
+
+  const handleDragLeave = () => {
+    setDragActive(false)
+  }
 
   if (loading) {
     return (
@@ -520,27 +597,26 @@ function GalleryEditor({ galleryId, onBack }) {
     )
   }
 
-  if (!gallery) {
-    return <div className="p-8 text-center text-gray-400">Gallery not found</div>
-  }
-
   return (
     <div className="p-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
         <div className="flex items-center gap-4">
           <button onClick={onBack} className="text-gray-400 hover:text-white">
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h1 className="text-2xl font-bold text-white">{gallery.title}</h1>
+          <div>
+            <h1 className="text-2xl font-bold text-white">{currentGallery.title}</h1>
+            <p className="text-gray-400 text-sm">{organization.display_name || organization.name}</p>
+          </div>
           <span className={`px-2 py-1 rounded text-sm ${
-            gallery.status === 'published' ? 'bg-green-600' : 'bg-yellow-600'
+            currentGallery.status === 'published' ? 'bg-green-600' : 'bg-yellow-600'
           } text-white`}>
-            {gallery.status}
+            {currentGallery.status}
           </span>
         </div>
         <div className="flex gap-3">
-          {gallery.status === 'draft' ? (
+          {currentGallery.status === 'draft' ? (
             <button
               onClick={publishGallery}
               disabled={photos.length === 0}
@@ -558,8 +634,9 @@ function GalleryEditor({ galleryId, onBack }) {
                 Unpublish
               </button>
               <a
-                href={`/#/gallery/${gallery.slug}`}
+                href={`/#/gallery/${currentGallery.slug}`}
                 target="_blank"
+                rel="noopener noreferrer"
                 className="bg-dark-600 hover:bg-dark-500 text-white px-4 py-2 rounded-lg flex items-center gap-2"
               >
                 <ExternalLink className="w-4 h-4" />
@@ -572,12 +649,22 @@ function GalleryEditor({ galleryId, onBack }) {
 
       {/* Upload Area */}
       <div
-        {...getRootProps()}
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
         className={`border-2 border-dashed rounded-xl p-8 mb-6 text-center cursor-pointer transition-colors ${
-          isDragActive ? 'border-red-500 bg-red-500/10' : 'border-dark-600 hover:border-dark-500'
+          dragActive ? 'border-red-500 bg-red-500/10' : 'border-dark-600 hover:border-dark-500'
         } ${uploading ? 'opacity-50 pointer-events-none' : ''}`}
+        onClick={() => !uploading && document.getElementById('photo-upload')?.click()}
       >
-        <input {...getInputProps()} />
+        <input
+          id="photo-upload"
+          type="file"
+          multiple
+          accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          onChange={(e) => e.target.files && handleFiles(e.target.files)}
+        />
         {uploading ? (
           <div>
             <Loader2 className="w-8 h-8 text-red-500 animate-spin mx-auto mb-2" />
@@ -591,7 +678,7 @@ function GalleryEditor({ galleryId, onBack }) {
               />
             </div>
           </div>
-        ) : isDragActive ? (
+        ) : dragActive ? (
           <div className="text-red-400">
             <Upload className="w-8 h-8 mx-auto mb-2" />
             Drop photos here...
@@ -608,6 +695,7 @@ function GalleryEditor({ galleryId, onBack }) {
       {/* Photo Grid */}
       {photos.length === 0 ? (
         <div className="text-center py-12 text-gray-400">
+          <Image className="w-12 h-12 mx-auto mb-4 opacity-50" />
           No photos yet. Upload some photos to get started!
         </div>
       ) : (
@@ -641,12 +729,12 @@ function GalleryEditor({ galleryId, onBack }) {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
           <div>
             <span className="text-gray-400">Price per Photo:</span>
-            <span className="text-white ml-2">${(gallery.price_per_photo / 100).toFixed(2)}</span>
+            <span className="text-white ml-2">${(currentGallery.price_per_photo / 100).toFixed(2)}</span>
           </div>
-          {gallery.package_enabled && gallery.package_price && (
+          {currentGallery.package_enabled && currentGallery.package_price && (
             <div>
               <span className="text-gray-400">Package Price:</span>
-              <span className="text-white ml-2">${(gallery.package_price / 100).toFixed(2)}</span>
+              <span className="text-white ml-2">${(currentGallery.package_price / 100).toFixed(2)}</span>
             </div>
           )}
           <div>
@@ -655,7 +743,7 @@ function GalleryEditor({ galleryId, onBack }) {
           </div>
           <div>
             <span className="text-gray-400">Public URL:</span>
-            <span className="text-white ml-2">/gallery/{gallery.slug}</span>
+            <span className="text-white ml-2">/gallery/{currentGallery.slug}</span>
           </div>
         </div>
       </div>
