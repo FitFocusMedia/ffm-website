@@ -987,15 +987,15 @@ function PricingTiersEditor({ gallery, onUpdate }) {
           {/* Tier List */}
           <div className="space-y-3 mb-4">
             {tiers.map((tier, idx) => (
-              <div key={idx} className="flex items-center gap-3 bg-dark-700 p-3 rounded-lg">
+              <div key={`tier-${idx}-${tier.min_qty}`} className="flex items-center gap-3 bg-dark-700 p-3 rounded-lg">
                 <div className="flex-1 grid grid-cols-3 gap-3">
                   <div>
                     <label className="text-xs text-gray-500 block mb-1">From Qty</label>
                     <input
                       type="number"
                       min="1"
-                      value={tier.min_qty}
-                      onChange={(e) => updateTier(idx, 'min_qty', e.target.value)}
+                      defaultValue={tier.min_qty}
+                      onBlur={(e) => updateTier(idx, 'min_qty', parseInt(e.target.value) || 1)}
                       className="w-full bg-dark-600 text-white rounded px-3 py-2 text-sm border border-dark-500 focus:border-red-500 focus:outline-none"
                     />
                   </div>
@@ -1003,10 +1003,10 @@ function PricingTiersEditor({ gallery, onUpdate }) {
                     <label className="text-xs text-gray-500 block mb-1">To Qty (blank=∞)</label>
                     <input
                       type="number"
-                      min={tier.min_qty}
-                      value={tier.max_qty || ''}
+                      min="1"
+                      defaultValue={tier.max_qty || ''}
                       placeholder="∞"
-                      onChange={(e) => updateTier(idx, 'max_qty', e.target.value || null)}
+                      onBlur={(e) => updateTier(idx, 'max_qty', e.target.value ? parseInt(e.target.value) : null)}
                       className="w-full bg-dark-600 text-white rounded px-3 py-2 text-sm border border-dark-500 focus:border-red-500 focus:outline-none"
                     />
                   </div>
@@ -1018,8 +1018,8 @@ function PricingTiersEditor({ gallery, onUpdate }) {
                         type="number"
                         step="0.01"
                         min="0"
-                        value={(tier.price_per_photo / 100).toFixed(2)}
-                        onChange={(e) => updateTier(idx, 'price_per_photo', Math.round(parseFloat(e.target.value || 0) * 100))}
+                        defaultValue={(tier.price_per_photo / 100).toFixed(2)}
+                        onBlur={(e) => updateTier(idx, 'price_per_photo', Math.round(parseFloat(e.target.value || 0) * 100))}
                         className="w-full bg-dark-600 text-white rounded pl-7 pr-3 py-2 text-sm border border-dark-500 focus:border-red-500 focus:outline-none"
                       />
                     </div>
