@@ -126,7 +126,7 @@ function App() {
 
         {/* Public Gallery Routes - NO Navbar/Footer */}
         <Route path="/gallery/:slug" element={<PublicGallery />} />
-        <Route path="/gallery/download" element={<DownloadPage />} />
+        <Route path="/gallery/download/:token" element={<DownloadPage />} />
 
         {/* Portal Login - NO AUTH REQUIRED, NO Navbar/Footer */}
         <Route path="/portal" element={<PortalLayout><LoginPage /></PortalLayout>} />
