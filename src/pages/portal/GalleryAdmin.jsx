@@ -798,24 +798,63 @@ function GalleryEditor({ gallery, organization, onBack }) {
       {/* Gallery Settings */}
       <div className="mt-8 bg-dark-800 rounded-xl p-6">
         <h2 className="text-lg font-semibold text-white mb-4">Gallery Settings</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-6">
+        
+        {/* Editable Pricing Fields */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <div>
-            <span className="text-gray-400">Price per Photo:</span>
-            <span className="text-white ml-2">${(currentGallery.price_per_photo / 100).toFixed(2)}</span>
+            <label className="block text-gray-400 text-sm mb-1">Price per Photo ($)</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={(currentGallery.price_per_photo / 100).toFixed(2)}
+              onChange={(e) => {
+                const cents = Math.round(parseFloat(e.target.value || 0) * 100)
+                updateGallery({ price_per_photo: cents })
+                setCurrentGallery({ ...currentGallery, price_per_photo: cents })
+              }}
+              className="w-full bg-dark-700 text-white rounded-lg px-3 py-2 border border-dark-600 focus:border-red-500 focus:outline-none"
+            />
           </div>
-          {currentGallery.package_enabled && currentGallery.package_price && (
-            <div>
-              <span className="text-gray-400">Package Price:</span>
-              <span className="text-white ml-2">${(currentGallery.package_price / 100).toFixed(2)}</span>
-            </div>
-          )}
+          
           <div>
-            <span className="text-gray-400">Total Photos:</span>
-            <span className="text-white ml-2">{photos.length}</span>
+            <label className="flex items-center gap-2 text-gray-400 text-sm mb-1 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={currentGallery.package_enabled || false}
+                onChange={(e) => {
+                  updateGallery({ package_enabled: e.target.checked })
+                  setCurrentGallery({ ...currentGallery, package_enabled: e.target.checked })
+                }}
+                className="w-4 h-4 rounded"
+              />
+              Enable "Buy All" Package
+            </label>
+            {currentGallery.package_enabled && (
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="Package price"
+                value={currentGallery.package_price ? (currentGallery.package_price / 100).toFixed(2) : ''}
+                onChange={(e) => {
+                  const cents = Math.round(parseFloat(e.target.value || 0) * 100)
+                  updateGallery({ package_price: cents })
+                  setCurrentGallery({ ...currentGallery, package_price: cents })
+                }}
+                className="w-full bg-dark-700 text-white rounded-lg px-3 py-2 border border-dark-600 focus:border-red-500 focus:outline-none mt-1"
+              />
+            )}
           </div>
+          
           <div>
-            <span className="text-gray-400">Public URL:</span>
-            <span className="text-white ml-2">/gallery/{currentGallery.slug}</span>
+            <label className="block text-gray-400 text-sm mb-1">Total Photos</label>
+            <div className="text-white text-lg font-semibold py-2">{photos.length}</div>
+          </div>
+          
+          <div>
+            <label className="block text-gray-400 text-sm mb-1">Public URL</label>
+            <div className="text-white text-sm py-2 break-all">/gallery/{currentGallery.slug}</div>
           </div>
         </div>
         
