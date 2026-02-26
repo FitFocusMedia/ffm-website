@@ -559,9 +559,9 @@ export default function EventPage() {
                   <div className="w-12 h-12 rounded-xl bg-red-500/10 flex items-center justify-center">
                     <MapPin className="w-6 h-6 text-red-500" />
                   </div>
-                  <div className="min-w-0">
+                  <div className="flex-1 min-w-0">
                     <p className="text-xs text-gray-500 uppercase tracking-wide">Venue</p>
-                    <p className="text-white font-medium truncate">{event.venue}</p>
+                    <p className="text-white font-medium">{event.venue}</p>
                   </div>
                 </div>
               </div>
