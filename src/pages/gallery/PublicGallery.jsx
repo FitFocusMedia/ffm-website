@@ -69,9 +69,22 @@ export default function GalleryPage() {
   const [showCheckout, setShowCheckout] = useState(false)
   const [purchasing, setPurchasing] = useState(false)
   const [lightboxPhoto, setLightboxPhoto] = useState(null)
+  
+  // Tutorial state (mobile only)
+  const [tutorialStep, setTutorialStep] = useState(0) // 0=not started, 1=tap image, 2=swipe, 3=double-tap, 4=done
+  const [tutorialPhotoId, setTutorialPhotoId] = useState(null) // Track which photo was added during tutorial
 
   // Check for cancelled checkout
   const cancelled = searchParams.get('cancelled')
+  
+  // Check if tutorial should show (mobile + first time)
+  useEffect(() => {
+    const isMobile = window.innerWidth < 768
+    const hasSeenTutorial = localStorage.getItem('gallery_tutorial_seen')
+    if (isMobile && !hasSeenTutorial && photos.length > 0) {
+      setTutorialStep(1) // Start tutorial
+    }
+  }, [photos])
 
   useEffect(() => {
     loadGallery()
@@ -311,13 +324,16 @@ export default function GalleryPage() {
 
         {/* Photo Grid */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 md:gap-4 mb-24 md:mb-8">
-          {photos.map(photo => (
+          {photos.map((photo, index) => (
             <div
               key={photo.id}
               className={`relative group cursor-pointer rounded-lg overflow-hidden transition-transform active:scale-98 ${
                 selectedPhotos.has(photo.id) ? 'ring-2 ring-red-500' : ''
-              }`}
-              onClick={() => setLightboxPhoto(photo)}
+              } ${tutorialStep === 1 && index === 0 ? 'ring-2 ring-white animate-pulse z-10' : ''}`}
+              onClick={() => {
+                setLightboxPhoto(photo)
+                if (tutorialStep === 1) setTutorialStep(2)
+              }}
             >
               <img
                 src={photo.thumbnail_url || photo.watermarked_url}
@@ -471,16 +487,64 @@ export default function GalleryPage() {
           />
         )}
 
+        {/* Tutorial Overlay - Step 1: Tap to view */}
+        {tutorialStep === 1 && photos.length > 0 && (
+          <div className="fixed inset-0 bg-black/60 z-30 flex items-start justify-center pt-40 pointer-events-none md:hidden">
+            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 mx-4 text-center animate-bounce-slow">
+              <div className="text-4xl mb-3">👆</div>
+              <p className="text-white text-lg font-semibold">Tap a photo to view</p>
+              <p className="text-white/70 text-sm mt-1">Open the fullscreen gallery</p>
+            </div>
+          </div>
+        )}
+
         {/* Lightbox */}
         {lightboxPhoto && (
           <Lightbox
             photos={photos}
             currentPhoto={lightboxPhoto}
             selectedPhotos={selectedPhotos}
-            onClose={() => setLightboxPhoto(null)}
+            onClose={() => {
+              setLightboxPhoto(null)
+              // If closing during tutorial, reset
+              if (tutorialStep > 0 && tutorialStep < 4) {
+                setTutorialStep(0)
+                // Remove tutorial photo from cart if added
+                if (tutorialPhotoId && selectedPhotos.has(tutorialPhotoId)) {
+                  const newSelected = new Set(selectedPhotos)
+                  newSelected.delete(tutorialPhotoId)
+                  setSelectedPhotos(newSelected)
+                  setTutorialPhotoId(null)
+                }
+              }
+            }}
             onNavigate={setLightboxPhoto}
-            onToggleSelect={togglePhoto}
+            onToggleSelect={(photoId) => {
+              // Track if this is a tutorial add
+              if (tutorialStep === 3 && !selectedPhotos.has(photoId)) {
+                setTutorialPhotoId(photoId)
+              }
+              togglePhoto(photoId)
+            }}
             pricePerPhoto={gallery.price_per_photo}
+            tutorialStep={tutorialStep}
+            onTutorialStep={(step) => {
+              setTutorialStep(step)
+              // Tutorial complete - save to localStorage and cleanup
+              if (step === 4) {
+                localStorage.setItem('gallery_tutorial_seen', 'true')
+                // Remove tutorial photo after a short delay
+                setTimeout(() => {
+                  if (tutorialPhotoId) {
+                    const newSelected = new Set(selectedPhotos)
+                    newSelected.delete(tutorialPhotoId)
+                    setSelectedPhotos(newSelected)
+                    setTutorialPhotoId(null)
+                  }
+                  setTutorialStep(0)
+                }, 1500)
+              }
+            }}
           />
         )}
       </div>
@@ -593,7 +657,7 @@ function CheckoutModal({ gallery, selectedCount, priceCalc, isPackage, packagePr
 }
 
 // TikTok-style fullscreen viewer with vertical swipe and double-tap to cart
-function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, onToggleSelect, pricePerPhoto }) {
+function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, onToggleSelect, pricePerPhoto, tutorialStep = 0, onTutorialStep }) {
   const currentIndex = photos.findIndex(p => p.id === currentPhoto.id)
   const isSelected = selectedPhotos.has(currentPhoto.id)
   const containerRef = useRef(null)
@@ -602,6 +666,7 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
   const [dragY, setDragY] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
   const [touchStartY, setTouchStartY] = useState(0)
+  const [hasSwipedInTutorial, setHasSwipedInTutorial] = useState(false)
   
   // Double-tap detection
   const [lastTap, setLastTap] = useState(0)
@@ -675,8 +740,18 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
     
     if (dragY < -threshold && nextPhoto) {
       goNext()
+      // Tutorial: user swiped, advance to step 3
+      if (tutorialStep === 2 && !hasSwipedInTutorial) {
+        setHasSwipedInTutorial(true)
+        onTutorialStep?.(3)
+      }
     } else if (dragY > threshold && prevPhoto) {
       goPrev()
+      // Tutorial: user swiped, advance to step 3
+      if (tutorialStep === 2 && !hasSwipedInTutorial) {
+        setHasSwipedInTutorial(true)
+        onTutorialStep?.(3)
+      }
     }
     setDragY(0)
   }
@@ -690,7 +765,13 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
       const y = e.clientY || rect.height / 2
       setHeartPosition({ x: x - rect.left, y: y - rect.top })
       setShowHeartAnimation(true)
-      if (!selectedPhotos.has(currentPhoto.id)) onToggleSelect(currentPhoto.id)
+      if (!selectedPhotos.has(currentPhoto.id)) {
+        onToggleSelect(currentPhoto.id)
+        // Tutorial: user double-tapped to add, complete tutorial
+        if (tutorialStep === 3) {
+          onTutorialStep?.(4)
+        }
+      }
       setTimeout(() => setShowHeartAnimation(false), 800)
     }
     setLastTap(now)
@@ -838,10 +919,43 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
         <span>Esc: Close</span>
       </div>
       
-      {/* Mobile hint */}
-      <div className="md:hidden absolute left-4 bottom-28 z-40 text-white/40 text-xs">
-        Double-tap to add
-      </div>
+      {/* Mobile hint - hide during tutorial */}
+      {tutorialStep === 0 && (
+        <div className="md:hidden absolute left-4 bottom-28 z-40 text-white/40 text-xs">
+          Double-tap to add
+        </div>
+      )}
+      
+      {/* Tutorial Overlays */}
+      {tutorialStep === 2 && (
+        <div className="md:hidden absolute inset-x-0 bottom-40 z-50 flex justify-center pointer-events-none">
+          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-5 mx-4 text-center">
+            <div className="text-4xl mb-2">👆👇</div>
+            <p className="text-white text-lg font-semibold">Swipe up or down</p>
+            <p className="text-white/70 text-sm mt-1">Browse through photos</p>
+          </div>
+        </div>
+      )}
+      
+      {tutorialStep === 3 && (
+        <div className="md:hidden absolute inset-0 z-50 flex items-center justify-center pointer-events-none">
+          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 mx-4 text-center">
+            <div className="text-4xl mb-2">👆👆</div>
+            <p className="text-white text-lg font-semibold">Double-tap to add to cart</p>
+            <p className="text-white/70 text-sm mt-1">Try it on this photo!</p>
+          </div>
+        </div>
+      )}
+      
+      {tutorialStep === 4 && (
+        <div className="md:hidden absolute inset-0 z-50 flex items-center justify-center pointer-events-none">
+          <div className="bg-green-500/20 backdrop-blur-md rounded-2xl p-6 mx-4 text-center animate-pulse">
+            <div className="text-4xl mb-2">✅</div>
+            <p className="text-white text-lg font-semibold">You're all set!</p>
+            <p className="text-white/70 text-sm mt-1">Swipe to browse, double-tap to add</p>
+          </div>
+        </div>
+      )}
       
       {/* Heart burst animation styles */}
       <style>{`
@@ -869,6 +983,13 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
         }
         .safe-area-pb {
           padding-bottom: max(12px, env(safe-area-inset-bottom));
+        }
+        @keyframes bounce-slow {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-10px); }
+        }
+        .animate-bounce-slow {
+          animation: bounce-slow 2s ease-in-out infinite;
         }
       `}</style>
     </div>
