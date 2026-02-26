@@ -606,10 +606,21 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
   const [isDragging, setIsDragging] = useState(false)
   const minSwipeDistance = 80
   
+  // Transition animation states
+  const [isTransitioning, setIsTransitioning] = useState(false)
+  const [transitionDirection, setTransitionDirection] = useState(null) // 'up' or 'down'
+  const [enterDirection, setEnterDirection] = useState(null) // For new image entrance
+  
   // Double-tap detection
   const [lastTap, setLastTap] = useState(0)
   const [showHeartAnimation, setShowHeartAnimation] = useState(false)
   const [heartPosition, setHeartPosition] = useState({ x: 0, y: 0 })
+  
+  // Calculate dynamic scale and opacity based on drag
+  const dragProgress = Math.min(Math.abs(dragOffset) / 150, 1) // 0 to 1
+  const dragScale = 1 - (dragProgress * 0.1) // Shrinks to 0.9 at max drag
+  const dragOpacity = 1 - (dragProgress * 0.3) // Fades to 0.7 at max drag
+  const dragRotation = (dragOffset / 300) * 3 // Subtle rotation, max ±3 degrees
   
   // Lock body scroll when lightbox is open
   useEffect(() => {
@@ -633,16 +644,36 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
   }, [])
   
   const goNext = useCallback(() => {
-    if (currentIndex < photos.length - 1) {
-      onNavigate(photos[currentIndex + 1])
+    if (currentIndex < photos.length - 1 && !isTransitioning) {
+      setIsTransitioning(true)
+      setTransitionDirection('up')
+      setTimeout(() => {
+        onNavigate(photos[currentIndex + 1])
+        setEnterDirection('up')
+        setTimeout(() => {
+          setIsTransitioning(false)
+          setTransitionDirection(null)
+          setEnterDirection(null)
+        }, 300)
+      }, 150)
     }
-  }, [currentIndex, photos, onNavigate])
+  }, [currentIndex, photos, onNavigate, isTransitioning])
   
   const goPrev = useCallback(() => {
-    if (currentIndex > 0) {
-      onNavigate(photos[currentIndex - 1])
+    if (currentIndex > 0 && !isTransitioning) {
+      setIsTransitioning(true)
+      setTransitionDirection('down')
+      setTimeout(() => {
+        onNavigate(photos[currentIndex - 1])
+        setEnterDirection('down')
+        setTimeout(() => {
+          setIsTransitioning(false)
+          setTransitionDirection(null)
+          setEnterDirection(null)
+        }, 300)
+      }, 150)
     }
-  }, [currentIndex, photos, onNavigate])
+  }, [currentIndex, photos, onNavigate, isTransitioning])
   
   // Keyboard navigation
   useEffect(() => {
@@ -787,18 +818,30 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
         onClick={handleTap}
-        style={{
-          transform: `translateY(${dragOffset}px)`,
-          transition: isDragging ? 'none' : 'transform 0.3s ease-out',
-          touchAction: 'none' // Prevent browser scroll/zoom gestures
-        }}
+        style={{ touchAction: 'none' }}
       >
-        {/* Image */}
+        {/* Image with enhanced animations */}
         <img
           src={currentPhoto.watermarked_url}
           alt={currentPhoto.filename}
           className="max-w-full max-h-full object-contain select-none"
           draggable={false}
+          style={{
+            transform: `
+              translateY(${isDragging ? dragOffset : 0}px) 
+              scale(${isDragging ? dragScale : (isTransitioning ? 0.95 : 1)}) 
+              rotate(${isDragging ? dragRotation : 0}deg)
+              ${transitionDirection === 'up' ? 'translateY(-100px)' : ''}
+              ${transitionDirection === 'down' ? 'translateY(100px)' : ''}
+              ${enterDirection === 'up' ? 'translateY(0)' : ''}
+              ${enterDirection === 'down' ? 'translateY(0)' : ''}
+            `,
+            opacity: isDragging ? dragOpacity : (transitionDirection ? 0 : 1),
+            transition: isDragging 
+              ? 'none' 
+              : 'transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.25s ease-out',
+            willChange: 'transform, opacity'
+          }}
         />
         
         {/* Heart Animation (Instagram-style) */}
@@ -923,6 +966,30 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
       <div className="md:hidden absolute bottom-20 left-1/2 -translate-x-1/2 text-white/30 text-xs text-center pointer-events-none">
         Double-tap to add to cart
       </div>
+      
+      {/* Swipe direction indicator */}
+      {isDragging && Math.abs(dragOffset) > 30 && (
+        <div className="absolute inset-x-0 flex justify-center pointer-events-none z-30"
+          style={{ 
+            top: dragOffset < 0 ? '20%' : 'auto',
+            bottom: dragOffset > 0 ? '20%' : 'auto'
+          }}>
+          <div className="flex flex-col items-center gap-2 text-white/60">
+            {dragOffset < 0 && currentIndex < photos.length - 1 && (
+              <>
+                <ChevronUp className="w-8 h-8 animate-bounce" />
+                <span className="text-sm font-medium">Next Photo</span>
+              </>
+            )}
+            {dragOffset > 0 && currentIndex > 0 && (
+              <>
+                <span className="text-sm font-medium">Previous Photo</span>
+                <ChevronDown className="w-8 h-8 animate-bounce" />
+              </>
+            )}
+          </div>
+        </div>
+      )}
       
       {/* Heart burst animation styles */}
       <style>{`
