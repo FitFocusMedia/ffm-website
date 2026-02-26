@@ -660,7 +660,8 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
   const [dragY, setDragY] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
   const [touchStartY, setTouchStartY] = useState(0)
-  const [hasSwipedInTutorial, setHasSwipedInTutorial] = useState(false)
+  const [hasSwipedUp, setHasSwipedUp] = useState(false)
+  const [hasSwipedDown, setHasSwipedDown] = useState(false)
   
   // Double-tap detection
   const [lastTap, setLastTap] = useState(0)
@@ -734,17 +735,19 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
     
     if (dragY < -threshold && nextPhoto) {
       goNext()
-      // Tutorial: user swiped, advance to step 3
-      if (tutorialStep === 2 && !hasSwipedInTutorial) {
-        setHasSwipedInTutorial(true)
-        onTutorialStep?.(3)
+      // Tutorial: track swipe up (to next)
+      if (tutorialStep === 2 && !hasSwipedUp) {
+        setHasSwipedUp(true)
+        // Advance to step 3 only if both directions have been swiped
+        if (hasSwipedDown) onTutorialStep?.(3)
       }
     } else if (dragY > threshold && prevPhoto) {
       goPrev()
-      // Tutorial: user swiped, advance to step 3
-      if (tutorialStep === 2 && !hasSwipedInTutorial) {
-        setHasSwipedInTutorial(true)
-        onTutorialStep?.(3)
+      // Tutorial: track swipe down (to prev)
+      if (tutorialStep === 2 && !hasSwipedDown) {
+        setHasSwipedDown(true)
+        // Advance to step 3 only if both directions have been swiped
+        if (hasSwipedUp) onTutorialStep?.(3)
       }
     }
     setDragY(0)
