@@ -611,6 +611,27 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
   const [showHeartAnimation, setShowHeartAnimation] = useState(false)
   const [heartPosition, setHeartPosition] = useState({ x: 0, y: 0 })
   
+  // Lock body scroll when lightbox is open
+  useEffect(() => {
+    // Save current scroll position and lock body
+    const scrollY = window.scrollY
+    document.body.style.position = 'fixed'
+    document.body.style.top = `-${scrollY}px`
+    document.body.style.left = '0'
+    document.body.style.right = '0'
+    document.body.style.overflow = 'hidden'
+    
+    return () => {
+      // Restore scroll position when closing
+      document.body.style.position = ''
+      document.body.style.top = ''
+      document.body.style.left = ''
+      document.body.style.right = ''
+      document.body.style.overflow = ''
+      window.scrollTo(0, scrollY)
+    }
+  }, [])
+  
   const goNext = useCallback(() => {
     if (currentIndex < photos.length - 1) {
       onNavigate(photos[currentIndex + 1])
@@ -654,6 +675,7 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
   
   // Touch handlers for TikTok-style vertical swipe
   const onTouchStart = (e) => {
+    e.preventDefault() // Prevent default scroll
     setTouchEndY(null)
     setTouchEndX(null)
     setTouchStartY(e.targetTouches[0].clientY)
@@ -662,6 +684,7 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
   }
   
   const onTouchMove = (e) => {
+    e.preventDefault() // Prevent default scroll
     if (!touchStartY) return
     const currentY = e.targetTouches[0].clientY
     const currentX = e.targetTouches[0].clientX
@@ -743,7 +766,7 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
   }, [currentIndex, photos])
   
   return (
-    <div className="fixed inset-0 bg-black z-50 flex flex-col overflow-hidden">
+    <div className="fixed inset-0 bg-black z-50 flex flex-col overflow-hidden" style={{ touchAction: 'none' }}>
       {/* Header - Minimal floating */}
       <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-4 bg-gradient-to-b from-black/70 to-transparent">
         <div className="text-white/80 font-medium text-sm bg-black/30 px-3 py-1 rounded-full backdrop-blur-sm">
@@ -766,7 +789,8 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
         onClick={handleTap}
         style={{
           transform: `translateY(${dragOffset}px)`,
-          transition: isDragging ? 'none' : 'transform 0.3s ease-out'
+          transition: isDragging ? 'none' : 'transform 0.3s ease-out',
+          touchAction: 'none' // Prevent browser scroll/zoom gestures
         }}
       >
         {/* Image */}
