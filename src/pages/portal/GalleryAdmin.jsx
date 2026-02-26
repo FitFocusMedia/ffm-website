@@ -2,35 +2,46 @@ import { useState, useEffect, useCallback } from 'react'
 import { Plus, Trash2, ArrowLeft, Loader2, Check, ExternalLink, Upload, Image, Building2, Calendar } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 
-// Apply watermark using canvas (client-side)
-async function applyWatermark(file) {
+// Apply watermark using canvas (client-side) - also resizes to max 1440px
+async function applyWatermark(file, maxSize = 1440) {
   return new Promise((resolve) => {
     const img = new window.Image()
     img.onload = () => {
+      // Resize to max dimension for storage savings + discourage screenshots
+      let width = img.width
+      let height = img.height
+      const maxDimension = Math.max(width, height)
+      
+      if (maxDimension > maxSize) {
+        const ratio = maxSize / maxDimension
+        width = Math.round(img.width * ratio)
+        height = Math.round(img.height * ratio)
+      }
+      
       const canvas = document.createElement('canvas')
-      canvas.width = img.width
-      canvas.height = img.height
+      canvas.width = width
+      canvas.height = height
       const ctx = canvas.getContext('2d')
       
-      ctx.drawImage(img, 0, 0)
+      ctx.drawImage(img, 0, 0, width, height)
       
       const text = 'FIT FOCUS MEDIA'
       // Use larger dimension for consistent sizing across orientations
-      const maxDim = Math.max(img.width, img.height)
+      const maxDim = Math.max(width, height)
       const fontSize = Math.max(Math.floor(maxDim / 20), 40)
       ctx.font = `bold ${fontSize}px Arial`
       ctx.textAlign = 'center'
       
       ctx.save()
-      ctx.translate(img.width / 2, img.height / 2)
+      ctx.translate(width / 2, height / 2)
       ctx.rotate(-30 * Math.PI / 180)
       
       // Spacing to prevent text overlap
       const spacingY = fontSize * 4
       const spacingX = fontSize * 10
       
-      for (let y = -img.height; y < img.height * 2; y += spacingY) {
-        for (let x = -img.width; x < img.width * 2; x += spacingX) {
+      for (let y = -height; y < height * 2; y += spacingY) {
+        for (let x = -width; x < width * 2; x += spacingX) {
           // Dark shadow for visibility on light backgrounds
           ctx.fillStyle = 'rgba(0, 0, 0, 0.4)'
           ctx.fillText(text, x + 2, y + 2)
@@ -41,7 +52,8 @@ async function applyWatermark(file) {
       }
       ctx.restore()
       
-      canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.85)
+      // Lower quality for watermarked (0.7) - saves storage, discourages screenshots
+      canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.7)
     }
     img.src = URL.createObjectURL(file)
   })
