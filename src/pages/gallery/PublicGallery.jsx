@@ -702,9 +702,6 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
     if (nextPhoto) { const img = new Image(); img.src = nextPhoto.watermarked_url }
   }, [prevPhoto, nextPhoto])
   
-  // Calculate container height for vertical stack
-  const PEEK_HEIGHT = 100 // Height of next image peek
-  
   return (
     <div 
       ref={containerRef}
@@ -713,122 +710,82 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
+      onClick={handleTap}
     >
-      {/* Header - Minimal floating */}
-      <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent">
+      {/* LAYER 1: Next image (BEHIND) - stationary, revealed as current slides away */}
+      {nextPhoto && (
+        <div className="absolute inset-0 flex items-center justify-center p-4 pt-16 pb-24">
+          <img
+            src={nextPhoto.watermarked_url}
+            alt="Next"
+            className="max-w-full max-h-full object-contain"
+            draggable={false}
+          />
+        </div>
+      )}
+      
+      {/* LAYER 2: Previous image (BEHIND) - only visible when dragging down */}
+      {prevPhoto && dragY > 0 && (
+        <div className="absolute inset-0 flex items-center justify-center p-4 pt-16 pb-24">
+          <img
+            src={prevPhoto.watermarked_url}
+            alt="Previous"
+            className="max-w-full max-h-full object-contain"
+            draggable={false}
+          />
+        </div>
+      )}
+      
+      {/* LAYER 3: Current image (TOP) - this one moves with swipe */}
+      <div 
+        className="absolute inset-0 flex items-center justify-center p-4 pt-16 pb-24 bg-black"
+        style={{
+          transform: `translateY(${dragY}px)`,
+          transition: isDragging ? 'none' : 'transform 0.25s ease-out'
+        }}
+      >
+        <img
+          src={currentPhoto.watermarked_url}
+          alt={currentPhoto.filename}
+          className="max-w-full max-h-full object-contain select-none"
+          draggable={false}
+        />
+      </div>
+      
+      {/* Heart Animation */}
+      {showHeartAnimation && (
+        <div 
+          className="absolute pointer-events-none z-50"
+          style={{ left: heartPosition.x, top: heartPosition.y, transform: 'translate(-50%, -50%)' }}
+        >
+          <Heart className="w-20 h-20 text-red-500 fill-red-500" style={{ animation: 'heartBurst 0.6s ease-out forwards' }} />
+        </div>
+      )}
+      
+      {/* Header */}
+      <div className="absolute top-0 left-0 right-0 z-40 flex items-center justify-between p-4 bg-gradient-to-b from-black/70 to-transparent">
         <div className="text-white/90 font-medium text-sm bg-black/40 px-3 py-1.5 rounded-full backdrop-blur-sm">
           {currentIndex + 1} / {photos.length}
         </div>
-        <button
-          onClick={onClose}
-          className="text-white bg-black/40 hover:bg-black/60 p-2.5 rounded-full backdrop-blur-sm transition-colors"
-        >
+        <button onClick={onClose} className="text-white bg-black/40 hover:bg-black/60 p-2.5 rounded-full backdrop-blur-sm transition-colors">
           <X className="w-5 h-5" />
         </button>
       </div>
       
-      {/* Vertical Stack Container - Swipeable */}
-      <div 
-        className="absolute inset-0 flex flex-col"
-        style={{
-          transform: `translateY(${dragY}px)`,
-          transition: isDragging ? 'none' : 'transform 0.2s ease-out'
-        }}
-        onClick={handleTap}
-      >
-        {/* Previous Image (above, hidden until you drag down) */}
-        {prevPhoto && (
-          <div 
-            className="absolute w-full flex items-end justify-center"
-            style={{ 
-              height: '100vh',
-              top: '-100vh',
-              paddingBottom: '60px'
-            }}
-          >
-            <img
-              src={prevPhoto.watermarked_url}
-              alt="Previous"
-              className="max-w-full max-h-[calc(100vh-120px)] object-contain opacity-60"
-              draggable={false}
-            />
-          </div>
-        )}
-        
-        {/* Current Image - Main view */}
-        <div 
-          className="flex-1 flex items-center justify-center px-2"
-          style={{ 
-            paddingTop: '70px',
-            paddingBottom: nextPhoto ? `${PEEK_HEIGHT + 20}px` : '100px'
-          }}
-        >
-          <img
-            src={currentPhoto.watermarked_url}
-            alt={currentPhoto.filename}
-            className="max-w-full max-h-full object-contain select-none"
-            draggable={false}
-          />
-        </div>
-        
-        {/* Next Image Peek - Shows at bottom */}
-        {nextPhoto && (
-          <div 
-            className="absolute bottom-0 w-full flex items-start justify-center overflow-hidden"
-            style={{ height: `${PEEK_HEIGHT}px` }}
-          >
-            <div className="relative w-full h-[300px] flex items-start justify-center">
-              <img
-                src={nextPhoto.watermarked_url}
-                alt="Next"
-                className="max-w-[90%] object-contain object-top opacity-50"
-                style={{ maxHeight: '300px' }}
-                draggable={false}
-              />
-              {/* Gradient fade overlay */}
-              <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-transparent to-transparent" />
-            </div>
-          </div>
-        )}
-        
-        {/* Heart Animation (Instagram-style) */}
-        {showHeartAnimation && (
-          <div 
-            className="absolute pointer-events-none z-40"
-            style={{ 
-              left: heartPosition.x, 
-              top: heartPosition.y,
-              transform: 'translate(-50%, -50%)'
-            }}
-          >
-            <Heart 
-              className="w-20 h-20 text-red-500 fill-red-500" 
-              style={{ animation: 'heartBurst 0.6s ease-out forwards' }}
-            />
-          </div>
-        )}
-      </div>
-      
       {/* Desktop Navigation Arrows */}
       {prevPhoto && (
-        <button
-          onClick={(e) => { e.stopPropagation(); goPrev() }}
-          className="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 z-20 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full transition-all"
-        >
+        <button onClick={(e) => { e.stopPropagation(); goPrev() }} className="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 z-40 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full">
           <ChevronLeft className="w-6 h-6" />
         </button>
       )}
       {nextPhoto && (
-        <button
-          onClick={(e) => { e.stopPropagation(); goNext() }}
-          className="hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 z-20 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full transition-all"
-        >
+        <button onClick={(e) => { e.stopPropagation(); goNext() }} className="hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 z-40 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full">
           <ChevronRight className="w-6 h-6" />
         </button>
       )}
       
       {/* Right side action buttons (TikTok style) - Mobile */}
-      <div className="md:hidden absolute right-3 z-20 flex flex-col items-center gap-4" style={{ bottom: `${PEEK_HEIGHT + 40}px` }}>
+      <div className="md:hidden absolute right-3 bottom-28 z-40 flex flex-col items-center gap-4">
         {/* Add to Cart */}
         <button
           onClick={(e) => { e.stopPropagation(); onToggleSelect(currentPhoto.id) }}
@@ -860,7 +817,7 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
       </div>
       
       {/* Bottom bar - Desktop only */}
-      <div className="hidden md:flex p-4 bg-gradient-to-t from-black/80 to-transparent items-center justify-between absolute bottom-0 left-0 right-0 z-20">
+      <div className="hidden md:flex p-4 bg-gradient-to-t from-black/80 to-transparent items-center justify-between absolute bottom-0 left-0 right-0 z-40">
         <div className="text-gray-300 text-sm truncate max-w-[50%]">
           {currentPhoto.filename}
         </div>
@@ -875,14 +832,14 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
       </div>
       
       {/* Keyboard hints (desktop only) */}
-      <div className="hidden md:flex absolute bottom-16 left-1/2 -translate-x-1/2 text-gray-500 text-xs gap-4 z-20">
+      <div className="hidden md:flex absolute bottom-16 left-1/2 -translate-x-1/2 text-gray-500 text-xs gap-4 z-40">
         <span>↑ ↓ Navigate</span>
         <span>Space: Add to cart</span>
         <span>Esc: Close</span>
       </div>
       
       {/* Mobile hint */}
-      <div className="md:hidden absolute left-4 z-20 text-white/40 text-xs" style={{ bottom: `${PEEK_HEIGHT + 20}px` }}>
+      <div className="md:hidden absolute left-4 bottom-28 z-40 text-white/40 text-xs">
         Double-tap to add
       </div>
       
