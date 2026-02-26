@@ -12,6 +12,47 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const STRIPE_SECRET_KEY = Deno.env.get('STRIPE_SECRET_KEY')!
 const BASE_URL = 'https://fitfocusmedia.com.au'
 
+// Tiered pricing calculation (matches frontend logic)
+function calculateTieredPrice(quantity: number, pricingTiers: any[], defaultPrice: number) {
+  if (!pricingTiers || !Array.isArray(pricingTiers) || pricingTiers.length === 0) {
+    return {
+      total: quantity * defaultPrice,
+      savings: 0,
+      flatTotal: quantity * defaultPrice
+    }
+  }
+  
+  const sortedTiers = [...pricingTiers].sort((a, b) => a.min_qty - b.min_qty)
+  let remaining = quantity
+  let total = 0
+  
+  for (const tier of sortedTiers) {
+    if (remaining <= 0) break
+    
+    const tierMin = tier.min_qty
+    const tierMax = tier.max_qty || Infinity
+    const tierPrice = tier.price_per_photo
+    
+    const tierCapacity = tierMax === Infinity ? remaining : (tierMax - tierMin + 1)
+    const qtyInTier = Math.min(remaining, tierCapacity)
+    
+    if (qtyInTier > 0) {
+      total += qtyInTier * tierPrice
+      remaining -= qtyInTier
+    }
+  }
+  
+  // Any remaining at default price
+  if (remaining > 0) {
+    total += remaining * defaultPrice
+  }
+  
+  const flatTotal = quantity * defaultPrice
+  const savings = flatTotal - total
+  
+  return { total, savings, flatTotal }
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -94,22 +135,46 @@ serve(async (req) => {
       }
 
       selectedPhotoIds = photos.map(p => p.id)
+      const quantity = photos.length
 
-      for (const photo of photos) {
-        const price = photo.price || gallery.price_per_photo
-        totalAmount += price
-
+      // Check if tiered pricing is enabled
+      if (gallery.tiered_pricing_enabled && gallery.pricing_tiers?.length > 0) {
+        // Use tiered pricing
+        const priceCalc = calculateTieredPrice(quantity, gallery.pricing_tiers, gallery.price_per_photo)
+        totalAmount = priceCalc.total
+        
+        // Create line items showing the discount
         lineItems.push({
           price_data: {
             currency: 'aud',
             product_data: {
-              name: photo.filename,
-              description: `Photo from ${gallery.title}`
+              name: `${quantity} Photos from ${gallery.title}`,
+              description: priceCalc.savings > 0 
+                ? `Volume discount applied: -$${(priceCalc.savings / 100).toFixed(2)}`
+                : `${quantity} selected photos`
             },
-            unit_amount: price
+            unit_amount: totalAmount
           },
           quantity: 1
         })
+      } else {
+        // Flat pricing - each photo at standard price
+        for (const photo of photos) {
+          const price = photo.price || gallery.price_per_photo
+          totalAmount += price
+
+          lineItems.push({
+            price_data: {
+              currency: 'aud',
+              product_data: {
+                name: photo.filename,
+                description: `Photo from ${gallery.title}`
+              },
+              unit_amount: price
+            },
+            quantity: 1
+          })
+        }
       }
     }
 
@@ -142,11 +207,12 @@ serve(async (req) => {
       )
     }
 
-    // Create order items
+    // Create order items (store the effective price per photo)
+    const effectivePricePerPhoto = Math.floor(totalAmount / selectedPhotoIds.length)
     const orderItems = selectedPhotoIds.map(photoId => ({
       order_id: order.id,
       photo_id: photoId,
-      price: is_package ? Math.floor(totalAmount / selectedPhotoIds.length) : gallery.price_per_photo
+      price: effectivePricePerPhoto
     }))
 
     await supabase.from('gallery_order_items').insert(orderItems)
