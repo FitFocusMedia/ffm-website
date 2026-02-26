@@ -80,7 +80,7 @@ END:VCALENDAR`
             onClick={() => setShowMenu(false)}
           />
           
-          <div className="absolute right-0 mt-2 w-48 bg-dark-800 border border-dark-700 rounded-lg shadow-xl z-50 overflow-hidden">
+          <div className="absolute left-0 sm:right-0 sm:left-auto mt-2 w-48 bg-dark-800 border border-dark-700 rounded-lg shadow-xl z-50 overflow-hidden">
             <a
               href={googleUrl}
               target="_blank"
