@@ -564,9 +564,15 @@ function GalleryEditor({ gallery, organization, onBack }) {
         const watermarkedPath = `${gallery.id}/watermarked/${photoId}_wm.jpg`
         const thumbnailPath = `${gallery.id}/thumbnails/${photoId}_thumb.jpg`
 
-        await supabase.storage.from('galleries').upload(originalPath, file, { contentType: file.type })
-        await supabase.storage.from('galleries').upload(watermarkedPath, watermarkedBlob, { contentType: 'image/jpeg' })
-        await supabase.storage.from('galleries').upload(thumbnailPath, thumbnailBlob, { contentType: 'image/jpeg' })
+        // Upload files and CHECK FOR ERRORS
+        const { error: origError } = await supabase.storage.from('galleries').upload(originalPath, file, { contentType: file.type })
+        if (origError) throw new Error(`Original upload failed: ${origError.message}`)
+        
+        const { error: wmError } = await supabase.storage.from('galleries').upload(watermarkedPath, watermarkedBlob, { contentType: 'image/jpeg' })
+        if (wmError) throw new Error(`Watermarked upload failed: ${wmError.message}`)
+        
+        const { error: thumbError } = await supabase.storage.from('galleries').upload(thumbnailPath, thumbnailBlob, { contentType: 'image/jpeg' })
+        if (thumbError) throw new Error(`Thumbnail upload failed: ${thumbError.message}`)
 
         const img = await new Promise((resolve) => {
           const img = new window.Image()
@@ -600,6 +606,7 @@ function GalleryEditor({ gallery, organization, onBack }) {
         uploadedPhotos.push({ ...photo, thumbnail_url: thumbUrl?.signedUrl })
       } catch (err) {
         console.error(`Failed to upload ${file.name}:`, err)
+        alert(`Failed to upload ${file.name}: ${err.message}`)
       }
     }
 
