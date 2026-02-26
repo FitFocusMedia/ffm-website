@@ -25,9 +25,9 @@ async function applyWatermark(file) {
       ctx.translate(img.width / 2, img.height / 2)
       ctx.rotate(-30 * Math.PI / 180)
       
-      // Consistent spacing regardless of orientation
-      const spacingY = fontSize * 3
-      const spacingX = fontSize * 6
+      // Spacing to prevent text overlap
+      const spacingY = fontSize * 4
+      const spacingX = fontSize * 10
       
       for (let y = -img.height; y < img.height * 2; y += spacingY) {
         for (let x = -img.width; x < img.width * 2; x += spacingX) {
