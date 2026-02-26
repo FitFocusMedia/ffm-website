@@ -528,6 +528,12 @@ function GalleryEditor({ gallery, organization, onBack }) {
   const [dragActive, setDragActive] = useState(false)
   const [selectedPhotos, setSelectedPhotos] = useState(new Set())
   const [deleting, setDeleting] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  
+  // Filter photos by search query
+  const filteredPhotos = searchQuery 
+    ? photos.filter(p => p.filename.toLowerCase().includes(searchQuery.toLowerCase()))
+    : photos
 
   useEffect(() => {
     loadPhotos()
@@ -673,7 +679,7 @@ function GalleryEditor({ gallery, organization, onBack }) {
     })
   }
 
-  const selectAll = () => setSelectedPhotos(new Set(photos.map(p => p.id)))
+  const selectAll = () => setSelectedPhotos(new Set(filteredPhotos.map(p => p.id)))
   const deselectAll = () => setSelectedPhotos(new Set())
 
   const deleteSelected = async () => {
@@ -851,13 +857,39 @@ function GalleryEditor({ gallery, organization, onBack }) {
         </div>
       ) : (
         <>
-          {/* Selection Controls */}
-          <div className="flex items-center gap-3 mb-4">
+          {/* Search + Selection Controls */}
+          <div className="flex flex-wrap items-center gap-3 mb-4">
+            {/* Search */}
+            <div className="relative flex-1 min-w-[200px] max-w-[300px]">
+              <input
+                type="text"
+                placeholder="Search by filename..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-dark-700 text-white rounded-lg px-3 py-1.5 pl-9 text-sm border border-dark-600 focus:border-red-500 focus:outline-none"
+              />
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              {searchQuery && (
+                <button 
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+            
+            {searchQuery && (
+              <span className="text-gray-400 text-sm">{filteredPhotos.length} of {photos.length}</span>
+            )}
+            
             <button
-              onClick={selectedPhotos.size === photos.length ? deselectAll : selectAll}
+              onClick={selectedPhotos.size === filteredPhotos.length ? deselectAll : selectAll}
               className="px-3 py-1.5 bg-dark-600 hover:bg-dark-500 text-white text-sm rounded-lg"
             >
-              {selectedPhotos.size === photos.length ? 'Deselect All' : 'Select All'}
+              {selectedPhotos.size === filteredPhotos.length && filteredPhotos.length > 0 ? 'Deselect All' : 'Select All'}
             </button>
             {selectedPhotos.size > 0 && (
               <>
@@ -875,7 +907,7 @@ function GalleryEditor({ gallery, organization, onBack }) {
           </div>
           
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {photos.map(photo => (
+            {filteredPhotos.map(photo => (
               <div 
                 key={photo.id} 
                 className={`relative group cursor-pointer ${selectedPhotos.has(photo.id) ? 'ring-2 ring-red-500' : ''}`}
