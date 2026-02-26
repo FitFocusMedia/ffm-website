@@ -15,18 +15,25 @@ async function applyWatermark(file) {
       ctx.drawImage(img, 0, 0)
       
       const text = 'FIT FOCUS MEDIA'
-      const fontSize = Math.max(Math.floor(img.width / 20), 24)
+      const fontSize = Math.max(Math.floor(img.width / 15), 32)
       ctx.font = `bold ${fontSize}px Arial`
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.3)'
       ctx.textAlign = 'center'
       
       ctx.save()
       ctx.translate(img.width / 2, img.height / 2)
       ctx.rotate(-30 * Math.PI / 180)
       
-      const spacing = fontSize * 8
-      for (let y = -img.height; y < img.height * 2; y += spacing) {
-        for (let x = -img.width; x < img.width * 2; x += fontSize * 12) {
+      // Tighter spacing for more coverage
+      const spacingY = fontSize * 4
+      const spacingX = fontSize * 8
+      
+      for (let y = -img.height; y < img.height * 2; y += spacingY) {
+        for (let x = -img.width; x < img.width * 2; x += spacingX) {
+          // Dark shadow for visibility on light backgrounds
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.4)'
+          ctx.fillText(text, x + 2, y + 2)
+          // White text with higher opacity
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.5)'
           ctx.fillText(text, x, y)
         }
       }
