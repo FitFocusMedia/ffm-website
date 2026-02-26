@@ -15,7 +15,9 @@ async function applyWatermark(file) {
       ctx.drawImage(img, 0, 0)
       
       const text = 'FIT FOCUS MEDIA'
-      const fontSize = Math.max(Math.floor(img.width / 15), 32)
+      // Use larger dimension for consistent sizing across orientations
+      const maxDim = Math.max(img.width, img.height)
+      const fontSize = Math.max(Math.floor(maxDim / 20), 40)
       ctx.font = `bold ${fontSize}px Arial`
       ctx.textAlign = 'center'
       
@@ -23,9 +25,9 @@ async function applyWatermark(file) {
       ctx.translate(img.width / 2, img.height / 2)
       ctx.rotate(-30 * Math.PI / 180)
       
-      // Balanced spacing - visible but not overwhelming
-      const spacingY = fontSize * 3.5
-      const spacingX = fontSize * 7
+      // Consistent spacing regardless of orientation
+      const spacingY = fontSize * 3
+      const spacingX = fontSize * 6
       
       for (let y = -img.height; y < img.height * 2; y += spacingY) {
         for (let x = -img.width; x < img.width * 2; x += spacingX) {
