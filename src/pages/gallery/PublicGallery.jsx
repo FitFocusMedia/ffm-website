@@ -72,6 +72,7 @@ export default function GalleryPage() {
   
   // Tutorial state (mobile only)
   const [tutorialStep, setTutorialStep] = useState(0) // 0=not started, 1=tap image, 2=swipe, 3=double-tap, 4=done
+  const [tutorialPhotoToRemove, setTutorialPhotoToRemove] = useState(null)
 
   // Check for cancelled checkout
   const cancelled = searchParams.get('cancelled')
@@ -84,6 +85,22 @@ export default function GalleryPage() {
       setTutorialStep(1) // Start tutorial
     }
   }, [photos])
+  
+  // Tutorial cleanup effect - remove demo photo after tutorial completes
+  useEffect(() => {
+    if (tutorialStep === 4 && tutorialPhotoToRemove) {
+      const timer = setTimeout(() => {
+        setSelectedPhotos(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(tutorialPhotoToRemove)
+          return newSet
+        })
+        setTutorialPhotoToRemove(null)
+        setTutorialStep(0)
+      }, 1500)
+      return () => clearTimeout(timer)
+    }
+  }, [tutorialStep, tutorialPhotoToRemove])
 
   useEffect(() => {
     loadGallery()
@@ -516,18 +533,10 @@ export default function GalleryPage() {
             tutorialStep={tutorialStep}
             onTutorialStep={(step, photoId) => {
               setTutorialStep(step)
-              // Tutorial complete - save to localStorage and cleanup
+              // Tutorial complete - save to localStorage and trigger cleanup
               if (step === 4 && photoId) {
                 localStorage.setItem('gallery_tutorial_seen', 'true')
-                // Remove tutorial photo after showing success message
-                setTimeout(() => {
-                  setSelectedPhotos(prev => {
-                    const newSelected = new Set(prev)
-                    newSelected.delete(photoId)
-                    return newSelected
-                  })
-                  setTutorialStep(0)
-                }, 1500)
+                setTutorialPhotoToRemove(photoId) // This triggers the cleanup useEffect
               }
             }}
           />
@@ -925,7 +934,7 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
       {tutorialStep === 3 && (
         <div className="md:hidden absolute inset-0 z-50 flex items-center justify-center pointer-events-none">
           <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 mx-4 text-center">
-            <div className="text-4xl mb-2">👆👆</div>
+            <div className="text-4xl mb-2 animate-double-tap">☝️</div>
             <p className="text-white text-lg font-semibold">Double-tap to add to cart</p>
             <p className="text-white/70 text-sm mt-1">Try it on this photo!</p>
           </div>
@@ -975,6 +984,16 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
         }
         .animate-bounce-slow {
           animation: bounce-slow 2s ease-in-out infinite;
+        }
+        @keyframes double-tap {
+          0%, 100% { transform: scale(1); }
+          10% { transform: scale(0.85) translateY(5px); }
+          20% { transform: scale(1); }
+          30% { transform: scale(0.85) translateY(5px); }
+          40% { transform: scale(1); }
+        }
+        .animate-double-tap {
+          animation: double-tap 1.5s ease-in-out infinite;
         }
       `}</style>
     </div>
