@@ -814,8 +814,8 @@ function GalleryEditor({ gallery, organization, onBack }) {
               type="number"
               step="0.01"
               min="0"
-              value={(currentGallery.price_per_photo / 100).toFixed(2)}
-              onChange={(e) => {
+              defaultValue={(currentGallery.price_per_photo / 100).toFixed(2)}
+              onBlur={(e) => {
                 const cents = Math.round(parseFloat(e.target.value || 0) * 100)
                 updateGallery({ price_per_photo: cents })
                 setCurrentGallery({ ...currentGallery, price_per_photo: cents })
@@ -843,8 +843,8 @@ function GalleryEditor({ gallery, organization, onBack }) {
                 step="0.01"
                 min="0"
                 placeholder="Package price"
-                value={currentGallery.package_price ? (currentGallery.package_price / 100).toFixed(2) : ''}
-                onChange={(e) => {
+                defaultValue={currentGallery.package_price ? (currentGallery.package_price / 100).toFixed(2) : ''}
+                onBlur={(e) => {
                   const cents = Math.round(parseFloat(e.target.value || 0) * 100)
                   updateGallery({ package_price: cents })
                   setCurrentGallery({ ...currentGallery, package_price: cents })
