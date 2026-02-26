@@ -596,35 +596,24 @@ function CheckoutModal({ gallery, selectedCount, priceCalc, isPackage, packagePr
 function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, onToggleSelect, pricePerPhoto }) {
   const currentIndex = photos.findIndex(p => p.id === currentPhoto.id)
   const isSelected = selectedPhotos.has(currentPhoto.id)
+  const containerRef = useRef(null)
   
-  // Touch handling for vertical swipe
-  const [touchStartY, setTouchStartY] = useState(null)
-  const [touchEndY, setTouchEndY] = useState(null)
-  const [touchStartX, setTouchStartX] = useState(null)
-  const [touchEndX, setTouchEndX] = useState(null)
-  const [dragOffset, setDragOffset] = useState(0)
+  // Simple swipe state
+  const [dragY, setDragY] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
-  const minSwipeDistance = 80
-  
-  // Transition animation states
-  const [isTransitioning, setIsTransitioning] = useState(false)
-  const [transitionDirection, setTransitionDirection] = useState(null) // 'up' or 'down'
-  const [enterDirection, setEnterDirection] = useState(null) // For new image entrance
+  const [touchStartY, setTouchStartY] = useState(0)
   
   // Double-tap detection
   const [lastTap, setLastTap] = useState(0)
   const [showHeartAnimation, setShowHeartAnimation] = useState(false)
   const [heartPosition, setHeartPosition] = useState({ x: 0, y: 0 })
   
-  // Calculate dynamic scale and opacity based on drag
-  const dragProgress = Math.min(Math.abs(dragOffset) / 150, 1) // 0 to 1
-  const dragScale = 1 - (dragProgress * 0.1) // Shrinks to 0.9 at max drag
-  const dragOpacity = 1 - (dragProgress * 0.3) // Fades to 0.7 at max drag
-  const dragRotation = (dragOffset / 300) * 3 // Subtle rotation, max ±3 degrees
+  // Get adjacent photos for peek preview
+  const prevPhoto = currentIndex > 0 ? photos[currentIndex - 1] : null
+  const nextPhoto = currentIndex < photos.length - 1 ? photos[currentIndex + 1] : null
   
-  // Lock body scroll when lightbox is open
+  // Lock body scroll
   useEffect(() => {
-    // Save current scroll position and lock body
     const scrollY = window.scrollY
     document.body.style.position = 'fixed'
     document.body.style.top = `-${scrollY}px`
@@ -633,7 +622,6 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
     document.body.style.overflow = 'hidden'
     
     return () => {
-      // Restore scroll position when closing
       document.body.style.position = ''
       document.body.style.top = ''
       document.body.style.left = ''
@@ -643,139 +631,66 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
     }
   }, [])
   
+  // Navigation functions
   const goNext = useCallback(() => {
-    if (currentIndex < photos.length - 1 && !isTransitioning) {
-      setIsTransitioning(true)
-      setTransitionDirection('up')
-      setTimeout(() => {
-        onNavigate(photos[currentIndex + 1])
-        setEnterDirection('up')
-        setTimeout(() => {
-          setIsTransitioning(false)
-          setTransitionDirection(null)
-          setEnterDirection(null)
-        }, 300)
-      }, 150)
+    if (currentIndex < photos.length - 1) {
+      onNavigate(photos[currentIndex + 1])
     }
-  }, [currentIndex, photos, onNavigate, isTransitioning])
+  }, [currentIndex, photos, onNavigate])
   
   const goPrev = useCallback(() => {
-    if (currentIndex > 0 && !isTransitioning) {
-      setIsTransitioning(true)
-      setTransitionDirection('down')
-      setTimeout(() => {
-        onNavigate(photos[currentIndex - 1])
-        setEnterDirection('down')
-        setTimeout(() => {
-          setIsTransitioning(false)
-          setTransitionDirection(null)
-          setEnterDirection(null)
-        }, 300)
-      }, 150)
+    if (currentIndex > 0) {
+      onNavigate(photos[currentIndex - 1])
     }
-  }, [currentIndex, photos, onNavigate, isTransitioning])
+  }, [currentIndex, photos, onNavigate])
   
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e) => {
-      switch (e.key) {
-        case 'ArrowRight':
-        case 'ArrowDown':
-          e.preventDefault()
-          goNext()
-          break
-        case 'ArrowLeft':
-        case 'ArrowUp':
-          e.preventDefault()
-          goPrev()
-          break
-        case 'Escape':
-          onClose()
-          break
-        case ' ':
-        case 'Enter':
-          e.preventDefault()
-          onToggleSelect(currentPhoto.id)
-          break
-      }
+      if (e.key === 'ArrowDown' || e.key === 'ArrowRight') { e.preventDefault(); goNext() }
+      else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') { e.preventDefault(); goPrev() }
+      else if (e.key === 'Escape') onClose()
+      else if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); onToggleSelect(currentPhoto.id) }
     }
-    
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [goNext, goPrev, onClose, onToggleSelect, currentPhoto.id])
   
-  // Touch handlers for TikTok-style vertical swipe
+  // Touch handlers - direct 1:1 tracking
   const onTouchStart = (e) => {
-    e.preventDefault() // Prevent default scroll
-    setTouchEndY(null)
-    setTouchEndX(null)
-    setTouchStartY(e.targetTouches[0].clientY)
-    setTouchStartX(e.targetTouches[0].clientX)
+    setTouchStartY(e.touches[0].clientY)
     setIsDragging(true)
+    setDragY(0)
   }
   
   const onTouchMove = (e) => {
-    e.preventDefault() // Prevent default scroll
-    if (!touchStartY) return
-    const currentY = e.targetTouches[0].clientY
-    const currentX = e.targetTouches[0].clientX
-    setTouchEndY(currentY)
-    setTouchEndX(currentX)
-    
-    // Calculate vertical offset for smooth drag effect
-    const deltaY = currentY - touchStartY
-    const deltaX = Math.abs(currentX - touchStartX)
-    
-    // Only apply vertical drag if mostly vertical movement
-    if (Math.abs(deltaY) > deltaX) {
-      setDragOffset(deltaY * 0.3) // Dampen the drag
-    }
+    if (!isDragging) return
+    const deltaY = e.touches[0].clientY - touchStartY
+    setDragY(deltaY)
   }
   
   const onTouchEnd = () => {
     setIsDragging(false)
-    setDragOffset(0)
+    const threshold = 80
     
-    if (!touchStartY || !touchEndY) return
-    
-    const distanceY = touchStartY - touchEndY
-    const distanceX = touchStartX && touchEndX ? Math.abs(touchStartX - touchEndX) : 0
-    
-    // Only trigger if mostly vertical swipe
-    if (Math.abs(distanceY) > distanceX && Math.abs(distanceY) > minSwipeDistance) {
-      if (distanceY > 0) {
-        // Swipe up = next photo
-        goNext()
-      } else {
-        // Swipe down = previous photo
-        goPrev()
-      }
+    if (dragY < -threshold && nextPhoto) {
+      goNext()
+    } else if (dragY > threshold && prevPhoto) {
+      goPrev()
     }
-    
-    setTouchStartY(null)
-    setTouchStartX(null)
+    setDragY(0)
   }
   
   // Double-tap handler
   const handleTap = (e) => {
     const now = Date.now()
-    const DOUBLE_TAP_DELAY = 300
-    
-    if (now - lastTap < DOUBLE_TAP_DELAY) {
-      // Double tap detected!
+    if (now - lastTap < 300) {
       const rect = e.currentTarget.getBoundingClientRect()
-      const x = e.clientX || (e.touches && e.touches[0]?.clientX) || rect.width / 2
-      const y = e.clientY || (e.touches && e.touches[0]?.clientY) || rect.height / 2
-      
+      const x = e.clientX || rect.width / 2
+      const y = e.clientY || rect.height / 2
       setHeartPosition({ x: x - rect.left, y: y - rect.top })
       setShowHeartAnimation(true)
-      
-      // Add to cart if not already selected
-      if (!selectedPhotos.has(currentPhoto.id)) {
-        onToggleSelect(currentPhoto.id)
-      }
-      
-      // Hide heart after animation
+      if (!selectedPhotos.has(currentPhoto.id)) onToggleSelect(currentPhoto.id)
       setTimeout(() => setShowHeartAnimation(false), 800)
     }
     setLastTap(now)
@@ -783,71 +698,103 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
   
   // Preload adjacent images
   useEffect(() => {
-    const preloadImages = []
-    if (currentIndex > 0) {
-      const img = new Image()
-      img.src = photos[currentIndex - 1].watermarked_url
-      preloadImages.push(img)
-    }
-    if (currentIndex < photos.length - 1) {
-      const img = new Image()
-      img.src = photos[currentIndex + 1].watermarked_url
-      preloadImages.push(img)
-    }
-  }, [currentIndex, photos])
+    if (prevPhoto) { const img = new Image(); img.src = prevPhoto.watermarked_url }
+    if (nextPhoto) { const img = new Image(); img.src = nextPhoto.watermarked_url }
+  }, [prevPhoto, nextPhoto])
+  
+  // Calculate container height for vertical stack
+  const PEEK_HEIGHT = 100 // Height of next image peek
   
   return (
-    <div className="fixed inset-0 bg-black z-50 flex flex-col overflow-hidden" style={{ touchAction: 'none' }}>
+    <div 
+      ref={containerRef}
+      className="fixed inset-0 bg-black z-50 overflow-hidden"
+      style={{ touchAction: 'none' }}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+    >
       {/* Header - Minimal floating */}
-      <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-4 bg-gradient-to-b from-black/70 to-transparent">
-        <div className="text-white/80 font-medium text-sm bg-black/30 px-3 py-1 rounded-full backdrop-blur-sm">
+      <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent">
+        <div className="text-white/90 font-medium text-sm bg-black/40 px-3 py-1.5 rounded-full backdrop-blur-sm">
           {currentIndex + 1} / {photos.length}
         </div>
         <button
           onClick={onClose}
-          className="text-white bg-black/30 hover:bg-black/50 p-2 rounded-full backdrop-blur-sm transition-colors"
+          className="text-white bg-black/40 hover:bg-black/60 p-2.5 rounded-full backdrop-blur-sm transition-colors"
         >
           <X className="w-5 h-5" />
         </button>
       </div>
       
-      {/* Main Image Area - Full screen, swipeable */}
+      {/* Vertical Stack Container - Swipeable */}
       <div 
-        className="flex-1 relative flex items-center justify-center overflow-hidden"
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
+        className="absolute inset-0 flex flex-col"
+        style={{
+          transform: `translateY(${dragY}px)`,
+          transition: isDragging ? 'none' : 'transform 0.2s ease-out'
+        }}
         onClick={handleTap}
-        style={{ touchAction: 'none' }}
       >
-        {/* Image with enhanced animations */}
-        <img
-          src={currentPhoto.watermarked_url}
-          alt={currentPhoto.filename}
-          className="max-w-full max-h-full object-contain select-none"
-          draggable={false}
-          style={{
-            transform: `
-              translateY(${isDragging ? dragOffset : 0}px) 
-              scale(${isDragging ? dragScale : (isTransitioning ? 0.95 : 1)}) 
-              rotate(${isDragging ? dragRotation : 0}deg)
-              ${transitionDirection === 'up' ? 'translateY(-100px)' : ''}
-              ${transitionDirection === 'down' ? 'translateY(100px)' : ''}
-              ${enterDirection === 'up' ? 'translateY(0)' : ''}
-              ${enterDirection === 'down' ? 'translateY(0)' : ''}
-            `,
-            opacity: isDragging ? dragOpacity : (transitionDirection ? 0 : 1),
-            transition: isDragging 
-              ? 'none' 
-              : 'transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.25s ease-out',
-            willChange: 'transform, opacity'
+        {/* Previous Image (above, hidden until you drag down) */}
+        {prevPhoto && (
+          <div 
+            className="absolute w-full flex items-end justify-center"
+            style={{ 
+              height: '100vh',
+              top: '-100vh',
+              paddingBottom: '60px'
+            }}
+          >
+            <img
+              src={prevPhoto.watermarked_url}
+              alt="Previous"
+              className="max-w-full max-h-[calc(100vh-120px)] object-contain opacity-60"
+              draggable={false}
+            />
+          </div>
+        )}
+        
+        {/* Current Image - Main view */}
+        <div 
+          className="flex-1 flex items-center justify-center px-2"
+          style={{ 
+            paddingTop: '70px',
+            paddingBottom: nextPhoto ? `${PEEK_HEIGHT + 20}px` : '100px'
           }}
-        />
+        >
+          <img
+            src={currentPhoto.watermarked_url}
+            alt={currentPhoto.filename}
+            className="max-w-full max-h-full object-contain select-none"
+            draggable={false}
+          />
+        </div>
+        
+        {/* Next Image Peek - Shows at bottom */}
+        {nextPhoto && (
+          <div 
+            className="absolute bottom-0 w-full flex items-start justify-center overflow-hidden"
+            style={{ height: `${PEEK_HEIGHT}px` }}
+          >
+            <div className="relative w-full h-[300px] flex items-start justify-center">
+              <img
+                src={nextPhoto.watermarked_url}
+                alt="Next"
+                className="max-w-[90%] object-contain object-top opacity-50"
+                style={{ maxHeight: '300px' }}
+                draggable={false}
+              />
+              {/* Gradient fade overlay */}
+              <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-transparent to-transparent" />
+            </div>
+          </div>
+        )}
         
         {/* Heart Animation (Instagram-style) */}
         {showHeartAnimation && (
           <div 
-            className="absolute pointer-events-none"
+            className="absolute pointer-events-none z-40"
             style={{ 
               left: heartPosition.x, 
               top: heartPosition.y,
@@ -855,141 +802,89 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
             }}
           >
             <Heart 
-              className="w-24 h-24 text-red-500 fill-red-500 animate-heart-burst" 
-              style={{
-                animation: 'heartBurst 0.8s ease-out forwards'
-              }}
+              className="w-20 h-20 text-red-500 fill-red-500" 
+              style={{ animation: 'heartBurst 0.6s ease-out forwards' }}
             />
           </div>
         )}
-        
-        {/* Navigation hints on edges (desktop) */}
-        {currentIndex > 0 && (
-          <button
-            onClick={(e) => { e.stopPropagation(); goPrev() }}
-            className="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 z-10 bg-black/40 hover:bg-black/60 text-white p-3 rounded-full transition-all opacity-50 hover:opacity-100"
-          >
-            <ChevronLeft className="w-6 h-6" />
-          </button>
-        )}
-        
-        {currentIndex < photos.length - 1 && (
-          <button
-            onClick={(e) => { e.stopPropagation(); goNext() }}
-            className="hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 z-10 bg-black/40 hover:bg-black/60 text-white p-3 rounded-full transition-all opacity-50 hover:opacity-100"
-          >
-            <ChevronRight className="w-6 h-6" />
-          </button>
-        )}
-        
-        {/* Mobile swipe hint (shows briefly) */}
-        <div className="md:hidden absolute bottom-24 left-1/2 -translate-x-1/2 flex flex-col items-center text-white/40 text-xs pointer-events-none animate-fade-out">
-          <ChevronUp className="w-5 h-5 animate-bounce" />
-          <span>Swipe to browse</span>
-        </div>
       </div>
       
+      {/* Desktop Navigation Arrows */}
+      {prevPhoto && (
+        <button
+          onClick={(e) => { e.stopPropagation(); goPrev() }}
+          className="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 z-20 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full transition-all"
+        >
+          <ChevronLeft className="w-6 h-6" />
+        </button>
+      )}
+      {nextPhoto && (
+        <button
+          onClick={(e) => { e.stopPropagation(); goNext() }}
+          className="hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 z-20 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full transition-all"
+        >
+          <ChevronRight className="w-6 h-6" />
+        </button>
+      )}
+      
       {/* Right side action buttons (TikTok style) - Mobile */}
-      <div className="md:hidden absolute right-3 bottom-32 flex flex-col items-center gap-5 z-20">
+      <div className="md:hidden absolute right-3 z-20 flex flex-col items-center gap-4" style={{ bottom: `${PEEK_HEIGHT + 40}px` }}>
         {/* Add to Cart */}
         <button
-          onClick={() => onToggleSelect(currentPhoto.id)}
+          onClick={(e) => { e.stopPropagation(); onToggleSelect(currentPhoto.id) }}
           className="flex flex-col items-center gap-1"
         >
-          <div className={`p-3 rounded-full transition-all ${
+          <div className={`p-3 rounded-full transition-all shadow-lg ${
             isSelected 
               ? 'bg-red-500 text-white scale-110' 
-              : 'bg-black/40 text-white backdrop-blur-sm'
+              : 'bg-black/60 text-white backdrop-blur-sm'
           }`}>
-            {isSelected ? (
-              <Check className="w-6 h-6" />
-            ) : (
-              <ShoppingCart className="w-6 h-6" />
-            )}
+            {isSelected ? <Check className="w-6 h-6" /> : <ShoppingCart className="w-6 h-6" />}
           </div>
-          <span className="text-white text-xs font-medium">
+          <span className="text-white text-xs font-medium drop-shadow">
             {isSelected ? 'Added' : 'Add'}
           </span>
         </button>
         
-        {/* Favorite indicator (if in cart) */}
+        {/* Price indicator */}
         <div className="flex flex-col items-center gap-1">
-          <div className={`p-3 rounded-full transition-all ${
-            isSelected 
-              ? 'bg-black/40 text-red-500 backdrop-blur-sm' 
-              : 'bg-black/40 text-white/50 backdrop-blur-sm'
-          }`}>
+          <div className={`p-3 rounded-full shadow-lg ${
+            isSelected ? 'bg-black/60 text-red-500' : 'bg-black/60 text-white/70'
+          } backdrop-blur-sm`}>
             <Heart className={`w-6 h-6 ${isSelected ? 'fill-red-500' : ''}`} />
           </div>
-          <span className="text-white/70 text-xs">
+          <span className="text-white/80 text-xs font-medium drop-shadow">
             ${(pricePerPhoto / 100).toFixed(0)}
           </span>
         </div>
       </div>
       
       {/* Bottom bar - Desktop only */}
-      <div className="hidden md:flex p-4 bg-gradient-to-t from-black/70 to-transparent items-center justify-between absolute bottom-0 left-0 right-0">
-        <div className="text-gray-400 text-sm truncate max-w-[50%]">
+      <div className="hidden md:flex p-4 bg-gradient-to-t from-black/80 to-transparent items-center justify-between absolute bottom-0 left-0 right-0 z-20">
+        <div className="text-gray-300 text-sm truncate max-w-[50%]">
           {currentPhoto.filename}
         </div>
-        
         <button
           onClick={() => onToggleSelect(currentPhoto.id)}
           className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold transition-all ${
-            isSelected
-              ? 'bg-green-500 hover:bg-green-600 text-white'
-              : 'bg-red-500 hover:bg-red-600 text-white'
+            isSelected ? 'bg-green-500 hover:bg-green-600 text-white' : 'bg-red-500 hover:bg-red-600 text-white'
           }`}
         >
-          {isSelected ? (
-            <>
-              <Check className="w-5 h-5" />
-              In Cart
-            </>
-          ) : (
-            <>
-              <Plus className="w-5 h-5" />
-              Add ${(pricePerPhoto / 100).toFixed(2)}
-            </>
-          )}
+          {isSelected ? <><Check className="w-5 h-5" />In Cart</> : <><Plus className="w-5 h-5" />Add ${(pricePerPhoto / 100).toFixed(2)}</>}
         </button>
       </div>
       
       {/* Keyboard hints (desktop only) */}
-      <div className="hidden md:flex absolute bottom-16 left-1/2 -translate-x-1/2 text-gray-500 text-xs gap-4">
+      <div className="hidden md:flex absolute bottom-16 left-1/2 -translate-x-1/2 text-gray-500 text-xs gap-4 z-20">
         <span>↑ ↓ Navigate</span>
         <span>Space: Add to cart</span>
         <span>Esc: Close</span>
       </div>
       
-      {/* Double-tap hint (mobile, shows once) */}
-      <div className="md:hidden absolute bottom-20 left-1/2 -translate-x-1/2 text-white/30 text-xs text-center pointer-events-none">
-        Double-tap to add to cart
+      {/* Mobile hint */}
+      <div className="md:hidden absolute left-4 z-20 text-white/40 text-xs" style={{ bottom: `${PEEK_HEIGHT + 20}px` }}>
+        Double-tap to add
       </div>
-      
-      {/* Swipe direction indicator */}
-      {isDragging && Math.abs(dragOffset) > 30 && (
-        <div className="absolute inset-x-0 flex justify-center pointer-events-none z-30"
-          style={{ 
-            top: dragOffset < 0 ? '20%' : 'auto',
-            bottom: dragOffset > 0 ? '20%' : 'auto'
-          }}>
-          <div className="flex flex-col items-center gap-2 text-white/60">
-            {dragOffset < 0 && currentIndex < photos.length - 1 && (
-              <>
-                <ChevronUp className="w-8 h-8 animate-bounce" />
-                <span className="text-sm font-medium">Next Photo</span>
-              </>
-            )}
-            {dragOffset > 0 && currentIndex > 0 && (
-              <>
-                <span className="text-sm font-medium">Previous Photo</span>
-                <ChevronDown className="w-8 h-8 animate-bounce" />
-              </>
-            )}
-          </div>
-        </div>
-      )}
       
       {/* Heart burst animation styles */}
       <style>{`
