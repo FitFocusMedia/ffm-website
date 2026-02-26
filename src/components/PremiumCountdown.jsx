@@ -98,11 +98,11 @@ export default function PremiumCountdown({ targetDate, onComplete, className = '
   )
 
   return (
-    <div className={`${className}`}>
+    <div className={`${className} overflow-x-hidden`}>
       <p className="text-center text-gray-400 mb-4 text-sm uppercase tracking-widest font-medium">
         ⏱️ Event Starts In
       </p>
-      <div className="flex items-start justify-center">
+      <div className="flex items-start justify-center overflow-x-hidden">
         {timeLeft.days > 0 && (
           <>
             <FlipCard 
