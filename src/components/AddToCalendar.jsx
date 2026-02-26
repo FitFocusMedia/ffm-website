@@ -65,11 +65,12 @@ END:VCALENDAR`
     <div className={`relative ${className}`}>
       <button
         onClick={() => setShowMenu(!showMenu)}
-        className="flex items-center gap-2 px-4 py-2 bg-dark-800 hover:bg-dark-700 border border-dark-700 rounded-lg text-gray-300 hover:text-white transition-colors"
+        className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-dark-800 hover:bg-dark-700 border border-dark-700 rounded-lg text-gray-300 hover:text-white transition-colors"
+        title="Add to Calendar"
       >
-        <Calendar className="w-4 h-4" />
-        <span className="text-sm font-medium">Add to Calendar</span>
-        <ChevronDown className={`w-4 h-4 transition-transform ${showMenu ? 'rotate-180' : ''}`} />
+        <Calendar className="w-4 h-4 flex-shrink-0" />
+        <span className="text-sm font-medium hidden sm:inline">Add to Calendar</span>
+        <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform ${showMenu ? 'rotate-180' : ''}`} />
       </button>
 
       {showMenu && (

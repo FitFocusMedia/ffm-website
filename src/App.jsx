@@ -60,6 +60,11 @@ import MyPurchasesPage from './pages/livestream/MyPurchasesPage'
 import PrivacyPage from './pages/PrivacyPage'
 import TermsPage from './pages/TermsPage'
 
+// Gallery imports
+import GalleryAdmin from './pages/portal/GalleryAdmin'
+import PublicGallery from './pages/gallery/PublicGallery'
+import DownloadPage from './pages/gallery/DownloadPage'
+
 function ScrollToTop() {
   const { pathname } = useLocation()
   useEffect(() => {
@@ -118,6 +123,10 @@ function App() {
 
         {/* Public Onboarding Portal - NO AUTH REQUIRED, NO Navbar/Footer */}
         <Route path="/onboarding/:token" element={<OnboardingPortal />} />
+
+        {/* Public Gallery Routes - NO Navbar/Footer */}
+        <Route path="/gallery/:slug" element={<PublicGallery />} />
+        <Route path="/gallery/download" element={<DownloadPage />} />
 
         {/* Portal Login - NO AUTH REQUIRED, NO Navbar/Footer */}
         <Route path="/portal" element={<PortalLayout><LoginPage /></PortalLayout>} />
@@ -253,6 +262,18 @@ function App() {
             <ProtectedRoute>
               <PortalLayout>
                 <ContentAdmin />
+              </PortalLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Gallery Admin */}
+        <Route
+          path="/portal/galleries"
+          element={
+            <ProtectedRoute>
+              <PortalLayout>
+                <GalleryAdmin />
               </PortalLayout>
             </ProtectedRoute>
           }

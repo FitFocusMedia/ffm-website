@@ -110,6 +110,7 @@ function EventRow({ title, events, icon, accentColor = 'red' }) {
 
 // Enhanced Event Card
 function EventCard({ event, featured = false, compact = false }) {
+  const [imgError, setImgError] = useState(false)
   const eventDate = new Date(event.start_time)
   const now = new Date()
   const isLive = event.status === 'live' || event.is_live
@@ -128,11 +129,12 @@ function EventCard({ event, featured = false, compact = false }) {
         <div className="relative rounded-2xl overflow-hidden aspect-[21/9] md:aspect-[21/8]">
           {/* Background Image */}
           <div className="absolute inset-0">
-            {event.thumbnail_url ? (
+            {event.thumbnail_url && !imgError ? (
               <img 
                 src={getDirectImageUrl(event.thumbnail_url)} 
                 alt={event.title}
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                onError={() => setImgError(true)}
               />
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-red-900 to-dark-900" />
@@ -212,11 +214,12 @@ function EventCard({ event, featured = false, compact = false }) {
     >
       {/* Thumbnail */}
       <div className="relative aspect-video bg-dark-800 overflow-hidden">
-        {event.thumbnail_url ? (
+        {event.thumbnail_url && !imgError ? (
           <img 
             src={getDirectImageUrl(event.thumbnail_url)} 
             alt={event.title}
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+            onError={() => setImgError(true)}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-dark-800 to-dark-900">
@@ -290,6 +293,7 @@ function EventCard({ event, featured = false, compact = false }) {
 
 // Hero Featured Event Component
 function HeroEvent({ event }) {
+  const [imgError, setImgError] = useState(false)
   const eventDate = new Date(event.start_time)
   const isLive = event.status === 'live' || event.is_live
   
@@ -297,11 +301,12 @@ function HeroEvent({ event }) {
     <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
       {/* Background */}
       <div className="absolute inset-0">
-        {event.thumbnail_url ? (
+        {event.thumbnail_url && !imgError ? (
           <img 
             src={getDirectImageUrl(event.thumbnail_url)} 
             alt={event.title}
             className="w-full h-full object-cover scale-105"
+            onError={() => setImgError(true)}
           />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-red-900 via-dark-900 to-black" />
