@@ -86,7 +86,7 @@ export default function GalleryPage() {
     }
   }, [photos])
   
-  // Tutorial cleanup effect - remove demo photo after tutorial completes
+  // Tutorial cleanup effect - remove demo photo after step 4, then show step 5
   useEffect(() => {
     if (tutorialStep === 4 && tutorialPhotoToRemove) {
       const timer = setTimeout(() => {
@@ -96,11 +96,21 @@ export default function GalleryPage() {
           return newSet
         })
         setTutorialPhotoToRemove(null)
-        setTutorialStep(0)
+        setTutorialStep(5) // Advance to grid icon hint
       }, 1500)
       return () => clearTimeout(timer)
     }
   }, [tutorialStep, tutorialPhotoToRemove])
+  
+  // Step 5: Show grid icon hint, then dismiss
+  useEffect(() => {
+    if (tutorialStep === 5) {
+      const timer = setTimeout(() => {
+        setTutorialStep(0)
+      }, 2500)
+      return () => clearTimeout(timer)
+    }
+  }, [tutorialStep])
 
   useEffect(() => {
     loadGallery()
@@ -950,10 +960,19 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
             <div className="text-4xl mb-2">✅</div>
             <p className="text-white text-lg font-semibold">You're all set!</p>
             <p className="text-white/70 text-sm mt-1">Swipe to browse, double-tap to add</p>
-            <div className="flex items-center justify-center gap-2 mt-3 text-white/60 text-sm">
-              <LayoutGrid className="w-4 h-4" />
-              <span>Tap grid icon to return to gallery</span>
+          </div>
+        </div>
+      )}
+      
+      {/* Step 5: Point to grid icon */}
+      {tutorialStep === 5 && (
+        <div className="md:hidden absolute top-16 right-2 z-50 pointer-events-none">
+          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 text-center animate-bounce-slow">
+            <div className="flex items-center gap-2 text-white">
+              <LayoutGrid className="w-5 h-5" />
+              <span className="text-sm font-medium">Tap to return to gallery</span>
             </div>
+            <div className="absolute -top-2 right-6 w-0 h-0 border-l-8 border-r-8 border-b-8 border-transparent border-b-white/10"></div>
           </div>
         </div>
       )}
