@@ -505,7 +505,7 @@ export default function GalleryPage() {
 
         {/* Tutorial Overlay - Step 1: Tap to view */}
         {tutorialStep === 1 && photos.length > 0 && (
-          <div className="fixed inset-0 bg-black/60 z-30 flex items-start justify-center pt-40 pointer-events-none md:hidden">
+          <div className="fixed inset-0 bg-black/60 z-30 flex items-center justify-center pointer-events-none md:hidden">
             <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 mx-4 text-center animate-bounce-slow">
               <div className="text-4xl mb-3">👆</div>
               <p className="text-white text-lg font-semibold">Tap a photo to view</p>
