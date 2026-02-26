@@ -1047,21 +1047,38 @@ function PricingTiersEditor({ gallery, onUpdate }) {
           {tiers.length > 0 && (
             <div className="bg-dark-700 rounded-lg p-4 mb-4">
               <h4 className="text-sm font-medium text-white mb-2">Preview Calculator</h4>
-              <div className="grid grid-cols-4 gap-4 text-sm">
-                {[5, 10, 15, 25].map(qty => {
-                  const tieredTotal = calculateExample(qty)
-                  const flatTotal = qty * gallery.price_per_photo
-                  const savings = flatTotal - tieredTotal
-                  return (
-                    <div key={qty} className="text-center">
-                      <div className="text-gray-400">{qty} photos</div>
-                      <div className="text-white font-medium">${(tieredTotal / 100).toFixed(2)}</div>
-                      {savings > 0 && (
-                        <div className="text-green-400 text-xs">Save ${(savings / 100).toFixed(2)}</div>
-                      )}
-                    </div>
-                  )
-                })}
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 text-sm">
+                {(() => {
+                  // Generate preview quantities based on tier boundaries
+                  const previewQtys = new Set()
+                  tiers.forEach(tier => {
+                    previewQtys.add(tier.min_qty)
+                    if (tier.max_qty) {
+                      previewQtys.add(tier.max_qty)
+                      previewQtys.add(tier.max_qty + 1) // Show next tier start
+                    }
+                  })
+                  // Add a few extra points
+                  const maxTier = Math.max(...tiers.map(t => t.max_qty || t.min_qty + 20))
+                  previewQtys.add(Math.ceil(maxTier / 2))
+                  previewQtys.add(maxTier)
+                  previewQtys.add(maxTier + 10)
+                  
+                  return [...previewQtys].sort((a, b) => a - b).slice(0, 8).map(qty => {
+                    const tieredTotal = calculateExample(qty)
+                    const flatTotal = qty * gallery.price_per_photo
+                    const savings = flatTotal - tieredTotal
+                    return (
+                      <div key={qty} className="text-center">
+                        <div className="text-gray-400">{qty} photos</div>
+                        <div className="text-white font-medium">${(tieredTotal / 100).toFixed(2)}</div>
+                        {savings > 0 && (
+                          <div className="text-green-400 text-xs">Save ${(savings / 100).toFixed(2)}</div>
+                        )}
+                      </div>
+                    )
+                  })
+                })()}
               </div>
             </div>
           )}
