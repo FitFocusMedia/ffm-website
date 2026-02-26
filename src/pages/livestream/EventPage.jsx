@@ -447,8 +447,8 @@ export default function EventPage() {
         type="video.other"
       />
       
-      <div className="py-12 md:py-16 px-4">
-        <div className="max-w-6xl mx-auto">
+      <div className="py-12 md:py-16 px-4 overflow-x-hidden">
+        <div className="max-w-6xl mx-auto overflow-x-hidden">
           <div className="grid lg:grid-cols-5 gap-8 lg:gap-12">
             {/* Event Details - Left Column */}
             <div className="lg:col-span-3 space-y-6">
