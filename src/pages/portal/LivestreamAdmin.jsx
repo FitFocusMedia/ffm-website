@@ -1575,51 +1575,54 @@ function MultiStreamManager({ eventId, event, onEventUpdate }) {
     if (!newStreamName.trim()) return
     setAdding(true)
     try {
-      // First, auto-create MUX stream via Supabase edge function
-      const muxResponse = await fetch('https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/mux-stream/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          name: newStreamName.trim(),
-          event_id: eventId 
-        })
-      })
-      
-      let muxData = null
-      if (muxResponse.ok) {
-        muxData = await muxResponse.json()
-        console.log('MUX stream created:', muxData)
-      } else {
-        console.warn('Failed to auto-create MUX stream, creating without MUX')
-      }
-      
+      // Step 1: Create stream entry in database first (without MUX data)
       const streamData = {
         event_id: eventId,
         name: newStreamName.trim(),
         display_order: streams.length,
-        is_default: streams.length === 0,
-        // Auto-populate MUX fields if created
-        ...(muxData && {
-          mux_stream_id: muxData.mux_stream_id,
-          mux_stream_key: muxData.mux_stream_key,
-          mux_playback_id: muxData.mux_playback_id,
-          status: 'idle'
-        })
+        is_default: streams.length === 0
       }
-      await createEventStream(streamData)
+      const newStream = await createEventStream(streamData)
       
       // Update event's multi-stream flag
       if (streams.length === 0) {
         await updateEventMultiStreamFlag(eventId, true)
       }
       
+      // Step 2: Now create MUX stream with the new stream_id
+      let muxData = null
+      try {
+        const muxResponse = await fetch('https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/mux-stream', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            action: 'create',
+            stream_id: newStream.id,
+            stream_name: newStreamName.trim(),
+            event_id: eventId 
+          })
+        })
+        
+        if (muxResponse.ok) {
+          muxData = await muxResponse.json()
+          console.log('MUX stream created:', muxData)
+        } else {
+          const errText = await muxResponse.text()
+          console.warn('Failed to auto-create MUX stream:', errText)
+        }
+      } catch (muxErr) {
+        console.warn('MUX stream creation failed:', muxErr)
+      }
+      
       setNewStreamName('')
       await loadStreams()
       
       // Show success message with stream key if created
-      if (muxData?.mux_stream_key) {
-        navigator.clipboard.writeText(muxData.mux_stream_key)
-        alert(`✅ Stream "${newStreamName.trim()}" created!\n\nRTMP Server: rtmps://global-live.mux.com:443/app\nStream Key: ${muxData.mux_stream_key}\n\n(Stream key copied to clipboard)`)
+      if (muxData?.stream_key) {
+        navigator.clipboard.writeText(muxData.stream_key)
+        alert(`✅ Stream "${newStreamName.trim()}" created!\n\nRTMP Server: rtmps://global-live.mux.com:443/app\nStream Key: ${muxData.stream_key}\n\n(Stream key copied to clipboard)`)
+      } else {
+        alert(`✅ Stream "${newStreamName.trim()}" added!\n\nClick "Generate MUX Stream Key" to get the stream key.`)
       }
     } catch (err) {
       console.error('Failed to add stream:', err)
