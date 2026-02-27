@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Calendar, MapPin, Play, Mail, LogOut, Ticket, Clock, Camera, Download, Image } from 'lucide-react'
+import { Calendar, MapPin, Play, Mail, LogOut, Ticket, Clock, Camera, Download, Image, ArrowLeft, Home } from 'lucide-react'
 import { 
   getCurrentUser, 
   getSession, 
@@ -251,6 +251,15 @@ export default function MyPurchasesPage() {
   return (
     <div className="min-h-screen bg-dark-950">
       <div className="max-w-4xl mx-auto px-4 py-8">
+        {/* Back Button */}
+        <button
+          onClick={() => navigate('/live')}
+          className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors mb-6"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          Back to Events
+        </button>
+
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
