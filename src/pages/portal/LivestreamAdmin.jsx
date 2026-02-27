@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit, Trash2, Eye, DollarSign, Users, Calendar, ToggleLeft, ToggleRight, Download, Radio, Copy, ExternalLink, BarChart3, MapPin, TrendingUp, Shield, RefreshCw, Film, Tag, Archive, Play, StopCircle, Tv, Layers, DoorOpen, DoorClosed } from 'lucide-react'
+import { Plus, Edit, Trash2, Eye, DollarSign, Users, Calendar, ToggleLeft, ToggleRight, Download, Radio, Copy, ExternalLink, BarChart3, MapPin, TrendingUp, Shield, RefreshCw, Film, Tag, Archive, Play, StopCircle, Tv, Layers, DoorOpen, DoorClosed, Pencil } from 'lucide-react'
 import { 
   getAllLivestreamEvents, 
   createLivestreamEvent, 
@@ -1962,6 +1962,18 @@ function MultiStreamManager({ eventId, event, onEventUpdate }) {
                       Set Default
                     </button>
                   )}
+                  <button
+                    type="button"
+                    onClick={(e) => { 
+                      e.stopPropagation()
+                      setEditingStreamId(stream.id)
+                      setEditingStreamName(stream.name)
+                    }}
+                    className="p-1.5 text-gray-500 hover:text-purple-400 transition-colors"
+                    title="Rename stream"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); handleDeleteStream(stream.id) }}
