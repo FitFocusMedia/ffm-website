@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Calendar, MapPin, Play, Mail, LogOut, Ticket, Clock } from 'lucide-react'
+import { Calendar, MapPin, Play, Mail, LogOut, Ticket, Clock, Camera, Download, Image } from 'lucide-react'
 import { 
   getCurrentUser, 
   getSession, 
   signOut, 
   sendMagicLink,
-  getUserPurchaseHistory,
+  getAllUserPurchases,
   onAuthStateChange,
   syncUserProfile
 } from '../../lib/supabase'
@@ -74,7 +74,7 @@ export default function MyPurchasesPage() {
 
   const loadPurchases = async (userEmail) => {
     try {
-      const data = await getUserPurchaseHistory(userEmail)
+      const data = await getAllUserPurchases(userEmail)
       setPurchases(data || [])
     } catch (err) {
       console.error('Failed to load purchases:', err)
@@ -253,7 +253,7 @@ export default function MyPurchasesPage() {
             <Ticket className="w-16 h-16 text-gray-600 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-white mb-2">No Purchases Yet</h2>
             <p className="text-gray-400 mb-6">
-              You haven't purchased any events yet.
+              You haven't purchased any events or photos yet.
             </p>
             <button
               onClick={() => navigate('/live')}
@@ -265,7 +265,89 @@ export default function MyPurchasesPage() {
         ) : (
           <div className="space-y-4">
             {purchases.map((purchase) => {
+              // Gallery/Photo purchase
+              if (purchase.type === 'gallery') {
+                const gallery = purchase.gallery
+                const isPackage = purchase.is_package
+                const photoCount = purchase.photoCount || 0
+                const downloadUrl = `/gallery/download/${purchase.download_token}`
+                const tokenExpired = purchase.token_expires_at && new Date(purchase.token_expires_at) < new Date()
+                
+                return (
+                  <div
+                    key={purchase.id}
+                    className="bg-dark-900 rounded-xl border border-dark-800 overflow-hidden hover:border-dark-700 transition-colors"
+                  >
+                    <div className="flex flex-col md:flex-row">
+                      {/* Photo Icon/Preview */}
+                      <div className="md:w-48 h-32 md:h-auto flex-shrink-0 bg-gradient-to-br from-purple-900/50 to-pink-900/50 flex items-center justify-center">
+                        <Camera className="w-16 h-16 text-purple-400/60" />
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex-1 p-5">
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex flex-wrap items-center gap-2 mb-1">
+                              <h3 className="text-lg font-bold text-white">{gallery?.title || 'Photo Gallery'}</h3>
+                              <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 text-xs font-medium rounded-full flex items-center gap-1">
+                                <Image className="w-3 h-3" />
+                                Photos
+                              </span>
+                            </div>
+                            <p className="text-gray-400 text-sm mb-3">
+                              {isPackage ? 'Full Gallery Package' : `${photoCount} photo${photoCount !== 1 ? 's' : ''}`}
+                            </p>
+                            
+                            <div className="flex flex-wrap gap-4 text-sm text-gray-500">
+                              {tokenExpired ? (
+                                <div className="flex items-center gap-1 text-amber-500">
+                                  <Clock className="w-4 h-4" />
+                                  Download link expired
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1">
+                                  <Download className="w-4 h-4" />
+                                  Download available
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Download Button */}
+                          <button
+                            onClick={() => navigate(downloadUrl)}
+                            disabled={tokenExpired}
+                            className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors w-full sm:w-auto ${
+                              tokenExpired 
+                                ? 'bg-dark-700 text-gray-500 cursor-not-allowed' 
+                                : 'bg-purple-600 hover:bg-purple-700 text-white'
+                            }`}
+                          >
+                            <Download className="w-5 h-5" />
+                            {tokenExpired ? 'Expired' : 'Download'}
+                          </button>
+                        </div>
+
+                        {/* Purchase Info */}
+                        <div className="mt-4 pt-4 border-t border-dark-800 flex items-center justify-between text-sm">
+                          <span className="text-gray-500">
+                            Purchased {formatDate(purchase.created_at)}
+                          </span>
+                          <span className="text-green-500 font-medium">
+                            ${(purchase.total_amount / 100).toFixed(2)} AUD
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              }
+              
+              // Livestream purchase
               const event = purchase.event
+              if (!event) return null // Skip if event data is missing
+              
               const live = isEventLive(event)
               const upcoming = isEventUpcoming(event)
               const past = isEventPast(event)

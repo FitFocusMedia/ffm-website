@@ -1125,7 +1125,7 @@ export async function linkAuthToProfile(authId, email) {
 }
 
 /**
- * Get user's purchase history
+ * Get user's livestream purchase history
  */
 export async function getUserPurchaseHistory(email) {
   const { data, error } = await supabase
@@ -1137,6 +1137,95 @@ export async function getUserPurchaseHistory(email) {
   
   if (error) throw error
   return data
+}
+
+/**
+ * Get user's gallery/photo purchase history
+ */
+export async function getGalleryPurchaseHistory(email) {
+  const { data, error } = await supabase
+    .from('gallery_orders')
+    .select(`
+      *,
+      gallery:galleries(
+        id,
+        title,
+        slug,
+        cover_photo_id,
+        event_id
+      ),
+      items:gallery_order_items(
+        id,
+        photo_id,
+        price
+      )
+    `)
+    .eq('email', email.toLowerCase())
+    .eq('status', 'completed')
+    .order('created_at', { ascending: false })
+  
+  if (error) throw error
+  return data
+}
+
+/**
+ * Get all user purchases (livestreams + galleries) combined
+ */
+export async function getAllUserPurchases(email) {
+  const lowerEmail = email.toLowerCase()
+  
+  // Fetch both in parallel
+  const [livestreamResult, galleryResult] = await Promise.all([
+    supabase
+      .from('livestream_orders')
+      .select('*, event:livestream_events(*)')
+      .eq('email', lowerEmail)
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('gallery_orders')
+      .select(`
+        *,
+        gallery:galleries(
+          id,
+          title,
+          slug,
+          cover_photo_id,
+          event_id
+        ),
+        items:gallery_order_items(
+          id,
+          photo_id,
+          price
+        )
+      `)
+      .eq('email', lowerEmail)
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false })
+  ])
+  
+  if (livestreamResult.error) throw livestreamResult.error
+  if (galleryResult.error) throw galleryResult.error
+  
+  // Normalize and combine
+  const livestreamPurchases = (livestreamResult.data || []).map(p => ({
+    ...p,
+    type: 'livestream',
+    sortDate: new Date(p.created_at)
+  }))
+  
+  const galleryPurchases = (galleryResult.data || []).map(p => ({
+    ...p,
+    type: 'gallery',
+    sortDate: new Date(p.created_at),
+    photoCount: p.items?.length || 0
+  }))
+  
+  // Merge and sort by date (newest first)
+  const allPurchases = [...livestreamPurchases, ...galleryPurchases]
+    .sort((a, b) => b.sortDate - a.sortDate)
+  
+  return allPurchases
 }
 
 // ============================================
