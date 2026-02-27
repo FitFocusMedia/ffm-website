@@ -25,7 +25,8 @@ export const AuthProvider = ({ children }) => {
     })
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state change:', event, session?.user?.email)
       setSession(session)
       setUser(session?.user ?? null)
       
@@ -35,10 +36,11 @@ export const AuthProvider = ({ children }) => {
         const hash = window.location.hash
         // If we landed on root with access_token (magic link callback), redirect to my-purchases
         if (hash.includes('access_token') || hash === '#' || hash === '#/' || hash === '') {
-          // Use setTimeout to ensure state is updated before redirect
-          setTimeout(() => {
-            window.location.hash = '#/my-purchases'
-          }, 100)
+          // Wait longer to ensure session is fully stored before redirect
+          await new Promise(resolve => setTimeout(resolve, 500))
+          window.location.hash = '#/my-purchases'
+          // Force a page reload to ensure clean state
+          window.location.reload()
         }
       }
     })
