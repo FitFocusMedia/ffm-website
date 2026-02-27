@@ -303,6 +303,78 @@ serve(async (req) => {
     }
 
     // ========================================
+    // STREAM-STATUS: Check if a specific MUX stream is live
+    // ========================================
+    if (action === 'stream-status') {
+      const { mux_stream_id } = body
+      
+      if (!mux_stream_id) {
+        return new Response(JSON.stringify({ error: 'mux_stream_id required' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+
+      try {
+        const muxRes = await fetch(`https://api.mux.com/video/v1/live-streams/${mux_stream_id}`, {
+          headers: { 'Authorization': 'Basic ' + auth }
+        })
+
+        if (!muxRes.ok) {
+          if (muxRes.status === 404) {
+            return new Response(JSON.stringify({ 
+              status: 'not_found', 
+              isLive: false,
+              error: 'Stream not found in MUX'
+            }), {
+              status: 200, // Return 200 with error field instead of 404
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            })
+          }
+          
+          const errText = await muxRes.text()
+          console.error('MUX API error:', errText)
+          return new Response(JSON.stringify({ 
+            error: 'MUX API error', 
+            status: 'error',
+            isLive: false
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+        }
+
+        const muxData = await muxRes.json()
+        const stream = muxData.data
+        const streamStatus = stream.status || 'unknown'
+        
+        // MUX statuses: 'idle', 'active', 'disabled'
+        // 'active' means actually receiving video
+        const isLive = streamStatus === 'active'
+        
+        return new Response(JSON.stringify({
+          status: streamStatus,
+          isLive,
+          playbackId: stream.playback_ids?.[0]?.id,
+          streamKey: stream.stream_key
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+
+      } catch (error) {
+        console.error('Stream status check error:', error)
+        return new Response(JSON.stringify({ 
+          error: error.message,
+          status: 'error',
+          isLive: false
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+    }
+
+    // ========================================
     // MIGRATE: Convert single stream to multi-stream
     // ========================================
     if (action === 'migrate') {
