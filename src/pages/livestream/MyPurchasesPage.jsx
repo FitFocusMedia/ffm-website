@@ -273,15 +273,30 @@ export default function MyPurchasesPage() {
                 const downloadUrl = `/gallery/download/${purchase.download_token}`
                 const tokenExpired = purchase.token_expires_at && new Date(purchase.token_expires_at) < new Date()
                 
+                // Get first photo's thumbnail for preview
+                const firstItem = purchase.items?.[0]
+                const thumbnailPath = firstItem?.photo?.thumbnail_path
+                const thumbnailUrl = thumbnailPath 
+                  ? `https://gonalgubgldgpkcekaxe.supabase.co/storage/v1/object/public/galleries/${thumbnailPath}`
+                  : null
+                
                 return (
                   <div
                     key={purchase.id}
                     className="bg-dark-900 rounded-xl border border-dark-800 overflow-hidden hover:border-dark-700 transition-colors"
                   >
                     <div className="flex flex-col md:flex-row">
-                      {/* Photo Icon/Preview */}
-                      <div className="md:w-48 h-32 md:h-auto flex-shrink-0 bg-gradient-to-br from-purple-900/50 to-pink-900/50 flex items-center justify-center">
-                        <Camera className="w-16 h-16 text-purple-400/60" />
+                      {/* Photo Thumbnail/Preview */}
+                      <div className="md:w-48 h-32 md:h-auto flex-shrink-0 bg-gradient-to-br from-purple-900/50 to-pink-900/50 flex items-center justify-center overflow-hidden">
+                        {thumbnailUrl ? (
+                          <img 
+                            src={thumbnailUrl} 
+                            alt={gallery?.title || 'Photo'} 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <Camera className="w-16 h-16 text-purple-400/60" />
+                        )}
                       </div>
 
                       {/* Content */}

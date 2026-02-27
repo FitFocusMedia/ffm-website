@@ -1157,7 +1157,12 @@ export async function getGalleryPurchaseHistory(email) {
       items:gallery_order_items(
         id,
         photo_id,
-        price
+        price,
+        photo:gallery_photos(
+          id,
+          thumbnail_path,
+          filename
+        )
       )
     `)
     .eq('email', email.toLowerCase())
@@ -1196,7 +1201,12 @@ export async function getAllUserPurchases(email) {
         items:gallery_order_items(
           id,
           photo_id,
-          price
+          price,
+          photo:gallery_photos(
+            id,
+            thumbnail_path,
+            filename
+          )
         )
       `)
       .eq('email', lowerEmail)
