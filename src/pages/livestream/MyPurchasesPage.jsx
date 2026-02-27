@@ -37,6 +37,11 @@ export default function MyPurchasesPage() {
           console.error('Failed to sync profile:', err)
         }
         loadPurchases(session.user.email)
+        
+        // HashRouter fix: If we landed on root with access_token, navigate to my-purchases
+        if (window.location.hash.includes('access_token') || window.location.hash === '#' || window.location.hash === '#/') {
+          navigate('/my-purchases', { replace: true })
+        }
       } else if (event === 'SIGNED_OUT') {
         setUser(null)
         setPurchases([])
@@ -44,7 +49,7 @@ export default function MyPurchasesPage() {
     })
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [navigate])
 
   const checkAuth = async () => {
     try {

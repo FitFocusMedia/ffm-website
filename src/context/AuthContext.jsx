@@ -25,9 +25,22 @@ export const AuthProvider = ({ children }) => {
     })
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session)
       setUser(session?.user ?? null)
+      
+      // Handle magic link callback: redirect to my-purchases after sign-in
+      // This fixes HashRouter + Supabase Auth conflict where access_token replaces the route
+      if (event === 'SIGNED_IN' && session?.user) {
+        const hash = window.location.hash
+        // If we landed on root with access_token (magic link callback), redirect to my-purchases
+        if (hash.includes('access_token') || hash === '#' || hash === '#/' || hash === '') {
+          // Use setTimeout to ensure state is updated before redirect
+          setTimeout(() => {
+            window.location.hash = '#/my-purchases'
+          }, 100)
+        }
+      }
     })
 
     return () => subscription.unsubscribe()
