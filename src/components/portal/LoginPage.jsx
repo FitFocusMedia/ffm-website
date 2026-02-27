@@ -29,8 +29,8 @@ export default function LoginPage() {
     <div className="min-h-screen bg-dark-950 flex items-center justify-center px-4">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">Portal Login</h1>
-          <p className="text-gray-400">Fit Focus Media Contract Management</p>
+          <h1 className="text-4xl font-bold text-white mb-2">Crew Login</h1>
+          <p className="text-gray-400">Fit Focus Media Team Access Portal</p>
         </div>
 
         <div className="bg-dark-900 rounded-lg p-8 shadow-xl">

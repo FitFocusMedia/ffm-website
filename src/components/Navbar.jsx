@@ -56,14 +56,8 @@ const Navbar = () => {
               </Link>
             ))}
             <Link
-              to="/portal"
-              className="ml-2 px-4 py-2 text-sm font-semibold text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-all"
-            >
-              Portal
-            </Link>
-            <Link
               to="/my-purchases"
-              className="px-4 py-2 text-sm font-semibold text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+              className="ml-2 px-4 py-2 text-sm font-semibold text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-all"
             >
               My Purchases
             </Link>
@@ -72,6 +66,12 @@ const Navbar = () => {
               className="ml-1 px-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-lg text-sm transition-all hover:scale-105"
             >
               Get Started
+            </Link>
+            <Link
+              to="/portal"
+              className="ml-2 px-4 py-2 text-sm font-semibold text-gray-500 hover:text-gray-300 hover:bg-white/5 rounded-lg transition-all"
+            >
+              Crew Login
             </Link>
           </div>
 
@@ -109,12 +109,6 @@ const Navbar = () => {
                 </Link>
               ))}
               <Link
-                to="/portal"
-                className="block px-4 py-3 rounded-lg text-base font-semibold text-gray-400 hover:text-white hover:bg-white/5 transition-all"
-              >
-                Portal
-              </Link>
-              <Link
                 to="/my-purchases"
                 className="block px-4 py-3 rounded-lg text-base font-semibold text-gray-400 hover:text-white hover:bg-white/5 transition-all"
               >
@@ -125,6 +119,12 @@ const Navbar = () => {
                 className="block mt-3 px-4 py-3 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-lg text-center transition-all"
               >
                 Get Your Free Analysis
+              </Link>
+              <Link
+                to="/portal"
+                className="block mt-2 px-4 py-3 rounded-lg text-base font-semibold text-gray-500 hover:text-gray-300 hover:bg-white/5 transition-all"
+              >
+                Crew Login
               </Link>
             </div>
           </motion.div>
