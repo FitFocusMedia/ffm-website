@@ -8,7 +8,8 @@ import {
   sendMagicLink,
   getAllUserPurchases,
   onAuthStateChange,
-  syncUserProfile
+  syncUserProfile,
+  supabase
 } from '../../lib/supabase'
 import { getDirectImageUrl } from '../../lib/imageUtils'
 
@@ -75,7 +76,25 @@ export default function MyPurchasesPage() {
   const loadPurchases = async (userEmail) => {
     try {
       const data = await getAllUserPurchases(userEmail)
-      setPurchases(data || [])
+      
+      // Generate signed URLs for gallery thumbnails
+      const purchasesWithThumbnails = await Promise.all(
+        (data || []).map(async (purchase) => {
+          if (purchase.type === 'gallery' && purchase.items?.[0]?.photo?.thumbnail_path) {
+            const thumbnailPath = purchase.items[0].photo.thumbnail_path
+            const { data: signedUrl } = await supabase.storage
+              .from('galleries')
+              .createSignedUrl(thumbnailPath, 3600) // 1 hour expiry
+            return {
+              ...purchase,
+              thumbnailUrl: signedUrl?.signedUrl || null
+            }
+          }
+          return purchase
+        })
+      )
+      
+      setPurchases(purchasesWithThumbnails)
     } catch (err) {
       console.error('Failed to load purchases:', err)
       setError('Failed to load your purchases')
@@ -273,12 +292,8 @@ export default function MyPurchasesPage() {
                 const downloadUrl = `/gallery/download/${purchase.download_token}`
                 const tokenExpired = purchase.token_expires_at && new Date(purchase.token_expires_at) < new Date()
                 
-                // Get first photo's thumbnail for preview
-                const firstItem = purchase.items?.[0]
-                const thumbnailPath = firstItem?.photo?.thumbnail_path
-                const thumbnailUrl = thumbnailPath 
-                  ? `https://gonalgubgldgpkcekaxe.supabase.co/storage/v1/object/public/galleries/${thumbnailPath}`
-                  : null
+                // Use pre-generated signed URL for thumbnail
+                const thumbnailUrl = purchase.thumbnailUrl || null
                 
                 return (
                   <div
