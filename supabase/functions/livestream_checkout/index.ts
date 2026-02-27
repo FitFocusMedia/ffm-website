@@ -302,6 +302,21 @@ async function sendConfirmationEmail(email: string, event: any, orderId: string)
           Click the button above or enter your email at the event page. Your access is linked to this email address.
         </p>
         
+        <!-- Photo Gallery Cross-Sell -->
+        <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 25px; border-radius: 12px; margin: 30px 0; text-align: center;">
+          <p style="color: #ffd700; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 10px;">📸 Exclusive Offer</p>
+          <h3 style="color: white; margin: 0 0 15px; font-size: 20px;">Competing at this event?</h3>
+          <p style="color: #ccc; margin: 0 0 20px; font-size: 14px;">
+            Get your professional competition photos! Our photographers capture every moment on the mats.
+          </p>
+          <a href="https://fitfocusmedia.com.au/#/gallery" style="background: #ffd700; color: #1a1a2e; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 14px;">
+            View Photo Packages →
+          </a>
+          <p style="color: #888; font-size: 12px; margin: 15px 0 0;">
+            Use code <strong style="color: #ffd700;">STREAM15</strong> for 15% off your photo order
+          </p>
+        </div>
+        
         <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
         
         <p style="color: #999; font-size: 12px; text-align: center;">

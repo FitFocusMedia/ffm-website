@@ -1015,11 +1015,49 @@ export default function WatchPage() {
 
         {/* Description */}
         {event.description && (
-          <div className="bg-dark-800/20 rounded-2xl p-6 border border-dark-700/30">
+          <div className="bg-dark-800/20 rounded-2xl p-6 border border-dark-700/30 mb-8">
             <h3 className="text-lg font-semibold text-white mb-3">About This Event</h3>
             <p className="text-gray-400 leading-relaxed">{event.description}</p>
           </div>
         )}
+
+        {/* Photo Gallery Cross-Sell */}
+        <div className="bg-gradient-to-br from-dark-800/40 to-dark-900/60 rounded-2xl p-6 border border-yellow-500/20 relative overflow-hidden">
+          {/* Background glow */}
+          <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full"></div>
+          
+          <div className="relative flex flex-col md:flex-row items-center gap-6">
+            {/* Icon */}
+            <div className="flex-shrink-0 w-20 h-20 rounded-2xl bg-gradient-to-br from-yellow-500/20 to-orange-500/20 flex items-center justify-center border border-yellow-500/30">
+              <span className="text-4xl">📸</span>
+            </div>
+            
+            {/* Content */}
+            <div className="flex-grow text-center md:text-left">
+              <span className="inline-block px-3 py-1 bg-yellow-500/20 text-yellow-400 text-xs font-semibold rounded-full mb-2 border border-yellow-500/30">
+                COMPETING TODAY?
+              </span>
+              <h3 className="text-xl font-bold text-white mb-2">Get Your Professional Photos</h3>
+              <p className="text-gray-400 text-sm mb-0">
+                Our photographers are capturing every moment on the mats. Don't miss your competition memories!
+              </p>
+            </div>
+            
+            {/* CTA */}
+            <div className="flex-shrink-0 flex flex-col items-center">
+              <Link
+                to="/gallery"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-dark-950 font-bold rounded-xl transition-all duration-300 shadow-lg shadow-yellow-500/25"
+              >
+                View Photo Packages
+                <span className="text-lg">→</span>
+              </Link>
+              <span className="text-yellow-400/80 text-xs mt-2 font-medium">
+                Use code STREAM15 for 15% off
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )
