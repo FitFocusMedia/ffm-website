@@ -62,6 +62,12 @@ const Navbar = () => {
               Portal
             </Link>
             <Link
+              to="/my-purchases"
+              className="px-4 py-2 text-sm font-semibold text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+            >
+              My Purchases
+            </Link>
+            <Link
               to="/proposal"
               className="ml-1 px-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-lg text-sm transition-all hover:scale-105"
             >
@@ -107,6 +113,12 @@ const Navbar = () => {
                 className="block px-4 py-3 rounded-lg text-base font-semibold text-gray-400 hover:text-white hover:bg-white/5 transition-all"
               >
                 Portal
+              </Link>
+              <Link
+                to="/my-purchases"
+                className="block px-4 py-3 rounded-lg text-base font-semibold text-gray-400 hover:text-white hover:bg-white/5 transition-all"
+              >
+                My Purchases
               </Link>
               <Link
                 to="/proposal"
