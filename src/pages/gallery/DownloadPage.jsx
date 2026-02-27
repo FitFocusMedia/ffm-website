@@ -230,18 +230,18 @@ export default function GalleryDownloadPage() {
         {/* Order Info */}
         <div className="mt-8 p-6 bg-dark-800 rounded-lg">
           <h2 className="text-lg font-semibold text-white mb-4">Order Details</h2>
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
             <div>
               <span className="text-gray-400">Order ID:</span>
               <span className="text-white ml-2 font-mono">{order.id.slice(0, 8)}</span>
             </div>
             <div>
-              <span className="text-gray-400">Email:</span>
-              <span className="text-white ml-2">{order.email}</span>
-            </div>
-            <div>
               <span className="text-gray-400">Total Paid:</span>
               <span className="text-white ml-2">${(order.total_amount / 100).toFixed(2)} AUD</span>
+            </div>
+            <div className="sm:col-span-2">
+              <span className="text-gray-400">Email:</span>
+              <span className="text-white ml-2 break-all">{order.email}</span>
             </div>
             <div>
               <span className="text-gray-400">Date:</span>

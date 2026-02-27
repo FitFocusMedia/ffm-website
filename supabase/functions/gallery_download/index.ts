@@ -75,8 +75,8 @@ serve(async (req) => {
         (order.gallery_order_items || []).map(async (item: any) => {
           let thumbnail_url = null
           
-          // Use original_path for thumbnail (they've paid, no watermark needed)
-          const imagePath = item.gallery_photos?.original_path
+          // Use thumbnail_path for fast loading, fall back to original if no thumbnail
+          const imagePath = item.gallery_photos?.thumbnail_path || item.gallery_photos?.original_path
           
           if (imagePath) {
             const { data: thumbData } = await supabase.storage
