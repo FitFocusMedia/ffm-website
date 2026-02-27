@@ -10,6 +10,7 @@ import {
   onAuthStateChange,
   syncUserProfile
 } from '../../lib/supabase'
+import { getDirectImageUrl } from '../../lib/imageUtils'
 
 export default function MyPurchasesPage() {
   const navigate = useNavigate()
@@ -279,7 +280,7 @@ export default function MyPurchasesPage() {
                     {event.thumbnail_url && (
                       <div className="md:w-48 h-32 md:h-auto flex-shrink-0">
                         <img
-                          src={event.thumbnail_url}
+                          src={getDirectImageUrl(event.thumbnail_url)}
                           alt={event.title}
                           className="w-full h-full object-cover"
                         />
