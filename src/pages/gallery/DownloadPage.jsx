@@ -47,19 +47,14 @@ export default function GalleryDownloadPage() {
     setDownloadingPhoto(photoId)
     
     try {
-      const response = await fetch(
-        `https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/gallery_download?token=${token}&photo_id=${photoId}`
-      )
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Download failed')
-      }
-
-      // Trigger download
+      // Direct download - file streams through Edge Function (no exposed Supabase URL)
+      const downloadUrl = `https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/gallery_download?token=${token}&photo_id=${photoId}&download=true`
+      
+      // Use anchor element with download attribute for proper file download
       const link = document.createElement('a')
-      link.href = data.download_url
-      link.download = filename
+      link.href = downloadUrl
+      link.download = filename || 'photo.jpg'
+      link.target = '_blank' // Opens in new context, triggers download
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
