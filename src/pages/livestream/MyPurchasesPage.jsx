@@ -94,7 +94,9 @@ export default function MyPurchasesPage() {
       await sendMagicLink(email, window.location.origin)
       setLinkSent(true)
     } catch (err) {
-      setError('Failed to send login link. Please try again.')
+      // Show actual Supabase error for debugging
+      const errorMsg = err?.message || err?.error_description || 'Unknown error'
+      setError(`Failed to send login link: ${errorMsg}`)
       console.error('Magic link error:', err)
     } finally {
       setSendingLink(false)
