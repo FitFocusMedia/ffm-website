@@ -26,9 +26,10 @@ export default function GalleryDownloadPage() {
 
       setOrder(data.order)
       
-      // Track already downloaded photos
+      // Track already downloaded photos (handle both API formats)
       const downloaded = new Set()
-      data.order.gallery_order_items?.forEach(item => {
+      const orderItems = data.order.gallery_order_items || data.order.items || []
+      orderItems.forEach(item => {
         if (item.downloaded) {
           downloaded.add(item.photo_id)
         }
@@ -74,10 +75,10 @@ export default function GalleryDownloadPage() {
   }
 
   const downloadAll = async () => {
-    const items = order.gallery_order_items || []
+    const items = order.gallery_order_items || order.items || []
     for (const item of items) {
       if (!downloadedPhotos.has(item.photo_id)) {
-        await downloadPhoto(item.photo_id, item.gallery_photos?.filename || `photo-${item.photo_id}.jpg`)
+        await downloadPhoto(item.photo_id, item.gallery_photos?.filename || item.filename || `photo-${item.photo_id}.jpg`)
         // Small delay between downloads
         await new Promise(resolve => setTimeout(resolve, 500))
       }
@@ -111,7 +112,7 @@ export default function GalleryDownloadPage() {
     )
   }
 
-  const items = order.gallery_order_items || []
+  const items = order.gallery_order_items || order.items || []
   const allDownloaded = items.every(item => downloadedPhotos.has(item.photo_id))
   const expiresAt = new Date(order.token_expires_at)
   const daysLeft = Math.ceil((expiresAt - new Date()) / (1000 * 60 * 60 * 24))
@@ -157,7 +158,9 @@ export default function GalleryDownloadPage() {
         {/* Photo List */}
         <div className="space-y-4">
           {items.map(item => {
-            const photo = item.gallery_photos
+            // Handle both API formats: nested (gallery_photos) and flattened (direct properties)
+            const photo = item.gallery_photos || item
+            const filename = item.gallery_photos?.filename || item.filename
             const isDownloaded = downloadedPhotos.has(item.photo_id)
             const isDownloading = downloadingPhoto === item.photo_id
 
@@ -167,7 +170,7 @@ export default function GalleryDownloadPage() {
                 className="bg-dark-800 rounded-lg p-4 flex items-center gap-4"
               >
                 <div className="w-20 h-20 bg-dark-700 rounded-lg overflow-hidden flex-shrink-0">
-                  {photo ? (
+                  {filename ? (
                     <Image className="w-full h-full text-gray-600 p-4" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-500">
@@ -178,9 +181,9 @@ export default function GalleryDownloadPage() {
 
                 <div className="flex-1 min-w-0">
                   <h3 className="text-white font-medium truncate">
-                    {photo?.filename || `Photo ${item.photo_id}`}
+                    {filename || `Photo ${item.photo_id}`}
                   </h3>
-                  {photo && (
+                  {photo?.width && photo?.height && (
                     <p className="text-gray-500 text-sm">
                       {photo.width} × {photo.height}
                     </p>
@@ -193,7 +196,7 @@ export default function GalleryDownloadPage() {
                 </div>
 
                 <button
-                  onClick={() => downloadPhoto(item.photo_id, photo?.filename || `photo-${item.photo_id}.jpg`)}
+                  onClick={() => downloadPhoto(item.photo_id, filename || `photo-${item.photo_id}.jpg`)}
                   disabled={isDownloading}
                   className={`flex-shrink-0 px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${
                     isDownloaded
