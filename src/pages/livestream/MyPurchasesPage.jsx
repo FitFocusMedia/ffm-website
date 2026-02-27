@@ -89,7 +89,9 @@ export default function MyPurchasesPage() {
     setError(null)
     
     try {
-      await sendMagicLink(email, `${window.location.origin}/#/my-purchases`)
+      // Don't include hash route - Supabase appends #access_token which conflicts with HashRouter
+      // AuthContext handles redirect to /my-purchases after sign-in
+      await sendMagicLink(email, window.location.origin)
       setLinkSent(true)
     } catch (err) {
       setError('Failed to send login link. Please try again.')
