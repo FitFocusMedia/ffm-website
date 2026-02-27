@@ -793,14 +793,16 @@ export default function LivestreamAdmin() {
             try {
               let eventId = editingEvent?.id
               
-              // Remove fields that might not exist in database (keep VOD fields)
+              // Remove fields that might not exist in database (keep VOD fields and category)
               const { 
-                category, 
                 crew_bypass_token, 
                 bypass_created_at, 
                 geo_venue_address,
                 ...cleanData 
               } = data
+              
+              // Keep category (convert empty string to null for cleaner DB)
+              if (data.category) cleanData.category = data.category
               
               // Convert empty timestamp strings to null (Postgres rejects empty strings for timestamps)
               if (cleanData.start_time === '') cleanData.start_time = null
