@@ -32,11 +32,13 @@ export const AuthProvider = ({ children }) => {
       
       // Handle magic link callback: redirect to my-purchases after sign-in
       // This fixes HashRouter + Supabase Auth conflict where access_token replaces the route
+      // ONLY redirect if we have an actual access_token in the URL (magic link callback)
+      // Do NOT redirect just because user has existing session and is on homepage
       if (event === 'SIGNED_IN' && session?.user) {
         const hash = window.location.hash
-        // If we landed on root with access_token (magic link callback), redirect to my-purchases
-        if (hash.includes('access_token') || hash === '#' || hash === '#/' || hash === '') {
-          // Wait longer to ensure session is fully stored before redirect
+        // ONLY redirect if there's an actual access_token (magic link callback)
+        if (hash.includes('access_token')) {
+          // Wait to ensure session is fully stored before redirect
           await new Promise(resolve => setTimeout(resolve, 500))
           window.location.hash = '#/my-purchases'
           // Force a page reload to ensure clean state
