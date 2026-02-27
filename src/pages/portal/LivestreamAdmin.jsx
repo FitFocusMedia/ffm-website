@@ -1554,6 +1554,8 @@ function MultiStreamManager({ eventId, event, onEventUpdate }) {
   const [convertStreamName, setConvertStreamName] = useState('')
   const [showConvertModal, setShowConvertModal] = useState(false)
   const [expandedStream, setExpandedStream] = useState(null)
+  const [editingStreamId, setEditingStreamId] = useState(null)
+  const [editingStreamName, setEditingStreamName] = useState('')
 
   // Check if event has existing single stream that can be converted
   const hasExistingSingleStream = event?.mux_stream_id && !event?.is_multi_stream
@@ -1690,6 +1692,22 @@ function MultiStreamManager({ eventId, event, onEventUpdate }) {
     } catch (err) {
       console.error('Failed to generate stream key:', err)
       alert('Failed to generate stream key: ' + err.message)
+    }
+  }
+
+  const handleRenameStream = async (streamId) => {
+    if (!editingStreamName.trim()) {
+      setEditingStreamId(null)
+      return
+    }
+    try {
+      await updateEventStream(streamId, { name: editingStreamName.trim() })
+      await loadStreams()
+      setEditingStreamId(null)
+      setEditingStreamName('')
+    } catch (err) {
+      console.error('Failed to rename stream:', err)
+      alert('Failed to rename stream')
     }
   }
 
@@ -1895,7 +1913,33 @@ function MultiStreamManager({ eventId, event, onEventUpdate }) {
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-white">{stream.name}</span>
+                      {editingStreamId === stream.id ? (
+                        <input
+                          type="text"
+                          value={editingStreamName}
+                          onChange={(e) => setEditingStreamName(e.target.value)}
+                          onBlur={() => handleRenameStream(stream.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleRenameStream(stream.id)
+                            if (e.key === 'Escape') { setEditingStreamId(null); setEditingStreamName('') }
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          autoFocus
+                          className="font-medium text-white bg-dark-900 border border-purple-500 rounded px-2 py-0.5 text-sm w-32"
+                        />
+                      ) : (
+                        <span 
+                          className="font-medium text-white cursor-pointer hover:text-purple-400"
+                          onClick={(e) => { 
+                            e.stopPropagation()
+                            setEditingStreamId(stream.id)
+                            setEditingStreamName(stream.name)
+                          }}
+                          title="Click to rename"
+                        >
+                          {stream.name}
+                        </span>
+                      )}
                       {stream.is_default && (
                         <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 text-xs rounded">Default</span>
                       )}
