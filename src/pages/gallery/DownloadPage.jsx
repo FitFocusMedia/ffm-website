@@ -170,7 +170,13 @@ export default function GalleryDownloadPage() {
                 className="bg-dark-800 rounded-lg p-4 flex items-center gap-4"
               >
                 <div className="w-20 h-20 bg-dark-700 rounded-lg overflow-hidden flex-shrink-0">
-                  {filename ? (
+                  {item.thumbnail_url ? (
+                    <img 
+                      src={item.thumbnail_url} 
+                      alt={filename || 'Photo'} 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : filename ? (
                     <Image className="w-full h-full text-gray-600 p-4" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-500">

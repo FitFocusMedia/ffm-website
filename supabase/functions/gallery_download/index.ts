@@ -39,7 +39,7 @@ serve(async (req) => {
           photo_id,
           downloaded,
           download_count,
-          gallery_photos(id, filename, original_path, width, height)
+          gallery_photos(id, filename, original_path, thumbnail_path, width, height)
         )
       `)
       .eq('download_token', token)
@@ -61,10 +61,44 @@ serve(async (req) => {
       )
     }
 
-    // If no photo_id, return order details (for download page)
+    // If no photo_id, return order details with thumbnail URLs (for download page)
     if (!photoId) {
+      // Generate thumbnail URLs for each photo (1 hour expiry for previews)
+      const itemsWithThumbnails = await Promise.all(
+        (order.gallery_order_items || []).map(async (item: any) => {
+          let thumbnail_url = null
+          
+          // Try thumbnail_path first, fall back to original_path
+          const imagePath = item.gallery_photos?.thumbnail_path || item.gallery_photos?.original_path
+          
+          if (imagePath) {
+            const { data: thumbData } = await supabase.storage
+              .from('galleries')
+              .createSignedUrl(imagePath, 3600) // 1 hour for thumbnails
+            
+            thumbnail_url = thumbData?.signedUrl || null
+          }
+          
+          return {
+            id: item.id,
+            photo_id: item.photo_id,
+            filename: item.gallery_photos?.filename,
+            width: item.gallery_photos?.width,
+            height: item.gallery_photos?.height,
+            thumbnail_url,
+            downloaded: item.downloaded,
+            download_count: item.download_count
+          }
+        })
+      )
+
       return new Response(
-        JSON.stringify({ order }),
+        JSON.stringify({ 
+          order: {
+            ...order,
+            items: itemsWithThumbnails
+          }
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
