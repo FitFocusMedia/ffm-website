@@ -40,8 +40,9 @@ export default function MyPurchasesPage() {
         }
         loadPurchases(session.user.email)
         
-        // HashRouter fix: If we landed on root with access_token, navigate to my-purchases
-        if (window.location.hash.includes('access_token') || window.location.hash === '#' || window.location.hash === '#/') {
+        // HashRouter fix: Only redirect if we landed with magic link access_token
+        // Don't redirect just because user is on homepage with existing session
+        if (window.location.hash.includes('access_token')) {
           navigate('/my-purchases', { replace: true })
         }
       } else if (event === 'SIGNED_OUT') {
