@@ -1651,11 +1651,13 @@ function MultiStreamManager({ eventId, event, onEventUpdate }) {
 
   const handleGenerateStreamKey = async (stream) => {
     try {
-      const response = await fetch('https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/mux-stream/create', {
+      const response = await fetch('https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/mux-stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          name: stream.name,
+          action: 'create',
+          stream_id: stream.id,
+          stream_name: stream.name,
           event_id: eventId 
         })
       })
@@ -1668,18 +1670,18 @@ function MultiStreamManager({ eventId, event, onEventUpdate }) {
       
       const muxData = await response.json()
       
-      if (muxData?.mux_stream_key) {
-        // Update stream with MUX credentials
+      if (muxData?.stream_key) {
+        // Update stream with MUX credentials (edge function updates DB directly, but update local state)
         await updateEventStream(stream.id, {
-          mux_stream_key: muxData.mux_stream_key,
-          mux_playback_id: muxData.mux_playback_id,
-          mux_stream_id: muxData.mux_stream_id,
+          mux_stream_key: muxData.stream_key,
+          mux_playback_id: muxData.playback_id,
+          mux_stream_id: muxData.stream_id,
           status: 'idle'
         })
         
         // Copy to clipboard
-        navigator.clipboard.writeText(muxData.mux_stream_key)
-        alert(`✅ Stream Key for ${stream.name} created and copied!\n\nServer: rtmps://global-live.mux.com:443/app\nStream Key: ${muxData.mux_stream_key}`)
+        navigator.clipboard.writeText(muxData.stream_key)
+        alert(`✅ Stream Key for ${stream.name} created and copied!\n\nServer: rtmps://global-live.mux.com:443/app\nStream Key: ${muxData.stream_key}`)
         
         await loadStreams()
       }
