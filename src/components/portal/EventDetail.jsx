@@ -26,6 +26,12 @@ export default function EventDetail({ event, organization, onBack, onEventUpdate
   // Editing state
   const [isEditing, setIsEditing] = useState(false)
   const [editForm, setEditForm] = useState({})
+  
+  // Match card modal state
+  const [showMatchCardModal, setShowMatchCardModal] = useState(false)
+  const [selectedOrderForCard, setSelectedOrderForCard] = useState(null)
+  const [uploadingCard, setUploadingCard] = useState(false)
+  const [extractingData, setExtractingData] = useState(false)
 
   useEffect(() => {
     loadEventData()
@@ -129,6 +135,144 @@ export default function EventDetail({ event, organization, onBack, onEventUpdate
     if (!error) {
       setAthletes([])
     }
+  }
+
+  // Match Card Functions
+  async function uploadMatchCard(file) {
+    if (!file || !selectedOrderForCard) return
+    
+    setUploadingCard(true)
+    
+    try {
+      // Upload to Supabase Storage
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${selectedOrderForCard.id}-${Date.now()}.${fileExt}`
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('match-cards')
+        .upload(fileName, file)
+      
+      if (uploadError) throw uploadError
+      
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('match-cards')
+        .getPublicUrl(fileName)
+      
+      const matchCardUrl = urlData.publicUrl
+      
+      // Update order with match card URL
+      const { error: updateError } = await supabase
+        .from('content_orders')
+        .update({ match_card_url: matchCardUrl })
+        .eq('id', selectedOrderForCard.id)
+      
+      if (updateError) throw updateError
+      
+      // Update local state
+      setOrders(prev => prev.map(o => 
+        o.id === selectedOrderForCard.id 
+          ? { ...o, match_card_url: matchCardUrl }
+          : o
+      ))
+      
+      // Now extract data from the image
+      await extractMatchCardData(matchCardUrl, selectedOrderForCard.id)
+      
+      setShowMatchCardModal(false)
+      setSelectedOrderForCard(null)
+      
+    } catch (error) {
+      console.error('Upload error:', error)
+      alert('Error uploading match card: ' + error.message)
+    } finally {
+      setUploadingCard(false)
+    }
+  }
+
+  async function extractMatchCardData(imageUrl, orderId) {
+    setExtractingData(true)
+    
+    try {
+      // Call Edge Function to extract data using Claude Vision
+      const { data, error } = await supabase.functions.invoke('extract-match-card', {
+        body: { imageUrl, orderId }
+      })
+      
+      if (error) {
+        console.error('Extraction error:', error)
+        // Still save the image even if extraction fails
+        return
+      }
+      
+      // Update order with extracted data
+      const { error: updateError } = await supabase
+        .from('content_orders')
+        .update({ match_card_data: data })
+        .eq('id', orderId)
+      
+      if (!updateError) {
+        setOrders(prev => prev.map(o => 
+          o.id === orderId 
+            ? { ...o, match_card_data: data }
+            : o
+        ))
+        
+        // Also create/update athlete record if we extracted enough data
+        if (data.mat || data.time || data.division) {
+          const order = orders.find(o => o.id === orderId)
+          if (order) {
+            await createOrUpdateAthleteFromOrder(order, data)
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Extraction error:', error)
+    } finally {
+      setExtractingData(false)
+    }
+  }
+
+  async function createOrUpdateAthleteFromOrder(order, extractedData) {
+    const athleteName = `${order.first_name || ''} ${order.last_name || ''}`.trim()
+    
+    // Check if athlete already exists
+    const { data: existing } = await supabase
+      .from('event_athletes')
+      .select('id')
+      .eq('event_id', event.id)
+      .ilike('name', athleteName)
+      .single()
+    
+    const athleteData = {
+      event_id: event.id,
+      name: athleteName,
+      division: extractedData.division || null,
+      mat: extractedData.mat || null,
+      competition_time: extractedData.time || null,
+      email: order.email || null,
+      status: 'pending',
+      captured: false
+    }
+    
+    if (existing) {
+      await supabase
+        .from('event_athletes')
+        .update(athleteData)
+        .eq('id', existing.id)
+    } else {
+      await supabase
+        .from('event_athletes')
+        .insert(athleteData)
+    }
+    
+    // Refresh athletes list
+    loadEventData()
+  }
+
+  function openMatchCardModal(order) {
+    setSelectedOrderForCard(order)
+    setShowMatchCardModal(true)
   }
 
   async function saveEventDetails() {
@@ -615,48 +759,92 @@ export default function EventDetail({ event, organization, onBack, onEventUpdate
           {/* ORDERS TAB */}
           {activeTab === 'orders' && (
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Event Orders</h3>
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-semibold">Event Orders</h3>
+                <p className="text-sm text-gray-400">
+                  Click "Link Match Card" to upload Smoothcomp screenshots
+                </p>
+              </div>
               
               {orders.length === 0 ? (
                 <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-8 text-center text-gray-400">
                   No orders for this event yet.
                 </div>
               ) : (
-                <div className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-800">
-                      <tr>
-                        <th className="text-left p-3">Date</th>
-                        <th className="text-left p-3">Customer</th>
-                        <th className="text-left p-3">Package</th>
-                        <th className="text-right p-3">Amount</th>
-                        <th className="text-center p-3">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {orders.map(order => (
-                        <tr key={order.id} className="border-t border-gray-800">
-                          <td className="p-3 text-gray-400">
-                            {new Date(order.created_at).toLocaleDateString('en-AU')}
-                          </td>
-                          <td className="p-3">
-                            <p className="font-medium">{order.first_name} {order.last_name}</p>
-                            <p className="text-xs text-gray-500">{order.email}</p>
-                          </td>
-                          <td className="p-3 text-gray-400">{order.packages?.name}</td>
-                          <td className="p-3 text-right">${order.amount}</td>
-                          <td className="p-3 text-center">
-                            <span className={`px-2 py-1 rounded text-xs ${
-                              order.status === 'paid' ? 'bg-green-600' :
-                              order.status === 'pending' ? 'bg-yellow-600' : 'bg-gray-600'
-                            }`}>
-                              {order.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="grid gap-4">
+                  {orders.map(order => (
+                    <div key={order.id} className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
+                      <div className="flex gap-4">
+                        {/* Match Card Preview */}
+                        <div className="flex-shrink-0">
+                          {order.match_card_url ? (
+                            <img 
+                              src={order.match_card_url} 
+                              alt="Match Card"
+                              className="w-24 h-32 object-cover rounded-lg cursor-pointer hover:opacity-80"
+                              onClick={() => openMatchCardModal(order)}
+                            />
+                          ) : (
+                            <button
+                              onClick={() => openMatchCardModal(order)}
+                              className="w-24 h-32 bg-gray-800 rounded-lg border-2 border-dashed border-gray-600 hover:border-red-500 flex flex-col items-center justify-center text-gray-500 hover:text-red-400 transition-colors"
+                            >
+                              <svg className="w-8 h-8 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                              <span className="text-xs">Add Card</span>
+                            </button>
+                          )}
+                        </div>
+                        
+                        {/* Order Details */}
+                        <div className="flex-grow">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="font-semibold text-lg">{order.first_name} {order.last_name}</p>
+                              <p className="text-sm text-gray-400">{order.email}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-semibold text-green-400">${order.amount}</p>
+                              <span className={`px-2 py-1 rounded text-xs ${
+                                order.status === 'paid' ? 'bg-green-600' :
+                                order.status === 'pending' ? 'bg-yellow-600' : 'bg-gray-600'
+                              }`}>
+                                {order.status}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <div className="mt-2 flex gap-4 text-sm text-gray-400">
+                            <span>{order.packages?.name}</span>
+                            <span>•</span>
+                            <span>{new Date(order.created_at).toLocaleDateString('en-AU')}</span>
+                          </div>
+                          
+                          {/* Extracted Match Card Data */}
+                          {order.match_card_data && Object.keys(order.match_card_data).length > 0 && (
+                            <div className="mt-3 flex gap-3 flex-wrap">
+                              {order.match_card_data.mat && (
+                                <span className="px-2 py-1 bg-blue-900/50 text-blue-300 rounded text-sm">
+                                  Mat {order.match_card_data.mat}
+                                </span>
+                              )}
+                              {order.match_card_data.time && (
+                                <span className="px-2 py-1 bg-purple-900/50 text-purple-300 rounded text-sm">
+                                  {order.match_card_data.time}
+                                </span>
+                              )}
+                              {order.match_card_data.division && (
+                                <span className="px-2 py-1 bg-green-900/50 text-green-300 rounded text-sm">
+                                  {order.match_card_data.division}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -696,6 +884,102 @@ export default function EventDetail({ event, organization, onBack, onEventUpdate
                 className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg"
               >
                 Import {parseImportData(importText).length} Athletes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Match Card Upload Modal */}
+      {showMatchCardModal && selectedOrderForCard && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 rounded-xl border border-gray-700 p-6 w-full max-w-lg">
+            <h3 className="text-lg font-semibold mb-4">
+              Link Match Card for {selectedOrderForCard.first_name} {selectedOrderForCard.last_name}
+            </h3>
+            
+            <p className="text-sm text-gray-400 mb-4">
+              Upload a screenshot of the athlete's Smoothcomp match card. 
+              We'll extract their mat number, competition time, and division automatically.
+            </p>
+            
+            {/* Current Match Card Preview */}
+            {selectedOrderForCard.match_card_url && (
+              <div className="mb-4">
+                <p className="text-sm text-gray-400 mb-2">Current Match Card:</p>
+                <img 
+                  src={selectedOrderForCard.match_card_url} 
+                  alt="Current Match Card"
+                  className="w-full max-h-64 object-contain rounded-lg border border-gray-700"
+                />
+                {selectedOrderForCard.match_card_data && Object.keys(selectedOrderForCard.match_card_data).length > 0 && (
+                  <div className="mt-2 flex gap-2 flex-wrap">
+                    {selectedOrderForCard.match_card_data.mat && (
+                      <span className="px-2 py-1 bg-blue-900/50 text-blue-300 rounded text-sm">
+                        Mat {selectedOrderForCard.match_card_data.mat}
+                      </span>
+                    )}
+                    {selectedOrderForCard.match_card_data.time && (
+                      <span className="px-2 py-1 bg-purple-900/50 text-purple-300 rounded text-sm">
+                        {selectedOrderForCard.match_card_data.time}
+                      </span>
+                    )}
+                    {selectedOrderForCard.match_card_data.division && (
+                      <span className="px-2 py-1 bg-green-900/50 text-green-300 rounded text-sm">
+                        {selectedOrderForCard.match_card_data.division}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* Upload Area */}
+            <div className="border-2 border-dashed border-gray-600 rounded-lg p-6 text-center">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) uploadMatchCard(file)
+                }}
+                className="hidden"
+                id="match-card-upload"
+                disabled={uploadingCard || extractingData}
+              />
+              <label 
+                htmlFor="match-card-upload"
+                className={`cursor-pointer ${uploadingCard || extractingData ? 'opacity-50' : ''}`}
+              >
+                {uploadingCard ? (
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="animate-spin w-8 h-8 border-2 border-red-500 border-t-transparent rounded-full"></div>
+                    <span className="text-gray-400">Uploading...</span>
+                  </div>
+                ) : extractingData ? (
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                    <span className="text-gray-400">Extracting data with AI...</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-2">
+                    <svg className="w-12 h-12 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    <span className="text-gray-400">Click to upload or drag & drop</span>
+                    <span className="text-xs text-gray-500">PNG, JPG up to 10MB</span>
+                  </div>
+                )}
+              </label>
+            </div>
+            
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                onClick={() => { setShowMatchCardModal(false); setSelectedOrderForCard(null) }}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg"
+                disabled={uploadingCard || extractingData}
+              >
+                Close
               </button>
             </div>
           </div>
