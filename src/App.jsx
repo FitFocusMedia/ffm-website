@@ -89,6 +89,7 @@ const LivestreamAnalytics = lazy(() => import('./pages/portal/LivestreamAnalytic
 const ProposalAdmin = lazy(() => import('./pages/portal/ProposalAdmin'))
 const GalleryAdmin = lazy(() => import('./pages/portal/GalleryAdmin'))
 const GalleryOrders = lazy(() => import('./pages/portal/GalleryOrders'))
+const AthleteTracker = lazy(() => import('./pages/portal/AthleteTracker'))
 
 // Error Boundary for lazy loading failures
 class ErrorBoundary extends Component {
@@ -234,6 +235,7 @@ function App() {
         <Route path="/portal/content-admin" element={<ProtectedRoute><PortalLayout><LazyRoute><ContentAdmin /></LazyRoute></PortalLayout></ProtectedRoute>} />
         <Route path="/portal/galleries" element={<ProtectedRoute><PortalLayout><LazyRoute><GalleryAdmin /></LazyRoute></PortalLayout></ProtectedRoute>} />
         <Route path="/portal/gallery-orders" element={<ProtectedRoute><PortalLayout><LazyRoute><GalleryOrders /></LazyRoute></PortalLayout></ProtectedRoute>} />
+        <Route path="/portal/athlete-tracker" element={<ProtectedRoute><PortalLayout><LazyRoute><AthleteTracker /></LazyRoute></PortalLayout></ProtectedRoute>} />
         <Route path="/portal/orders" element={<ProtectedRoute><PortalLayout><LazyRoute><OrderManagement /></LazyRoute></PortalLayout></ProtectedRoute>} />
         <Route path="/portal/pricing" element={<ProtectedRoute><PortalLayout><LazyRoute><PricingCalculator /></LazyRoute></PortalLayout></ProtectedRoute>} />
         <Route path="/portal/crews" element={<ProtectedRoute><PortalLayout><LazyRoute><CrewManagement /></LazyRoute></PortalLayout></ProtectedRoute>} />
