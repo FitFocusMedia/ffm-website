@@ -57,7 +57,21 @@ export default function EventDetail({ event, organization, onBack, onEventUpdate
         .order('competition_time', { ascending: true })
     ])
     
-    setOrders(ordersRes.data || [])
+    // Generate signed URLs for match cards (private bucket)
+    const ordersWithSignedUrls = await Promise.all(
+      (ordersRes.data || []).map(async (order) => {
+        if (order.match_card_url && !order.match_card_url.startsWith('http')) {
+          const { data } = await supabase.storage
+            .from('match-cards')
+            .createSignedUrl(order.match_card_url, 3600)
+          return { ...order, match_card_signed_url: data?.signedUrl }
+        }
+        // Legacy: if it's already a full URL, use as-is
+        return { ...order, match_card_signed_url: order.match_card_url }
+      })
+    )
+    
+    setOrders(ordersWithSignedUrls)
     setGalleries(galleriesRes.data || [])
     setAthletes(athletesRes.data || [])
     
@@ -154,30 +168,33 @@ export default function EventDetail({ event, organization, onBack, onEventUpdate
       
       if (uploadError) throw uploadError
       
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('match-cards')
-        .getPublicUrl(fileName)
+      // Store just the file path (not full URL) for private bucket
+      const matchCardPath = fileName
       
-      const matchCardUrl = urlData.publicUrl
-      
-      // Update order with match card URL
+      // Update order with match card path
       const { error: updateError } = await supabase
         .from('content_orders')
-        .update({ match_card_url: matchCardUrl })
+        .update({ match_card_url: matchCardPath })
         .eq('id', selectedOrderForCard.id)
       
       if (updateError) throw updateError
       
-      // Update local state
+      // Get signed URL for display
+      const { data: signedData } = await supabase.storage
+        .from('match-cards')
+        .createSignedUrl(matchCardPath, 3600)
+      
+      const displayUrl = signedData?.signedUrl
+      
+      // Update local state with signed URL for immediate display
       setOrders(prev => prev.map(o => 
         o.id === selectedOrderForCard.id 
-          ? { ...o, match_card_url: matchCardUrl }
+          ? { ...o, match_card_url: matchCardPath, match_card_signed_url: displayUrl }
           : o
       ))
       
-      // Now extract data from the image
-      await extractMatchCardData(matchCardUrl, selectedOrderForCard.id)
+      // Now extract data from the image using signed URL
+      await extractMatchCardData(displayUrl, selectedOrderForCard.id)
       
       setShowMatchCardModal(false)
       setSelectedOrderForCard(null)
@@ -230,6 +247,35 @@ export default function EventDetail({ event, organization, onBack, onEventUpdate
       console.error('Extraction error:', error)
     } finally {
       setExtractingData(false)
+    }
+  }
+
+  async function deleteMatchCard(order) {
+    if (!confirm('Remove this match card?')) return
+    
+    try {
+      // Delete from storage if it's a path (not legacy URL)
+      if (order.match_card_url && !order.match_card_url.startsWith('http')) {
+        await supabase.storage
+          .from('match-cards')
+          .remove([order.match_card_url])
+      }
+      
+      // Clear from database
+      await supabase
+        .from('content_orders')
+        .update({ match_card_url: null, match_card_data: null })
+        .eq('id', order.id)
+      
+      // Update local state
+      setOrders(prev => prev.map(o => 
+        o.id === order.id 
+          ? { ...o, match_card_url: null, match_card_signed_url: null, match_card_data: null }
+          : o
+      ))
+    } catch (error) {
+      console.error('Delete error:', error)
+      alert('Error removing match card')
     }
   }
 
@@ -778,12 +824,21 @@ export default function EventDetail({ event, organization, onBack, onEventUpdate
                         {/* Match Card Preview */}
                         <div className="flex-shrink-0">
                           {order.match_card_url ? (
-                            <img 
-                              src={order.match_card_url} 
-                              alt="Match Card"
-                              className="w-24 h-32 object-cover rounded-lg cursor-pointer hover:opacity-80"
-                              onClick={() => openMatchCardModal(order)}
-                            />
+                            <div className="relative group">
+                              <img 
+                                src={order.match_card_signed_url || order.match_card_url} 
+                                alt="Match Card"
+                                className="w-24 h-32 object-cover rounded-lg cursor-pointer hover:opacity-80"
+                                onClick={() => openMatchCardModal(order)}
+                              />
+                              <button
+                                onClick={(e) => { e.stopPropagation(); deleteMatchCard(order); }}
+                                className="absolute -top-2 -right-2 bg-red-600 hover:bg-red-700 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="Remove card"
+                              >
+                                ×
+                              </button>
+                            </div>
                           ) : (
                             <button
                               onClick={() => openMatchCardModal(order)}
