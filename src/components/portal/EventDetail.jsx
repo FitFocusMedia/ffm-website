@@ -157,8 +157,8 @@ export default function EventDetail({ event, organization, onBack, onEventUpdate
       (filterStatus === 'captured' && athlete.captured) ||
       (filterStatus === 'pending' && !athlete.captured) ||
       (filterStatus === 'paid' && orders.some(o => 
-        o.customer_name?.toLowerCase() === athlete.name?.toLowerCase() ||
-        o.customer_email?.toLowerCase() === athlete.email?.toLowerCase()
+        `${o.first_name} ${o.last_name}`.toLowerCase() === athlete.name?.toLowerCase() ||
+        o.email?.toLowerCase() === athlete.email?.toLowerCase()
       ))
     
     const matchesMat = filterMat === 'all' || athlete.mat === filterMat
@@ -171,7 +171,7 @@ export default function EventDetail({ event, organization, onBack, onEventUpdate
 
   // Get athletes who have paid (match orders to athletes)
   const paidAthleteNames = new Set(
-    orders.map(o => o.customer_name?.toLowerCase()).filter(Boolean)
+    orders.map(o => `${o.first_name || ''} ${o.last_name || ''}`.toLowerCase().trim()).filter(Boolean)
   )
   
   // Priority queue: paid but not captured
@@ -640,8 +640,8 @@ export default function EventDetail({ event, organization, onBack, onEventUpdate
                             {new Date(order.created_at).toLocaleDateString('en-AU')}
                           </td>
                           <td className="p-3">
-                            <p className="font-medium">{order.customer_name}</p>
-                            <p className="text-xs text-gray-500">{order.customer_email}</p>
+                            <p className="font-medium">{order.first_name} {order.last_name}</p>
+                            <p className="text-xs text-gray-500">{order.email}</p>
                           </td>
                           <td className="p-3 text-gray-400">{order.packages?.name}</td>
                           <td className="p-3 text-right">${order.amount}</td>
