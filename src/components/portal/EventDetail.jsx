@@ -423,21 +423,23 @@ export default function EventDetail({ event, organization, onBack, onEventUpdate
         <p className="text-sm text-gray-500 mt-1">{organization?.name}</p>
       </div>
 
-      {/* Sub-tabs */}
-      <div className="flex gap-2 border-b border-gray-700 pb-2">
-        {tabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2 rounded-t-lg transition-colors ${
-              activeTab === tab.id 
-                ? 'bg-red-600 text-white' 
-                : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      {/* Sub-tabs - horizontally scrollable on mobile */}
+      <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+        <div className="flex gap-2 border-b border-gray-700 pb-2 min-w-max">
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-3 py-2 rounded-t-lg transition-colors whitespace-nowrap text-sm md:text-base md:px-4 ${
+                activeTab === tab.id 
+                  ? 'bg-red-600 text-white' 
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {loading ? (
@@ -819,41 +821,55 @@ export default function EventDetail({ event, organization, onBack, onEventUpdate
               ) : (
                 <div className="grid gap-4">
                   {orders.map(order => (
-                    <div key={order.id} className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
-                      <div className="flex gap-4">
-                        {/* Match Card Preview */}
-                        <div className="flex-shrink-0">
-                          {order.match_card_url ? (
-                            <div className="relative group">
-                              <img 
-                                src={order.match_card_signed_url || order.match_card_url} 
-                                alt="Match Card"
-                                className="w-24 h-32 object-cover rounded-lg cursor-pointer hover:opacity-80"
-                                onClick={() => openMatchCardModal(order)}
-                              />
+                    <div key={order.id} className="bg-gray-900/50 rounded-xl border border-gray-800 p-3 md:p-4">
+                      <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
+                        {/* Match Card Preview + Status (mobile: side by side) */}
+                        <div className="flex sm:block gap-3">
+                          <div className="flex-shrink-0">
+                            {order.match_card_url ? (
+                              <div className="relative group">
+                                <img 
+                                  src={order.match_card_signed_url || order.match_card_url} 
+                                  alt="Match Card"
+                                  className="w-20 h-28 md:w-24 md:h-32 object-cover rounded-lg cursor-pointer hover:opacity-80"
+                                  onClick={() => openMatchCardModal(order)}
+                                />
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); deleteMatchCard(order); }}
+                                  className="absolute -top-2 -right-2 bg-red-600 hover:bg-red-700 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                  title="Remove card"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ) : (
                               <button
-                                onClick={(e) => { e.stopPropagation(); deleteMatchCard(order); }}
-                                className="absolute -top-2 -right-2 bg-red-600 hover:bg-red-700 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                                title="Remove card"
+                                onClick={() => openMatchCardModal(order)}
+                                className="w-20 h-28 md:w-24 md:h-32 bg-gray-800 rounded-lg border-2 border-dashed border-gray-600 hover:border-red-500 flex flex-col items-center justify-center text-gray-500 hover:text-red-400 transition-colors"
                               >
-                                ×
+                                <svg className="w-6 h-6 md:w-8 md:h-8 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                <span className="text-xs">Add Card</span>
                               </button>
+                            )}
+                          </div>
+                          {/* Mobile: Name + Status next to card */}
+                          <div className="sm:hidden flex-grow">
+                            <p className="font-semibold">{order.first_name} {order.last_name}</p>
+                            <p className="text-xs text-gray-400 truncate">{order.email}</p>
+                            <div className="flex items-center gap-2 mt-2">
+                              <span className="font-semibold text-green-400">${order.amount}</span>
+                              <span className={`px-2 py-0.5 rounded text-xs ${
+                                order.status === 'paid' ? 'bg-green-600' :
+                                order.status === 'pending' ? 'bg-yellow-600' : 'bg-gray-600'
+                              }`}>{order.status}</span>
                             </div>
-                          ) : (
-                            <button
-                              onClick={() => openMatchCardModal(order)}
-                              className="w-24 h-32 bg-gray-800 rounded-lg border-2 border-dashed border-gray-600 hover:border-red-500 flex flex-col items-center justify-center text-gray-500 hover:text-red-400 transition-colors"
-                            >
-                              <svg className="w-8 h-8 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                              </svg>
-                              <span className="text-xs">Add Card</span>
-                            </button>
-                          )}
+                          </div>
                         </div>
                         
-                        {/* Order Details */}
-                        <div className="flex-grow">
+                        {/* Order Details - Desktop */}
+                        <div className="flex-grow hidden sm:block">
                           <div className="flex justify-between items-start">
                             <div>
                               <p className="font-semibold text-lg">{order.first_name} {order.last_name}</p>
