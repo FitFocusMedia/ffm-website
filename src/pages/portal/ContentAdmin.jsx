@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { getDirectImageUrl } from '../../lib/imageUtils'
+import EventDetail from '../../components/portal/EventDetail'
 
 export default function ContentAdmin() {
   const [organizations, setOrganizations] = useState([])
@@ -11,7 +12,11 @@ export default function ContentAdmin() {
   const [divisionSubdivisions, setDivisionSubdivisions] = useState([])
   const [orders, setOrders] = useState([])
   const [galleries, setGalleries] = useState([])
+  const [galleryOrders, setGalleryOrders] = useState([])
   const [loading, setLoading] = useState(true)
+  
+  // Event detail view
+  const [selectedEvent, setSelectedEvent] = useState(null)
   
   // Sub-tab within org view
   const [orgTab, setOrgTab] = useState('events')
@@ -66,17 +71,19 @@ export default function ContentAdmin() {
   }
 
   async function loadOrgData(orgId) {
-    const [eventsRes, packagesRes, ordersRes, galleriesRes] = await Promise.all([
+    const [eventsRes, packagesRes, ordersRes, galleriesRes, galleryOrdersRes] = await Promise.all([
       supabase.from('events').select('*').eq('organization_id', orgId).order('date', { ascending: true }),
       supabase.from('packages').select('*').eq('organization_id', orgId).order('sort_order'),
       supabase.from('content_orders').select('*, events(name), packages(name)').eq('organization_id', orgId).order('created_at', { ascending: false }).limit(50),
-      supabase.from('galleries').select('*, events(name), gallery_photos(count)').eq('organization_id', orgId).order('created_at', { ascending: false })
+      supabase.from('galleries').select('*, events(name), gallery_photos(count)').eq('organization_id', orgId).order('created_at', { ascending: false }),
+      supabase.from('gallery_purchases').select('*, galleries(title, slug, events(name))').eq('organization_id', orgId).order('created_at', { ascending: false }).limit(100)
     ])
     
     setOrgEvents(eventsRes.data || [])
     setOrgPackages(packagesRes.data || [])
     setOrders(ordersRes.data || [])
     setGalleries(galleriesRes.data || [])
+    setGalleryOrders(galleryOrdersRes.data || [])
     
     // Load divisions for all events
     const eventIds = (eventsRes.data || []).map(e => e.id)
@@ -414,6 +421,21 @@ export default function ContentAdmin() {
   }
 
   // ==================== ORGANIZATION DETAIL VIEW ====================
+  
+  // If an event is selected, show EventDetail view
+  if (selectedEvent) {
+    return (
+      <div className="p-6">
+        <EventDetail
+          event={selectedEvent}
+          organization={selectedOrg}
+          onBack={() => setSelectedEvent(null)}
+          onEventUpdate={() => loadOrgData(selectedOrg.id)}
+        />
+      </div>
+    )
+  }
+  
   return (
     <div className="p-6">
       {/* Header with back button */}
@@ -440,20 +462,21 @@ export default function ContentAdmin() {
       </div>
 
       {/* Sub-tabs */}
-      <div className="flex gap-2 mb-6 border-b border-gray-700 pb-2">
-        {['events', 'packages', 'divisions', 'galleries', 'orders'].map(tab => (
+      <div className="flex gap-2 mb-6 border-b border-gray-700 pb-2 overflow-x-auto">
+        {['events', 'packages', 'divisions', 'galleries', 'gallery-orders', 'orders'].map(tab => (
           <button
             key={tab}
             onClick={() => setOrgTab(tab)}
-            className={`px-4 py-2 rounded-t-lg capitalize transition-colors ${
+            className={`px-4 py-2 rounded-t-lg capitalize transition-colors whitespace-nowrap ${
               orgTab === tab 
                 ? 'bg-red-600 text-white' 
                 : 'text-gray-400 hover:text-white'
             }`}
           >
-            {tab} {tab === 'events' && `(${orgEvents.length})`}
+            {tab === 'gallery-orders' ? 'Gallery Orders' : tab} {tab === 'events' && `(${orgEvents.length})`}
             {tab === 'packages' && `(${orgPackages.length})`}
             {tab === 'galleries' && `(${galleries.length})`}
+            {tab === 'gallery-orders' && `(${galleryOrders.length})`}
             {tab === 'orders' && `(${orders.length})`}
           </button>
         ))}
@@ -491,8 +514,12 @@ export default function ContentAdmin() {
                 </thead>
                 <tbody>
                   {orgEvents.map(event => (
-                    <tr key={event.id} className="border-t border-gray-800">
-                      <td className="p-3 font-medium">{event.name}</td>
+                    <tr 
+                      key={event.id} 
+                      className="border-t border-gray-800 hover:bg-gray-800/50 cursor-pointer transition-colors"
+                      onClick={() => setSelectedEvent(event)}
+                    >
+                      <td className="p-3 font-medium text-blue-400 hover:text-blue-300">{event.name}</td>
                       <td className="p-3 text-gray-400">
                         {event.date && new Date(event.date).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
                       </td>
@@ -505,7 +532,7 @@ export default function ContentAdmin() {
                           {event.status}
                         </span>
                       </td>
-                      <td className="p-3 text-center">
+                      <td className="p-3 text-center" onClick={e => e.stopPropagation()}>
                         <button
                           onClick={() => toggleActive('events', event.id, event.active)}
                           className={`px-2 py-1 rounded text-xs ${event.active ? 'bg-green-600' : 'bg-gray-600'}`}
@@ -513,7 +540,7 @@ export default function ContentAdmin() {
                           {event.active ? 'Yes' : 'No'}
                         </button>
                       </td>
-                      <td className="p-3 text-right space-x-2">
+                      <td className="p-3 text-right space-x-2" onClick={e => e.stopPropagation()}>
                         <button onClick={() => openModal('event', event)} className="text-blue-400 hover:text-blue-300">Edit</button>
                         <button onClick={() => deleteItem('events', event.id)} className="text-red-400 hover:text-red-300">Delete</button>
                       </td>
@@ -855,6 +882,82 @@ export default function ContentAdmin() {
                         <a href={`/#/portal/galleries?edit=${gallery.id}`} className="text-blue-400 hover:text-blue-300">Edit</a>
                         {gallery.status === 'published' && (
                           <a href={`/#/gallery/${gallery.slug}`} target="_blank" className="text-green-400 hover:text-green-300">View</a>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* GALLERY ORDERS TAB */}
+      {orgTab === 'gallery-orders' && (
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold">Gallery Photo Orders</h2>
+            <div className="text-sm text-gray-400">
+              Total Revenue: <span className="text-green-400 font-semibold">
+                ${galleryOrders.reduce((sum, o) => sum + (o.amount || 0), 0).toFixed(2)}
+              </span>
+            </div>
+          </div>
+          
+          {galleryOrders.length === 0 ? (
+            <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-8 text-center text-gray-400">
+              No gallery orders yet. Orders will appear here when customers purchase photos.
+            </div>
+          ) : (
+            <div className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-800">
+                  <tr>
+                    <th className="text-left p-3">Date</th>
+                    <th className="text-left p-3">Customer</th>
+                    <th className="text-left p-3">Gallery</th>
+                    <th className="text-left p-3">Event</th>
+                    <th className="text-center p-3">Photos</th>
+                    <th className="text-right p-3">Amount</th>
+                    <th className="text-center p-3">Status</th>
+                    <th className="text-right p-3">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {galleryOrders.map(order => (
+                    <tr key={order.id} className="border-t border-gray-800">
+                      <td className="p-3 text-gray-400">
+                        {new Date(order.created_at).toLocaleDateString('en-AU')}
+                        <div className="text-xs text-gray-500">
+                          {new Date(order.created_at).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      </td>
+                      <td className="p-3">
+                        <div className="font-medium">{order.customer_name || 'N/A'}</div>
+                        <div className="text-xs text-gray-500">{order.customer_email}</div>
+                      </td>
+                      <td className="p-3 text-gray-400">{order.galleries?.title || 'N/A'}</td>
+                      <td className="p-3 text-gray-400">{order.galleries?.events?.name || '—'}</td>
+                      <td className="p-3 text-center">{order.photo_count || 1}</td>
+                      <td className="p-3 text-right font-semibold text-green-400">${(order.amount || 0).toFixed(2)}</td>
+                      <td className="p-3 text-center">
+                        <span className={`px-2 py-1 rounded text-xs ${
+                          order.status === 'completed' || order.status === 'paid' ? 'bg-green-600' :
+                          order.status === 'pending' ? 'bg-yellow-600' : 'bg-gray-600'
+                        }`}>
+                          {order.status || 'pending'}
+                        </span>
+                      </td>
+                      <td className="p-3 text-right">
+                        {order.galleries?.slug && (
+                          <a 
+                            href={`/#/gallery/${order.galleries.slug}`} 
+                            target="_blank"
+                            className="text-blue-400 hover:text-blue-300 text-sm"
+                          >
+                            View Gallery
+                          </a>
                         )}
                       </td>
                     </tr>
