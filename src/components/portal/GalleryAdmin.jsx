@@ -323,6 +323,10 @@ function GalleryEditor({ galleryId, onBack }) {
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 })
+  const [selectedCategory, setSelectedCategory] = useState('Main')
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [categories, setCategories] = useState(['Main'])
+  const [filterCategory, setFilterCategory] = useState('All')
 
   useEffect(() => {
     loadGallery()
@@ -361,6 +365,14 @@ function GalleryEditor({ galleryId, onBack }) {
       }))
 
       setPhotos(photosWithUrls)
+      
+      // Extract unique categories
+      const uniqueCategories = ['Main', ...new Set(
+        photosData
+          .map(p => p.category)
+          .filter(c => c && c !== 'Main')
+      )]
+      setCategories(uniqueCategories)
     } catch (err) {
       console.error('Load gallery error:', err)
     } finally {
@@ -431,6 +443,7 @@ function GalleryEditor({ galleryId, onBack }) {
             watermarked_path: watermarkedPath,
             thumbnail_path: thumbnailPath,
             filename: file.name,
+            category: selectedCategory,
             sort_order: sortOrder++,
             width: img.width,
             height: img.height,
@@ -570,6 +583,63 @@ function GalleryEditor({ galleryId, onBack }) {
         </div>
       </div>
 
+      {/* Category Selector */}
+      <div className="bg-dark-800 border border-dark-700 rounded-xl p-4 mb-6">
+        <label className="block text-gray-300 font-medium mb-2">Upload to Category</label>
+        <div className="flex gap-2 flex-wrap mb-3">
+          {categories.map(cat => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                selectedCategory === cat
+                  ? 'bg-red-600 text-white'
+                  : 'bg-dark-700 text-gray-400 hover:bg-dark-600'
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="New category name..."
+            value={newCategoryName}
+            onChange={(e) => setNewCategoryName(e.target.value)}
+            className="flex-1 bg-dark-900 border border-dark-700 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-red-500"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && newCategoryName.trim()) {
+                const newCat = newCategoryName.trim()
+                if (!categories.includes(newCat)) {
+                  setCategories([...categories, newCat])
+                  setSelectedCategory(newCat)
+                  setNewCategoryName('')
+                }
+              }
+            }}
+          />
+          <button
+            onClick={() => {
+              if (newCategoryName.trim()) {
+                const newCat = newCategoryName.trim()
+                if (!categories.includes(newCat)) {
+                  setCategories([...categories, newCat])
+                  setSelectedCategory(newCat)
+                  setNewCategoryName('')
+                }
+              }
+            }}
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
+          >
+            Add Category
+          </button>
+        </div>
+        <p className="text-gray-500 text-sm mt-2">
+          Photos will be uploaded to: <span className="text-red-400 font-medium">{selectedCategory}</span>
+        </p>
+      </div>
+
       {/* Upload Area */}
       <div
         {...getRootProps()}
@@ -605,6 +675,34 @@ function GalleryEditor({ galleryId, onBack }) {
         )}
       </div>
 
+      {/* Category Filter */}
+      {photos.length > 0 && (
+        <div className="mb-4 flex gap-2 items-center flex-wrap">
+          <span className="text-gray-400 text-sm font-medium">Filter:</span>
+          {['All', ...categories].map(cat => (
+            <button
+              key={cat}
+              onClick={() => setFilterCategory(cat)}
+              className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                filterCategory === cat
+                  ? 'bg-red-600 text-white'
+                  : 'bg-dark-800 text-gray-400 hover:bg-dark-700'
+              }`}
+            >
+              {cat}
+              {cat !== 'All' && (
+                <span className="ml-1.5 text-xs opacity-70">
+                  ({photos.filter(p => (p.category || 'Main') === cat).length})
+                </span>
+              )}
+              {cat === 'All' && (
+                <span className="ml-1.5 text-xs opacity-70">({photos.length})</span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Photo Grid */}
       {photos.length === 0 ? (
         <div className="text-center py-12 text-gray-400">
@@ -612,7 +710,9 @@ function GalleryEditor({ galleryId, onBack }) {
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          {photos.map(photo => (
+          {photos
+            .filter(photo => filterCategory === 'All' || (photo.category || 'Main') === filterCategory)
+            .map(photo => (
             <div key={photo.id} className="relative group">
               <img
                 src={photo.thumbnail_url}
@@ -630,6 +730,11 @@ function GalleryEditor({ galleryId, onBack }) {
               <div className="absolute bottom-1 left-1 right-1 text-xs text-white truncate bg-black/50 px-1 rounded">
                 {photo.filename}
               </div>
+              {photo.category && photo.category !== 'Main' && (
+                <div className="absolute top-1 left-1 bg-red-600 text-white text-xs px-2 py-0.5 rounded font-medium">
+                  {photo.category}
+                </div>
+              )}
             </div>
           ))}
         </div>

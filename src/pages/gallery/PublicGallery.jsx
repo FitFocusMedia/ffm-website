@@ -69,6 +69,8 @@ export default function GalleryPage() {
   const [showCheckout, setShowCheckout] = useState(false)
   const [purchasing, setPurchasing] = useState(false)
   const [lightboxPhoto, setLightboxPhoto] = useState(null)
+  const [filterCategory, setFilterCategory] = useState('All')
+  const [categories, setCategories] = useState(['All'])
   
   // Tutorial state (mobile only)
   const [tutorialStep, setTutorialStep] = useState(0) // 0=not started, 1=tap image, 2=swipe, 3=double-tap, 4=done
@@ -159,6 +161,14 @@ export default function GalleryPage() {
       }))
 
       setPhotos(photosWithUrls)
+      
+      // Extract unique categories
+      const uniqueCategories = ['All', ...new Set(
+        photosData
+          .map(p => p.category || 'Main')
+          .filter(c => c && c !== 'All')
+      )]
+      setCategories(uniqueCategories)
     } catch (err) {
       console.error('Load gallery error:', err)
       setError('Gallery not found')
@@ -348,9 +358,36 @@ export default function GalleryPage() {
           )}
         </div>
 
+        {/* Category Tabs */}
+        {categories.length > 1 && (
+          <div className="mb-4 md:mb-6 flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+            {categories.map(cat => (
+              <button
+                key={cat}
+                onClick={() => setFilterCategory(cat)}
+                className={`px-3 md:px-4 py-2 rounded-lg text-sm md:text-base font-medium whitespace-nowrap transition-all ${
+                  filterCategory === cat
+                    ? 'bg-red-500 text-white shadow-lg'
+                    : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                }`}
+              >
+                {cat}
+                <span className="ml-1.5 text-xs opacity-70">
+                  ({cat === 'All' 
+                    ? photos.length 
+                    : photos.filter(p => (p.category || 'Main') === cat).length
+                  })
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Photo Grid */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 md:gap-4 mb-24 md:mb-8">
-          {photos.map((photo, index) => (
+          {photos
+            .filter(photo => filterCategory === 'All' || (photo.category || 'Main') === filterCategory)
+            .map((photo, index) => (
             <div
               key={photo.id}
               className={`relative group cursor-pointer rounded-lg overflow-hidden transition-transform active:scale-98 ${
