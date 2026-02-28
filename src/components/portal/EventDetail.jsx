@@ -75,7 +75,51 @@ export default function EventDetail({ event, organization, onBack, onEventUpdate
     setGalleries(galleriesRes.data || [])
     setAthletes(athletesRes.data || [])
     
+    // Auto-sync orders to athletes (creates athlete records for anyone who ordered)
+    await syncOrdersToAthletes(ordersWithSignedUrls, athletesRes.data || [])
+    
     setLoading(false)
+  }
+
+  // Automatically create athlete records from orders
+  async function syncOrdersToAthletes(ordersList, existingAthletes) {
+    const athletesToCreate = []
+    
+    for (const order of ordersList) {
+      const athleteName = `${order.first_name || ''} ${order.last_name || ''}`.trim()
+      if (!athleteName) continue
+      
+      // Check if athlete already exists (by name match or order_id link)
+      const exists = existingAthletes.some(a => 
+        a.order_id === order.id || 
+        a.name?.toLowerCase() === athleteName.toLowerCase()
+      )
+      
+      if (!exists) {
+        athletesToCreate.push({
+          event_id: event.id,
+          name: athleteName,
+          email: order.email,
+          order_id: order.id,
+          package: order.packages?.name || 'Photo Pack',
+          status: 'pending', // pending capture
+          mat: order.match_card_data?.mat || null,
+          competition_time: order.match_card_data?.time || null,
+          division: order.match_card_data?.division || null
+        })
+      }
+    }
+    
+    if (athletesToCreate.length > 0) {
+      const { data: newAthletes, error } = await supabase
+        .from('event_athletes')
+        .insert(athletesToCreate)
+        .select()
+      
+      if (!error && newAthletes) {
+        setAthletes(prev => [...prev, ...newAthletes])
+      }
+    }
   }
 
   // Parse Smoothcomp import format: Name | Division | Mat | Time | Academy
@@ -282,38 +326,59 @@ export default function EventDetail({ event, organization, onBack, onEventUpdate
   async function createOrUpdateAthleteFromOrder(order, extractedData) {
     const athleteName = `${order.first_name || ''} ${order.last_name || ''}`.trim()
     
-    // Check if athlete already exists
-    const { data: existing } = await supabase
+    // Check if athlete already exists (by order_id link OR name match)
+    const { data: existingByOrder } = await supabase
+      .from('event_athletes')
+      .select('id')
+      .eq('order_id', order.id)
+      .single()
+    
+    const { data: existingByName } = await supabase
       .from('event_athletes')
       .select('id')
       .eq('event_id', event.id)
       .ilike('name', athleteName)
       .single()
     
+    const existing = existingByOrder || existingByName
+    
     const athleteData = {
       event_id: event.id,
       name: athleteName,
+      order_id: order.id,
       division: extractedData.division || null,
       mat: extractedData.mat || null,
       competition_time: extractedData.time || null,
       email: order.email || null,
-      status: 'pending',
+      package: order.packages?.name || null,
+      status: 'scheduled', // Now has schedule info
       captured: false
     }
     
     if (existing) {
-      await supabase
+      // Update existing athlete with extracted data
+      const { error } = await supabase
         .from('event_athletes')
         .update(athleteData)
         .eq('id', existing.id)
+      
+      if (!error) {
+        setAthletes(prev => prev.map(a => 
+          a.id === existing.id ? { ...a, ...athleteData } : a
+        ))
+      }
     } else {
-      await supabase
+      // Create new athlete
+      const { data: newAthlete, error } = await supabase
         .from('event_athletes')
         .insert(athleteData)
+        .select()
+        .single()
+      
+      if (!error && newAthlete) {
+        setAthletes(prev => [...prev, newAthlete])
+      }
     }
-    
-    // Refresh athletes list
-    loadEventData()
   }
 
   function openMatchCardModal(order) {
