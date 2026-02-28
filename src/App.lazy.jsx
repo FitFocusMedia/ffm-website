@@ -86,6 +86,10 @@ const LivestreamAdmin = lazy(() => import('./pages/portal/LivestreamAdmin'))
 const LivestreamAnalytics = lazy(() => import('./pages/portal/LivestreamAnalytics'))
 const ProposalAdmin = lazy(() => import('./pages/portal/ProposalAdmin'))
 const GalleryAdmin = lazy(() => import('./pages/portal/GalleryAdmin'))
+const VideoGalleryAdmin = lazy(() => import('./components/portal/VideoGalleryAdmin'))
+
+// Video Gallery - public
+const PublicVideoGallery = lazy(() => import('./pages/video-gallery/PublicVideoGallery'))
 
 // Loading spinner component
 function PageLoader() {
@@ -184,6 +188,9 @@ function App() {
           {/* Public Gallery Routes */}
           <Route path="/gallery/:slug" element={<PublicGallery />} />
           <Route path="/gallery/download/:token" element={<DownloadPage />} />
+          
+          {/* Video Gallery */}
+          <Route path="/video-gallery/:slug" element={<LazyRoute><PublicVideoGallery /></LazyRoute>} />
 
           {/* Portal Login */}
           <Route path="/portal" element={<LazyPortalLayout><LoginPage /></LazyPortalLayout>} />
@@ -209,6 +216,7 @@ function App() {
           <Route path="/portal/content" element={<LazyProtectedRoute><LazyPortalLayout><ContentManager /></LazyPortalLayout></LazyProtectedRoute>} />
           <Route path="/portal/content-admin" element={<LazyProtectedRoute><LazyPortalLayout><ContentAdmin /></LazyPortalLayout></LazyProtectedRoute>} />
           <Route path="/portal/galleries" element={<LazyProtectedRoute><LazyPortalLayout><GalleryAdmin /></LazyPortalLayout></LazyProtectedRoute>} />
+          <Route path="/portal/video-galleries" element={<LazyProtectedRoute><LazyPortalLayout><VideoGalleryAdmin /></LazyPortalLayout></LazyProtectedRoute>} />
           <Route path="/portal/orders" element={<LazyProtectedRoute><LazyPortalLayout><OrderManagement /></LazyPortalLayout></LazyProtectedRoute>} />
           <Route path="/portal/pricing" element={<LazyProtectedRoute><LazyPortalLayout><PricingCalculator /></LazyPortalLayout></LazyProtectedRoute>} />
           <Route path="/portal/crews" element={<LazyProtectedRoute><LazyPortalLayout><CrewManagement /></LazyPortalLayout></LazyProtectedRoute>} />

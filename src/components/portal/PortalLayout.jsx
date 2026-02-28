@@ -28,6 +28,7 @@ export default function PortalLayout({ children }) {
     { name: 'Content', path: '/portal/content-admin' },
     { name: 'Orders', path: '/portal/orders' },
     { name: 'Gallery Orders', path: '/portal/gallery-orders' },
+    { name: '🎬 Videos', path: '/portal/video-galleries' },
     { name: 'Livestream', path: '/portal/livestream' },
     { name: 'Analytics', path: '/portal/livestream/analytics' },
     { name: 'Crews', path: '/portal/crews' },
