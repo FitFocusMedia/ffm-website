@@ -71,6 +71,24 @@ export default function GalleryPage() {
   const [lightboxPhoto, setLightboxPhoto] = useState(null)
   const [filterCategory, setFilterCategory] = useState('All')
   const [categories, setCategories] = useState(['All'])
+  const [showCategoryTabs, setShowCategoryTabs] = useState(true)
+  const lastScrollY = useRef(0)
+  
+  // Hide category tabs on scroll down, show on scroll up
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY
+      if (currentScrollY > lastScrollY.current && currentScrollY > 100) {
+        setShowCategoryTabs(false) // Scrolling down
+      } else {
+        setShowCategoryTabs(true) // Scrolling up
+      }
+      lastScrollY.current = currentScrollY
+    }
+    
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
   
   // Tutorial state (mobile only)
   const [tutorialStep, setTutorialStep] = useState(0) // 0=not started, 1=tap image, 2=swipe, 3=double-tap, 4=done
@@ -358,28 +376,34 @@ export default function GalleryPage() {
           )}
         </div>
 
-        {/* Category Tabs */}
+        {/* Category Tabs - Sticky, hides on scroll down, shows on scroll up */}
         {categories.length > 1 && (
-          <div className="mb-4 md:mb-6 flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-            {categories.map(cat => (
-              <button
-                key={cat}
-                onClick={() => setFilterCategory(cat)}
-                className={`px-3 md:px-4 py-2 rounded-lg text-sm md:text-base font-medium whitespace-nowrap transition-all ${
-                  filterCategory === cat
-                    ? 'bg-red-500 text-white shadow-lg'
-                    : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                }`}
-              >
-                {cat}
-                <span className="ml-1.5 text-xs opacity-70">
-                  ({cat === 'All' 
-                    ? photos.length 
-                    : photos.filter(p => (p.category || 'Main') === cat).length
-                  })
-                </span>
-              </button>
-            ))}
+          <div 
+            className={`sticky top-0 z-20 bg-gradient-to-b from-[#0d0d1a] via-[#0d0d1a] to-transparent pb-4 pt-2 -mx-4 px-4 transition-all duration-300 ${
+              showCategoryTabs ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-full pointer-events-none'
+            }`}
+          >
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+              {categories.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setFilterCategory(cat)}
+                  className={`px-3 md:px-4 py-2 rounded-lg text-sm md:text-base font-medium whitespace-nowrap transition-all ${
+                    filterCategory === cat
+                      ? 'bg-red-500 text-white shadow-lg'
+                      : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                  }`}
+                >
+                  {cat}
+                  <span className="ml-1.5 text-xs opacity-70">
+                    ({cat === 'All' 
+                      ? photos.length 
+                      : photos.filter(p => (p.category || 'Main') === cat).length
+                    })
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
