@@ -661,10 +661,14 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
   const isSelected = selectedPhotos.has(currentPhoto.id)
   const containerRef = useRef(null)
   
-  // Simple swipe state
-  const [dragY, setDragY] = useState(0)
+  // TikTok-style swipe state
+  const [offsetY, setOffsetY] = useState(0)  // Current drag offset in px
   const [isDragging, setIsDragging] = useState(false)
   const [touchStartY, setTouchStartY] = useState(0)
+  const [touchStartTime, setTouchStartTime] = useState(0)  // For velocity calculation
+  const [lastTouchY, setLastTouchY] = useState(0)  // Track last position for velocity
+  const [lastTouchTime, setLastTouchTime] = useState(0)  // Track timing for velocity
+  const [isAnimating, setIsAnimating] = useState(false)  // True during slide animation
   const [hasSwipedUp, setHasSwipedUp] = useState(false)
   const [hasSwipedDown, setHasSwipedDown] = useState(false)
   
@@ -673,7 +677,16 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
   const [showHeartAnimation, setShowHeartAnimation] = useState(false)
   const [heartPosition, setHeartPosition] = useState({ x: 0, y: 0 })
   
-  // Get adjacent photos for peek preview
+  // Viewport height for calculations
+  const [viewportHeight, setViewportHeight] = useState(window.innerHeight)
+  
+  useEffect(() => {
+    const updateHeight = () => setViewportHeight(window.innerHeight)
+    window.addEventListener('resize', updateHeight)
+    return () => window.removeEventListener('resize', updateHeight)
+  }, [])
+  
+  // Get adjacent photos
   const prevPhoto = currentIndex > 0 ? photos[currentIndex - 1] : null
   const nextPhoto = currentIndex < photos.length - 1 ? photos[currentIndex + 1] : null
   
@@ -696,22 +709,33 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
     }
   }, [])
   
-  // Navigation functions
-  const goNext = useCallback(() => {
-    if (currentIndex < photos.length - 1) {
-      onNavigate(photos[currentIndex + 1])
-    }
-  }, [currentIndex, photos, onNavigate])
+  // Animate to next/prev with smooth TikTok-style slide
+  const animateToPhoto = useCallback((direction) => {
+    // direction: 1 = next (slide up), -1 = prev (slide down)
+    const targetPhoto = direction === 1 ? nextPhoto : prevPhoto
+    if (!targetPhoto || isAnimating) return
+    
+    setIsAnimating(true)
+    // Animate offset to full viewport height
+    setOffsetY(direction === -1 ? viewportHeight : -viewportHeight)
+    
+    // After animation completes (280ms), swap photo and reset offset instantly
+    // The timeout matches the CSS transition duration for seamless handoff
+    setTimeout(() => {
+      onNavigate(targetPhoto)
+      setOffsetY(0)
+      setIsAnimating(false)
+    }, 280)
+  }, [nextPhoto, prevPhoto, viewportHeight, onNavigate, isAnimating])
   
-  const goPrev = useCallback(() => {
-    if (currentIndex > 0) {
-      onNavigate(photos[currentIndex - 1])
-    }
-  }, [currentIndex, photos, onNavigate])
+  // Navigation functions
+  const goNext = useCallback(() => animateToPhoto(1), [animateToPhoto])
+  const goPrev = useCallback(() => animateToPhoto(-1), [animateToPhoto])
   
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e) => {
+      if (isAnimating) return
       if (e.key === 'ArrowDown' || e.key === 'ArrowRight') { e.preventDefault(); goNext() }
       else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') { e.preventDefault(); goPrev() }
       else if (e.key === 'Escape') onClose()
@@ -719,47 +743,87 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [goNext, goPrev, onClose, onToggleSelect, currentPhoto.id])
+  }, [goNext, goPrev, onClose, onToggleSelect, currentPhoto.id, isAnimating])
   
-  // Touch handlers - direct 1:1 tracking
+  // Touch handlers - 1:1 finger tracking with velocity detection
   const onTouchStart = (e) => {
-    setTouchStartY(e.touches[0].clientY)
+    if (isAnimating) return
+    const now = Date.now()
+    const touchY = e.touches[0].clientY
+    setTouchStartY(touchY)
+    setTouchStartTime(now)
+    setLastTouchY(touchY)
+    setLastTouchTime(now)
     setIsDragging(true)
-    setDragY(0)
   }
   
   const onTouchMove = (e) => {
-    if (!isDragging) return
-    const deltaY = e.touches[0].clientY - touchStartY
-    setDragY(deltaY)
+    if (!isDragging || isAnimating) return
+    const now = Date.now()
+    const touchY = e.touches[0].clientY
+    const deltaY = touchY - touchStartY
+    
+    // Track for velocity calculation (use last 50ms of movement)
+    setLastTouchY(touchY)
+    setLastTouchTime(now)
+    
+    // Add resistance at edges (no prev/next available)
+    const resistance = 0.3
+    let newOffset = deltaY
+    if (deltaY > 0 && !prevPhoto) newOffset = deltaY * resistance
+    if (deltaY < 0 && !nextPhoto) newOffset = deltaY * resistance
+    setOffsetY(newOffset)
   }
   
-  const onTouchEnd = () => {
+  const onTouchEnd = (e) => {
+    if (!isDragging || isAnimating) return
     setIsDragging(false)
-    const threshold = 80
     
-    if (dragY < -threshold && nextPhoto) {
-      goNext()
-      // Tutorial: track swipe up (to next)
-      if (tutorialStep === 2 && !hasSwipedUp) {
-        setHasSwipedUp(true)
-        // Advance to step 3 only if both directions have been swiped
-        if (hasSwipedDown) onTutorialStep?.(3)
+    // Calculate velocity (px/ms)
+    const now = Date.now()
+    const timeDelta = Math.max(now - lastTouchTime, 1) // Prevent division by zero
+    const lastY = e.changedTouches?.[0]?.clientY ?? lastTouchY
+    const distDelta = lastY - lastTouchY
+    const velocity = distDelta / timeDelta // px/ms (negative = swiping up)
+    
+    // Thresholds
+    const distanceThreshold = viewportHeight * 0.15 // 15% of screen
+    const velocityThreshold = 0.5 // px/ms (a quick flick)
+    
+    // Determine if we should navigate based on distance OR velocity
+    const movedEnough = Math.abs(offsetY) > distanceThreshold
+    const flickedUp = velocity < -velocityThreshold && offsetY < 0
+    const flickedDown = velocity > velocityThreshold && offsetY > 0
+    const shouldNavigate = movedEnough || flickedUp || flickedDown
+    
+    if (shouldNavigate) {
+      if ((offsetY < 0 || flickedUp) && nextPhoto && offsetY <= 0) {
+        // Tutorial: track swipe up
+        if (tutorialStep === 2 && !hasSwipedUp) {
+          setHasSwipedUp(true)
+          if (hasSwipedDown) onTutorialStep?.(3)
+        }
+        animateToPhoto(1)
+      } else if ((offsetY > 0 || flickedDown) && prevPhoto && offsetY >= 0) {
+        // Tutorial: track swipe down
+        if (tutorialStep === 2 && !hasSwipedDown) {
+          setHasSwipedDown(true)
+          if (hasSwipedUp) onTutorialStep?.(3)
+        }
+        animateToPhoto(-1)
+      } else {
+        // Snap back (edge case)
+        setOffsetY(0)
       }
-    } else if (dragY > threshold && prevPhoto) {
-      goPrev()
-      // Tutorial: track swipe down (to prev)
-      if (tutorialStep === 2 && !hasSwipedDown) {
-        setHasSwipedDown(true)
-        // Advance to step 3 only if both directions have been swiped
-        if (hasSwipedUp) onTutorialStep?.(3)
-      }
+    } else {
+      // Snap back to current
+      setOffsetY(0)
     }
-    setDragY(0)
   }
   
   // Double-tap handler
   const handleTap = (e) => {
+    if (isAnimating) return
     const now = Date.now()
     if (now - lastTap < 300) {
       const rect = e.currentTarget.getBoundingClientRect()
@@ -769,7 +833,6 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
       setShowHeartAnimation(true)
       if (!selectedPhotos.has(currentPhoto.id)) {
         onToggleSelect(currentPhoto.id)
-        // Tutorial: user double-tapped to add, complete tutorial (pass photo ID for cleanup)
         if (tutorialStep === 3) {
           onTutorialStep?.(4, currentPhoto.id)
         }
@@ -785,6 +848,11 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
     if (nextPhoto) { const img = new Image(); img.src = nextPhoto.watermarked_url }
   }, [prevPhoto, nextPhoto])
   
+  // Calculate transform for the sliding container
+  // TikTok uses ~250-300ms with ease-out (fast start, decelerate at end)
+  const containerTransform = `translateY(${offsetY}px)`
+  const transitionStyle = isDragging ? 'none' : 'transform 0.28s cubic-bezier(0.33, 1, 0.68, 1)' // Ease-out quad
+  
   return (
     <div 
       ref={containerRef}
@@ -795,44 +863,65 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
       onTouchEnd={onTouchEnd}
       onClick={handleTap}
     >
-      {/* LAYER 1: Next image (BEHIND) - stationary, revealed as current slides away */}
-      {nextPhoto && (
-        <div className="absolute inset-0 flex items-center justify-center p-4 pt-16 pb-24">
-          <img
-            src={nextPhoto.watermarked_url}
-            alt="Next"
-            className="max-w-full max-h-full object-contain"
-            draggable={false}
-          />
-        </div>
-      )}
-      
-      {/* LAYER 2: Previous image (BEHIND) - only visible when dragging down */}
-      {prevPhoto && dragY > 0 && (
-        <div className="absolute inset-0 flex items-center justify-center p-4 pt-16 pb-24">
-          <img
-            src={prevPhoto.watermarked_url}
-            alt="Previous"
-            className="max-w-full max-h-full object-contain"
-            draggable={false}
-          />
-        </div>
-      )}
-      
-      {/* LAYER 3: Current image (TOP) - this one moves with swipe */}
-      <div 
-        className="absolute inset-0 flex items-center justify-center p-4 pt-16 pb-24 bg-black"
+      {/* Sliding viewport container - all 3 images move together */}
+      <div
+        className="absolute inset-0"
         style={{
-          transform: `translateY(${dragY}px)`,
-          transition: isDragging ? 'none' : 'transform 0.25s ease-out'
+          transform: containerTransform,
+          transition: transitionStyle
         }}
       >
-        <img
-          src={currentPhoto.watermarked_url}
-          alt={currentPhoto.filename}
-          className="max-w-full max-h-full object-contain select-none"
-          draggable={false}
-        />
+        {/* Previous photo - positioned above current */}
+        {prevPhoto && (
+          <div 
+            className="absolute inset-x-0 flex items-center justify-center p-4 pt-16 pb-24"
+            style={{ 
+              height: viewportHeight,
+              top: -viewportHeight
+            }}
+          >
+            <img
+              src={prevPhoto.watermarked_url}
+              alt="Previous"
+              className="max-w-full max-h-full object-contain"
+              draggable={false}
+            />
+          </div>
+        )}
+        
+        {/* Current photo - at origin position */}
+        <div 
+          className="absolute inset-x-0 flex items-center justify-center p-4 pt-16 pb-24"
+          style={{ 
+            height: viewportHeight,
+            top: 0
+          }}
+        >
+          <img
+            src={currentPhoto.watermarked_url}
+            alt={currentPhoto.filename}
+            className="max-w-full max-h-full object-contain select-none"
+            draggable={false}
+          />
+        </div>
+        
+        {/* Next photo - positioned below current */}
+        {nextPhoto && (
+          <div 
+            className="absolute inset-x-0 flex items-center justify-center p-4 pt-16 pb-24"
+            style={{ 
+              height: viewportHeight,
+              top: viewportHeight
+            }}
+          >
+            <img
+              src={nextPhoto.watermarked_url}
+              alt="Next"
+              className="max-w-full max-h-full object-contain"
+              draggable={false}
+            />
+          </div>
+        )}
       </div>
       
       {/* Heart Animation */}
