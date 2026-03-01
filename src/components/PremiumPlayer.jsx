@@ -42,20 +42,58 @@ export default function PremiumPlayer({
     }
   }, [])
 
-  // Fullscreen handling
+  // Fullscreen handling - with iOS support
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement)
+      setIsFullscreen(!!document.fullscreenElement || !!document.webkitFullscreenElement)
     }
     document.addEventListener('fullscreenchange', handleFullscreenChange)
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange)
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange)
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange)
+    }
   }, [])
 
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      containerRef.current?.requestFullscreen()
-    } else {
-      document.exitFullscreen()
+  const toggleFullscreen = async () => {
+    try {
+      // Check if already in fullscreen
+      const isInFullscreen = document.fullscreenElement || document.webkitFullscreenElement
+      
+      if (!isInFullscreen) {
+        // Try standard API first (Chrome, Firefox, Edge)
+        if (containerRef.current?.requestFullscreen) {
+          await containerRef.current.requestFullscreen()
+        } 
+        // Try webkit API (Safari desktop)
+        else if (containerRef.current?.webkitRequestFullscreen) {
+          containerRef.current.webkitRequestFullscreen()
+        }
+        // iOS Safari - need to fullscreen the video element directly
+        else {
+          const video = containerRef.current?.querySelector('video, mux-player')?.shadowRoot?.querySelector('video') 
+            || containerRef.current?.querySelector('video')
+          if (video?.webkitEnterFullscreen) {
+            video.webkitEnterFullscreen()
+          } else if (video?.webkitRequestFullscreen) {
+            video.webkitRequestFullscreen()
+          }
+        }
+      } else {
+        // Exit fullscreen
+        if (document.exitFullscreen) {
+          document.exitFullscreen()
+        } else if (document.webkitExitFullscreen) {
+          document.webkitExitFullscreen()
+        }
+      }
+    } catch (err) {
+      console.warn('Fullscreen error:', err)
+      // Fallback: try to get mux-player to handle it
+      const muxPlayer = containerRef.current?.querySelector('mux-player')
+      if (muxPlayer) {
+        muxPlayer.requestFullscreen?.() || muxPlayer.webkitRequestFullscreen?.()
+      }
     }
   }
 
