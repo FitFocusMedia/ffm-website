@@ -1550,6 +1550,8 @@ function MultiStreamManager({ eventId, event, onEventUpdate }) {
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
   const [converting, setConverting] = useState(false)
+  const [syncingVod, setSyncingVod] = useState(false)
+  const [vodSyncResult, setVodSyncResult] = useState(null)
   const [newStreamName, setNewStreamName] = useState('')
   const [convertStreamName, setConvertStreamName] = useState('')
   const [showConvertModal, setShowConvertModal] = useState(false)
@@ -1559,6 +1561,9 @@ function MultiStreamManager({ eventId, event, onEventUpdate }) {
 
   // Check if event has existing single stream that can be converted
   const hasExistingSingleStream = event?.mux_stream_id && !event?.is_multi_stream
+  
+  // Check if event has ended (for showing VOD sync)
+  const eventHasEnded = event?.end_time ? new Date(event.end_time) < new Date() : false
   
   useEffect(() => {
     loadStreams()
@@ -1770,6 +1775,38 @@ function MultiStreamManager({ eventId, event, onEventUpdate }) {
     }
   }
 
+  // Sync VOD assets from MUX
+  const handleSyncVod = async () => {
+    setSyncingVod(true)
+    setVodSyncResult(null)
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('mux-stream', {
+        body: { action: 'sync-vod', event_id: eventId }
+      })
+      
+      if (error) throw error
+      
+      setVodSyncResult({
+        success: true,
+        message: data.message,
+        linked: data.linked,
+        total: data.total_assets
+      })
+      
+      // Reload streams to show updated VOD info
+      await loadStreams()
+    } catch (err) {
+      console.error('Failed to sync VOD:', err)
+      setVodSyncResult({
+        success: false,
+        message: err.message || 'Failed to sync VOD assets'
+      })
+    } finally {
+      setSyncingVod(false)
+    }
+  }
+
   return (
     <div className="pt-6 border-t border-dark-800">
       <div className="flex items-center justify-between mb-4">
@@ -1884,6 +1921,52 @@ function MultiStreamManager({ eventId, event, onEventUpdate }) {
         </button>
       </div>
 
+      {/* VOD Sync Section - shown for events that have ended */}
+      {streams.length > 0 && event?.vod_enabled && (
+        <div className="mb-4 p-4 bg-purple-500/10 border border-purple-500/30 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-purple-500/20 rounded-lg">
+                <Film className="w-5 h-5 text-purple-500" />
+              </div>
+              <div>
+                <h4 className="font-medium text-purple-400">VOD Replays</h4>
+                <p className="text-sm text-gray-400">
+                  {streams.filter(s => s.vod_playback_id).length} of {streams.length} streams have VOD linked
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleSyncVod}
+              disabled={syncingVod}
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-dark-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+            >
+              {syncingVod ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                  Syncing...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-4 h-4" />
+                  Sync VOD from MUX
+                </>
+              )}
+            </button>
+          </div>
+          
+          {/* Sync Result */}
+          {vodSyncResult && (
+            <div className={`mt-3 p-3 rounded-lg ${vodSyncResult.success ? 'bg-green-500/10 border border-green-500/30' : 'bg-red-500/10 border border-red-500/30'}`}>
+              <p className={`text-sm ${vodSyncResult.success ? 'text-green-400' : 'text-red-400'}`}>
+                {vodSyncResult.message}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Streams List */}
       {loading ? (
         <div className="text-center py-4">
@@ -1945,6 +2028,12 @@ function MultiStreamManager({ eventId, event, onEventUpdate }) {
                       )}
                       {stream.mux_stream_key && (
                         <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded">Ready</span>
+                      )}
+                      {stream.vod_playback_id && (
+                        <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 text-xs rounded flex items-center gap-1">
+                          <Film className="w-3 h-3" />
+                          VOD
+                        </span>
                       )}
                     </div>
                     <p className="text-xs text-gray-500">
@@ -2022,6 +2111,41 @@ function MultiStreamManager({ eventId, event, onEventUpdate }) {
                       <p className="text-xs text-amber-400 font-medium">
                         📡 RTMP Server: rtmps://global-live.mux.com:443/app
                       </p>
+                      
+                      {/* VOD Info Section */}
+                      {stream.vod_playback_id && (
+                        <div className="pt-3 mt-3 border-t border-dark-700">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Film className="w-4 h-4 text-purple-400" />
+                            <span className="text-xs font-medium text-purple-400">VOD Replay</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">VOD Asset ID</label>
+                              <input
+                                type="text"
+                                readOnly
+                                value={stream.vod_asset_id || '—'}
+                                className="w-full px-2 py-1.5 bg-dark-900 border border-dark-700 rounded text-gray-400 font-mono text-xs"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">VOD Playback ID</label>
+                              <input
+                                type="text"
+                                readOnly
+                                value={stream.vod_playback_id || '—'}
+                                className="w-full px-2 py-1.5 bg-dark-900 border border-dark-700 rounded text-gray-400 font-mono text-xs"
+                              />
+                            </div>
+                          </div>
+                          {stream.vod_duration_seconds && (
+                            <p className="text-xs text-gray-500 mt-2">
+                              Duration: {Math.floor(stream.vod_duration_seconds / 3600)}h {Math.floor((stream.vod_duration_seconds % 3600) / 60)}m
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </>
                   ) : (
                     <button

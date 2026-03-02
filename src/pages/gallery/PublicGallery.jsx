@@ -299,6 +299,19 @@ export default function GalleryPage() {
           )}
         </div>
 
+        {/* Processing Notice */}
+        <div className="mb-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">📸</span>
+            <div>
+              <p className="text-blue-300 font-medium">Photos are being uploaded</p>
+              <p className="text-blue-200/70 text-sm mt-1">
+                Your images will be ready to view within 24-48 hours. Bookmark this page and check back soon!
+              </p>
+            </div>
+          </div>
+        </div>
+
         {cancelled && (
           <div className="mb-6 p-4 bg-yellow-500/20 border border-yellow-500/50 rounded-lg text-yellow-300">
             Checkout was cancelled. Your selection is still saved.

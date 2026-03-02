@@ -418,6 +418,124 @@ serve(async (req) => {
     }
 
     // ========================================
+    // SYNC-VOD: Sync VOD assets from MUX to streams
+    // ========================================
+    if (action === 'sync-vod') {
+      if (!event_id) {
+        return new Response(JSON.stringify({ error: 'event_id required' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+
+      // Fetch all MUX assets
+      const assetsResponse = await fetch('https://api.mux.com/video/v1/assets?limit=100', {
+        headers: { 'Authorization': 'Basic ' + auth }
+      })
+      const assetsData = await assetsResponse.json()
+      
+      // Filter to ready assets for this event
+      const eventAssets = (assetsData.data || []).filter((asset: any) => {
+        if (asset.status !== 'ready') return false
+        try {
+          const passthrough = JSON.parse(asset.passthrough || '{}')
+          return passthrough.event_id === event_id
+        } catch {
+          return false
+        }
+      })
+
+      if (eventAssets.length === 0) {
+        return new Response(JSON.stringify({ 
+          success: true, 
+          message: 'No VOD assets found for this event',
+          linked: 0 
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+
+      // Get streams for this event
+      const { data: streams, error: streamsError } = await supabase
+        .from('livestream_streams')
+        .select('id, name, mux_stream_id')
+        .eq('event_id', event_id)
+
+      if (streamsError) {
+        return new Response(JSON.stringify({ error: 'Failed to fetch streams', details: streamsError.message }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+
+      // Group assets by stream (using stream_id or stream_name from passthrough)
+      // Pick the longest duration asset per stream (main recording, not short reconnects)
+      const streamAssets: Record<string, any> = {}
+      
+      for (const asset of eventAssets) {
+        const passthrough = JSON.parse(asset.passthrough || '{}')
+        const streamId = passthrough.stream_id
+        const streamName = passthrough.stream_name
+        
+        // Find matching stream
+        let matchedStream = streams?.find(s => s.id === streamId)
+        if (!matchedStream && streamName) {
+          matchedStream = streams?.find(s => 
+            s.name.toLowerCase().includes(streamName.toLowerCase().replace(/\.$/, '')) ||
+            streamName.toLowerCase().includes(s.name.toLowerCase())
+          )
+        }
+        
+        if (matchedStream) {
+          const existingAsset = streamAssets[matchedStream.id]
+          // Keep the longest recording
+          if (!existingAsset || (asset.duration || 0) > (existingAsset.duration || 0)) {
+            streamAssets[matchedStream.id] = {
+              ...asset,
+              matched_stream_id: matchedStream.id
+            }
+          }
+        }
+      }
+
+      // Update streams with VOD info
+      const updates = []
+      for (const [streamId, asset] of Object.entries(streamAssets)) {
+        const playbackId = asset.playback_ids?.[0]?.id
+        if (playbackId) {
+          const { error: updateError } = await supabase
+            .from('livestream_streams')
+            .update({
+              vod_asset_id: asset.id,
+              vod_playback_id: playbackId,
+              vod_duration_seconds: Math.round(asset.duration || 0),
+              vod_enabled: true
+            })
+            .eq('id', streamId)
+          
+          if (!updateError) {
+            updates.push({
+              stream_id: streamId,
+              asset_id: asset.id,
+              playback_id: playbackId,
+              duration_seconds: Math.round(asset.duration || 0)
+            })
+          }
+        }
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        message: `Linked ${updates.length} VOD assets to streams`,
+        linked: updates.length,
+        total_assets: eventAssets.length,
+        updates
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    // ========================================
     // INVALID ACTION
     // ========================================
     return new Response(JSON.stringify({ error: 'Invalid action' }), {

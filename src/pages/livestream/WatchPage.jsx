@@ -750,11 +750,17 @@ export default function WatchPage() {
     )
   }
 
-  // Determine which playback ID to use (VOD mode uses vod_playback_id, otherwise stream or event default)
-  const activePlaybackId = isVodMode && event.vod_playback_id 
-    ? event.vod_playback_id 
+  // Determine which playback ID to use
+  // VOD mode: use stream's vod_playback_id if available, else event's vod_playback_id
+  // Live mode: use stream's mux_playback_id if available, else event's mux_playback_id
+  const activePlaybackId = isVodMode 
+    ? (selectedStream?.vod_playback_id || event.vod_playback_id || selectedStream?.mux_playback_id || event.mux_playback_id)
     : (selectedStream?.mux_playback_id || event.mux_playback_id || 'demo-playback-id')
-  const isMultiStream = streams.length > 1
+  
+  // Check if we have multi-stream VOD (streams with vod_playback_id set)
+  const streamsWithVod = streams.filter(s => s.vod_playback_id)
+  const hasMultiStreamVod = streamsWithVod.length > 0
+  const isMultiStream = streams.length > 1 || (isVodMode && hasMultiStreamVod)
   
   // Stream selector screen for multi-stream events (show before player)
   if (isMultiStream && (showStreamSelector || !selectedStream)) {
@@ -795,13 +801,27 @@ export default function WatchPage() {
           {/* Stream Selection */}
           <div className="bg-dark-900/50 backdrop-blur-sm rounded-2xl border border-dark-700/50 p-6 mb-6">
             <div className="flex items-center justify-center gap-2 mb-6">
-              <Tv className="w-6 h-6 text-red-500" />
-              <h2 className="text-xl font-bold text-white">Select a Stream</h2>
+              {isVodMode ? <Film className="w-6 h-6 text-red-500" /> : <Tv className="w-6 h-6 text-red-500" />}
+              <h2 className="text-xl font-bold text-white">
+                {isVodMode ? 'Select a Replay' : 'Select a Stream'}
+              </h2>
             </div>
             
+            {/* VOD mode banner */}
+            {isVodMode && (
+              <div className="flex items-center justify-center gap-2 mb-4 px-4 py-2 bg-purple-500/10 border border-purple-500/30 rounded-lg">
+                <PlayCircle className="w-5 h-5 text-purple-400" />
+                <span className="text-purple-300 text-sm">Watching replay — event has ended</span>
+              </div>
+            )}
+            
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {streams.map((stream) => {
-                const streamIsLive = isStreamLive(stream)
+              {(isVodMode ? streams.filter(s => s.vod_playback_id || s.vod_enabled !== false) : streams).map((stream) => {
+                const streamIsLive = !isVodMode && isStreamLive(stream)
+                const hasVod = !!stream.vod_playback_id
+                const vodDuration = stream.vod_duration_seconds 
+                  ? `${Math.floor(stream.vod_duration_seconds / 3600)}h ${Math.floor((stream.vod_duration_seconds % 3600) / 60)}m`
+                  : null
                 
                 return (
                   <button
@@ -810,37 +830,72 @@ export default function WatchPage() {
                       setSelectedStream(stream)
                       setShowStreamSelector(false)
                     }}
-                    className="relative flex flex-col items-center justify-center p-6 rounded-xl border-2 border-dark-600 bg-dark-800 hover:border-red-500 hover:bg-red-500/10 transition-all duration-200 group"
+                    disabled={isVodMode && !hasVod}
+                    className={`relative flex flex-col items-center justify-center p-6 rounded-xl border-2 transition-all duration-200 group ${
+                      isVodMode && !hasVod 
+                        ? 'border-dark-700 bg-dark-800/50 opacity-50 cursor-not-allowed'
+                        : 'border-dark-600 bg-dark-800 hover:border-red-500 hover:bg-red-500/10'
+                    }`}
                   >
-                    {/* Live indicator */}
+                    {/* Live/VOD indicator */}
                     {streamIsLive && (
                       <span className="absolute top-3 right-3 flex items-center gap-1 px-2 py-0.5 bg-red-500/20 text-red-500 text-xs font-medium rounded-full">
                         <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
                         LIVE
                       </span>
                     )}
+                    {isVodMode && hasVod && (
+                      <span className="absolute top-3 right-3 flex items-center gap-1 px-2 py-0.5 bg-purple-500/20 text-purple-400 text-xs font-medium rounded-full">
+                        <Film className="w-3 h-3" />
+                        VOD
+                      </span>
+                    )}
+                    {isVodMode && !hasVod && (
+                      <span className="absolute top-3 right-3 flex items-center gap-1 px-2 py-0.5 bg-gray-500/20 text-gray-500 text-xs font-medium rounded-full">
+                        <Lock className="w-3 h-3" />
+                        N/A
+                      </span>
+                    )}
                     
                     {/* Stream icon */}
-                    <div className="w-16 h-16 rounded-full bg-dark-700 group-hover:bg-red-500/20 flex items-center justify-center mb-3 transition-colors">
-                      <Tv className="w-8 h-8 text-gray-400 group-hover:text-red-500 transition-colors" />
+                    <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-3 transition-colors ${
+                      isVodMode && !hasVod 
+                        ? 'bg-dark-700'
+                        : 'bg-dark-700 group-hover:bg-red-500/20'
+                    }`}>
+                      {isVodMode ? (
+                        <Film className={`w-8 h-8 transition-colors ${hasVod ? 'text-purple-400 group-hover:text-red-500' : 'text-gray-600'}`} />
+                      ) : (
+                        <Tv className="w-8 h-8 text-gray-400 group-hover:text-red-500 transition-colors" />
+                      )}
                     </div>
                     
                     {/* Stream name */}
-                    <span className="text-lg font-semibold text-white group-hover:text-red-400 transition-colors">
+                    <span className={`text-lg font-semibold transition-colors ${
+                      isVodMode && !hasVod ? 'text-gray-500' : 'text-white group-hover:text-red-400'
+                    }`}>
                       {stream.name}
                     </span>
                     
-                    {/* Status */}
-                    <span className={`text-sm mt-1 ${streamIsLive ? 'text-red-400' : 'text-gray-500'}`}>
-                      {streamIsLive ? 'Now Streaming' : 'Waiting'}
-                    </span>
-                    
-                    {/* Watch button on hover */}
-                    <div className="absolute inset-0 flex items-center justify-center bg-red-500/0 group-hover:bg-red-500/10 rounded-xl transition-colors">
-                      <span className="opacity-0 group-hover:opacity-100 transition-opacity text-red-400 font-semibold flex items-center gap-2">
-                        <Play className="w-5 h-5" /> Watch
+                    {/* Status / Duration */}
+                    {isVodMode ? (
+                      <span className={`text-sm mt-1 ${hasVod ? 'text-purple-400' : 'text-gray-600'}`}>
+                        {hasVod ? (vodDuration || 'Available') : 'Not Available'}
                       </span>
-                    </div>
+                    ) : (
+                      <span className={`text-sm mt-1 ${streamIsLive ? 'text-red-400' : 'text-gray-500'}`}>
+                        {streamIsLive ? 'Now Streaming' : 'Waiting'}
+                      </span>
+                    )}
+                    
+                    {/* Watch button on hover (only if available) */}
+                    {(!isVodMode || hasVod) && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-red-500/0 group-hover:bg-red-500/10 rounded-xl transition-colors">
+                        <span className="opacity-0 group-hover:opacity-100 transition-opacity text-red-400 font-semibold flex items-center gap-2">
+                          <Play className="w-5 h-5" /> {isVodMode ? 'Watch Replay' : 'Watch'}
+                        </span>
+                      </div>
+                    )}
                   </button>
                 )
               })}
