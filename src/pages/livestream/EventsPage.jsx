@@ -113,8 +113,10 @@ function EventCard({ event, featured = false, compact = false }) {
   const [imgError, setImgError] = useState(false)
   const eventDate = new Date(event.start_time)
   const now = new Date()
-  const isLive = event.status === 'live' || event.is_live
-  const isPast = event.status === 'ended' || new Date(event.end_time) < now
+  // Fix: Check status !== 'ended' AND end_time hasn't passed to determine live status
+  const hasEnded = event.status === 'ended' || (event.end_time && new Date(event.end_time) < now)
+  const isLive = (event.status === 'live' || event.is_live) && !hasEnded
+  const isPast = hasEnded
   const isUpcoming = !isLive && !isPast
   
   // Time until event
@@ -295,7 +297,10 @@ function EventCard({ event, featured = false, compact = false }) {
 function HeroEvent({ event }) {
   const [imgError, setImgError] = useState(false)
   const eventDate = new Date(event.start_time)
-  const isLive = event.status === 'live' || event.is_live
+  const now = new Date()
+  // Fix: Check status !== 'ended' AND end_time hasn't passed to determine live status
+  const hasEnded = event.status === 'ended' || (event.end_time && new Date(event.end_time) < now)
+  const isLive = (event.status === 'live' || event.is_live) && !hasEnded
   
   return (
     <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
