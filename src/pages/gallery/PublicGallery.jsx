@@ -1002,6 +1002,9 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
   const [showHeartAnimation, setShowHeartAnimation] = useState(false)
   const [heartPosition, setHeartPosition] = useState({ x: 0, y: 0 })
   
+  // Ref to skip transition during photo swap (prevents janky snap-back)
+  const skipTransitionRef = useRef(false)
+  
   // Viewport height for calculations
   const [viewportHeight, setViewportHeight] = useState(window.innerHeight)
   
@@ -1047,9 +1050,15 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
     // After animation completes (280ms), swap photo and reset offset instantly
     // The timeout matches the CSS transition duration for seamless handoff
     setTimeout(() => {
+      // Disable transition for the reset to prevent janky snap-back
+      skipTransitionRef.current = true
       onNavigate(targetPhoto)
       setOffsetY(0)
       setIsAnimating(false)
+      // Re-enable transition after paint
+      requestAnimationFrame(() => {
+        skipTransitionRef.current = false
+      })
     }, 280)
   }, [nextPhoto, prevPhoto, viewportHeight, onNavigate, isAnimating])
   
@@ -1176,7 +1185,8 @@ function Lightbox({ photos, currentPhoto, selectedPhotos, onClose, onNavigate, o
   // Calculate transform for the sliding container
   // TikTok uses ~250-300ms with ease-out (fast start, decelerate at end)
   const containerTransform = `translateY(${offsetY}px)`
-  const transitionStyle = isDragging ? 'none' : 'transform 0.28s cubic-bezier(0.33, 1, 0.68, 1)' // Ease-out quad
+  // Disable transition during drag OR during photo swap reset (skipTransitionRef)
+  const transitionStyle = (isDragging || skipTransitionRef.current) ? 'none' : 'transform 0.28s cubic-bezier(0.33, 1, 0.68, 1)'
   
   return (
     <div 
