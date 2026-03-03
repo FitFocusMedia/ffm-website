@@ -537,23 +537,18 @@ function GalleryEditor({ gallery, organization, onBack }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [activeTab, setActiveTab] = useState('photos') // 'photos' or 'videos'
   
-  // Category/Division management
-  const [selectedCategory, setSelectedCategory] = useState('all')
+  // Category/Division management - now using gallery_categories table
+  const [categories, setCategories] = useState([])
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null) // null = show all
   const [showCategoryModal, setShowCategoryModal] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
+  const [editingCategory, setEditingCategory] = useState(null)
   const [movingToCategory, setMovingToCategory] = useState(false)
-  
-  // Get unique categories from photos
-  const categories = [...new Set(photos.map(p => p.category || 'Main'))].sort((a, b) => {
-    if (a === 'Main') return -1
-    if (b === 'Main') return 1
-    return a.localeCompare(b)
-  })
   
   // Filter photos by search query AND category
   const filteredPhotos = photos.filter(p => {
     const matchesSearch = !searchQuery || p.filename.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesCategory = selectedCategory === 'all' || (p.category || 'Main') === selectedCategory
+    const matchesCategory = !selectedCategoryId || p.category_id === selectedCategoryId
     return matchesSearch && matchesCategory
   })
   
@@ -562,8 +557,119 @@ function GalleryEditor({ gallery, organization, onBack }) {
     ? clips.filter(c => c.filename.toLowerCase().includes(searchQuery.toLowerCase()))
     : clips
   
+  // Load categories from database
+  const loadCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('gallery_categories')
+        .select('*')
+        .eq('gallery_id', gallery.id)
+        .order('position', { ascending: true })
+      
+      if (error) throw error
+      setCategories(data || [])
+      
+      // If no categories exist, auto-select null (all)
+      // If categories exist and none selected, select the first one
+      if (data && data.length > 0 && !selectedCategoryId) {
+        setSelectedCategoryId(data[0].id)
+      }
+    } catch (err) {
+      console.error('Load categories error:', err)
+    }
+  }
+  
+  // Create new category
+  const createCategory = async () => {
+    if (!newCategoryName.trim()) return
+    
+    try {
+      const position = categories.length
+      const { data, error } = await supabase
+        .from('gallery_categories')
+        .insert({
+          gallery_id: gallery.id,
+          name: newCategoryName.trim(),
+          position
+        })
+        .select()
+        .single()
+      
+      if (error) throw error
+      
+      setCategories([...categories, data])
+      setSelectedCategoryId(data.id) // Switch to new category
+      setNewCategoryName('')
+      setShowCategoryModal(false)
+    } catch (err) {
+      console.error('Create category error:', err)
+      alert('Failed to create category: ' + err.message)
+    }
+  }
+  
+  // Rename category
+  const renameCategory = async (categoryId, newName) => {
+    if (!newName.trim()) return
+    
+    try {
+      const { error } = await supabase
+        .from('gallery_categories')
+        .update({ name: newName.trim() })
+        .eq('id', categoryId)
+      
+      if (error) throw error
+      
+      setCategories(categories.map(c => 
+        c.id === categoryId ? { ...c, name: newName.trim() } : c
+      ))
+      setEditingCategory(null)
+    } catch (err) {
+      console.error('Rename category error:', err)
+      alert('Failed to rename category: ' + err.message)
+    }
+  }
+  
+  // Delete category (moves photos to uncategorized)
+  const deleteCategory = async (categoryId) => {
+    const category = categories.find(c => c.id === categoryId)
+    const photoCount = photos.filter(p => p.category_id === categoryId).length
+    
+    if (!confirm(`Delete "${category?.name}"? ${photoCount} photo(s) will be moved to uncategorized.`)) return
+    
+    try {
+      // Clear category_id from photos in this category
+      await supabase
+        .from('gallery_photos')
+        .update({ category_id: null })
+        .eq('category_id', categoryId)
+      
+      // Delete the category
+      const { error } = await supabase
+        .from('gallery_categories')
+        .delete()
+        .eq('id', categoryId)
+      
+      if (error) throw error
+      
+      // Update local state
+      setPhotos(photos.map(p => 
+        p.category_id === categoryId ? { ...p, category_id: null } : p
+      ))
+      setCategories(categories.filter(c => c.id !== categoryId))
+      
+      // If deleted category was selected, switch to first available or null
+      if (selectedCategoryId === categoryId) {
+        const remaining = categories.filter(c => c.id !== categoryId)
+        setSelectedCategoryId(remaining.length > 0 ? remaining[0].id : null)
+      }
+    } catch (err) {
+      console.error('Delete category error:', err)
+      alert('Failed to delete category: ' + err.message)
+    }
+  }
+  
   // Move selected photos to a category
-  const moveSelectedToCategory = async (targetCategory) => {
+  const moveSelectedToCategory = async (targetCategoryId) => {
     if (selectedPhotos.size === 0) return
     setMovingToCategory(true)
     
@@ -571,14 +677,14 @@ function GalleryEditor({ gallery, organization, onBack }) {
       const ids = Array.from(selectedPhotos)
       const { error } = await supabase
         .from('gallery_photos')
-        .update({ category: targetCategory })
+        .update({ category_id: targetCategoryId })
         .in('id', ids)
       
       if (error) throw error
       
       // Update local state
       setPhotos(photos.map(p => 
-        selectedPhotos.has(p.id) ? { ...p, category: targetCategory } : p
+        selectedPhotos.has(p.id) ? { ...p, category_id: targetCategoryId } : p
       ))
       setSelectedPhotos(new Set())
     } catch (err) {
@@ -588,21 +694,9 @@ function GalleryEditor({ gallery, organization, onBack }) {
       setMovingToCategory(false)
     }
   }
-  
-  // Create new category
-  const createCategory = async () => {
-    if (!newCategoryName.trim()) return
-    
-    // Just update the selected photos with the new category name
-    if (selectedPhotos.size > 0) {
-      await moveSelectedToCategory(newCategoryName.trim())
-    }
-    
-    setNewCategoryName('')
-    setShowCategoryModal(false)
-  }
 
   useEffect(() => {
+    loadCategories()
     loadPhotos()
     loadClips()
   }, [gallery.id])
@@ -806,7 +900,8 @@ function GalleryEditor({ gallery, organization, onBack }) {
             sort_order: sortOrder++,
             width: img.width,
             height: img.height,
-            file_size: file.size
+            file_size: file.size,
+            category_id: selectedCategoryId // Upload to currently selected category
           })
           .select()
           .single()
@@ -1109,41 +1204,104 @@ function GalleryEditor({ gallery, organization, onBack }) {
 
       {/* Photo Grid */}
       {activeTab === 'photos' && (
-        photos.length === 0 ? (
+        <>
+          {/* Category Management Bar */}
+          <div className="mb-4 pb-4 border-b border-dark-600">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-gray-400">Categories</h3>
+              <button
+                onClick={() => setShowCategoryModal(true)}
+                className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg flex items-center gap-2"
+              >
+                <Plus className="w-3 h-3" />
+                Add Category
+              </button>
+            </div>
+            
+            {/* Category Tabs */}
+            <div className="flex flex-wrap gap-2">
+              {/* All Photos Tab */}
+              <button
+                onClick={() => setSelectedCategoryId(null)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                  selectedCategoryId === null
+                    ? 'bg-red-600 text-white'
+                    : 'bg-dark-700 text-gray-300 hover:bg-dark-600'
+                }`}
+              >
+                All ({photos.length})
+              </button>
+              
+              {/* Category Tabs */}
+              {categories.map(cat => (
+                <div key={cat.id} className="relative group">
+                  {editingCategory === cat.id ? (
+                    <input
+                      type="text"
+                      defaultValue={cat.name}
+                      autoFocus
+                      onBlur={(e) => renameCategory(cat.id, e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') renameCategory(cat.id, e.target.value)
+                        if (e.key === 'Escape') setEditingCategory(null)
+                      }}
+                      className="px-4 py-2 bg-dark-700 text-white rounded-lg text-sm border border-red-500 focus:outline-none w-32"
+                    />
+                  ) : (
+                    <button
+                      onClick={() => setSelectedCategoryId(cat.id)}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                        selectedCategoryId === cat.id
+                          ? 'bg-red-600 text-white'
+                          : 'bg-dark-700 text-gray-300 hover:bg-dark-600'
+                      }`}
+                    >
+                      {cat.name} ({photos.filter(p => p.category_id === cat.id).length})
+                    </button>
+                  )}
+                  
+                  {/* Edit/Delete buttons on hover */}
+                  {editingCategory !== cat.id && (
+                    <div className="absolute -top-1 -right-1 hidden group-hover:flex gap-1">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setEditingCategory(cat.id) }}
+                        className="w-5 h-5 bg-blue-600 hover:bg-blue-700 rounded-full flex items-center justify-center"
+                        title="Rename"
+                      >
+                        <span className="text-[10px] text-white">✎</span>
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); deleteCategory(cat.id) }}
+                        className="w-5 h-5 bg-red-600 hover:bg-red-700 rounded-full flex items-center justify-center"
+                        title="Delete"
+                      >
+                        <span className="text-[10px] text-white">✕</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+              
+              {categories.length === 0 && (
+                <span className="text-gray-500 text-sm italic">No categories yet. Create one to organize your photos.</span>
+              )}
+            </div>
+          </div>
+          
+          {/* Upload hint when category selected */}
+          {selectedCategoryId && (
+            <div className="mb-4 px-3 py-2 bg-blue-900/30 border border-blue-700/50 rounded-lg text-sm text-blue-300">
+              📁 Uploading to: <strong>{categories.find(c => c.id === selectedCategoryId)?.name}</strong>
+            </div>
+          )}
+          
+        {photos.length === 0 && categories.length === 0 ? (
           <div className="text-center py-12 text-gray-400">
             <Image className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            No photos yet. Upload some photos to get started!
+            No photos yet. Create a category and upload some photos to get started!
           </div>
         ) : (
           <>
-            {/* Category Filter Tabs */}
-            {categories.length > 1 && (
-              <div className="flex flex-wrap gap-2 mb-4 pb-3 border-b border-dark-600">
-                <button
-                  onClick={() => setSelectedCategory('all')}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
-                    selectedCategory === 'all'
-                      ? 'bg-red-600 text-white'
-                      : 'bg-dark-700 text-gray-300 hover:bg-dark-600'
-                  }`}
-                >
-                  All ({photos.length})
-                </button>
-                {categories.map(cat => (
-                  <button
-                    key={cat}
-                    onClick={() => setSelectedCategory(cat)}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
-                      selectedCategory === cat
-                        ? 'bg-red-600 text-white'
-                        : 'bg-dark-700 text-gray-300 hover:bg-dark-600'
-                    }`}
-                  >
-                    {cat} ({photos.filter(p => (p.category || 'Main') === cat).length})
-                  </button>
-                ))}
-              </div>
-            )}
             
             {/* Search + Selection Controls */}
             <div className="flex flex-wrap items-center gap-3 mb-4">
@@ -1169,7 +1327,7 @@ function GalleryEditor({ gallery, organization, onBack }) {
                 )}
               </div>
               
-              {(searchQuery || selectedCategory !== 'all') && (
+              {(searchQuery || selectedCategoryId !== null) && (
                 <span className="text-gray-400 text-sm">{filteredPhotos.length} of {photos.length}</span>
               )}
               
@@ -1184,34 +1342,34 @@ function GalleryEditor({ gallery, organization, onBack }) {
                   <span className="text-gray-400 text-sm">{selectedPhotos.size} selected</span>
                   
                   {/* Move to Category Dropdown */}
-                  <div className="relative group">
-                    <button
-                      disabled={movingToCategory}
-                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white text-sm rounded-lg flex items-center gap-2"
-                    >
-                      {movingToCategory ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
-                      Move to Category ▾
-                    </button>
-                    <div className="absolute top-full left-0 mt-1 bg-dark-700 border border-dark-600 rounded-lg shadow-xl z-20 min-w-[180px] hidden group-hover:block">
-                      {categories.map(cat => (
+                  {categories.length > 0 && (
+                    <div className="relative group">
+                      <button
+                        disabled={movingToCategory}
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white text-sm rounded-lg flex items-center gap-2"
+                      >
+                        {movingToCategory ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                        Move to Category ▾
+                      </button>
+                      <div className="absolute top-full left-0 mt-1 bg-dark-700 border border-dark-600 rounded-lg shadow-xl z-20 min-w-[180px] hidden group-hover:block">
                         <button
-                          key={cat}
-                          onClick={() => moveSelectedToCategory(cat)}
-                          className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-dark-600 hover:text-white first:rounded-t-lg"
+                          onClick={() => moveSelectedToCategory(null)}
+                          className="block w-full text-left px-4 py-2 text-sm text-gray-400 hover:bg-dark-600 hover:text-white first:rounded-t-lg italic"
                         >
-                          {cat}
+                          Uncategorized
                         </button>
-                      ))}
-                      <div className="border-t border-dark-600">
-                        <button
-                          onClick={() => setShowCategoryModal(true)}
-                          className="block w-full text-left px-4 py-2 text-sm text-green-400 hover:bg-dark-600 rounded-b-lg"
-                        >
-                          + New Category...
-                        </button>
+                        {categories.map(cat => (
+                          <button
+                            key={cat.id}
+                            onClick={() => moveSelectedToCategory(cat.id)}
+                            className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-dark-600 hover:text-white"
+                          >
+                            {cat.name}
+                          </button>
+                        ))}
                       </div>
                     </div>
-                  </div>
+                  )}
                   
                   <button
                     onClick={deleteSelected}
@@ -1254,7 +1412,7 @@ function GalleryEditor({ gallery, organization, onBack }) {
                       disabled={!newCategoryName.trim()}
                       className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white py-2 rounded-lg"
                     >
-                      Create & Move
+                      Create Category
                     </button>
                   </div>
                 </div>
@@ -1297,7 +1455,8 @@ function GalleryEditor({ gallery, organization, onBack }) {
               ))}
             </div>
           </>
-        )
+        )}
+        </>
       )}
 
       {/* Video Clips Grid */}
