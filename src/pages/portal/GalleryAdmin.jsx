@@ -1295,6 +1295,42 @@ function GalleryEditor({ gallery, organization, onBack }) {
             </div>
           )}
           
+          {/* New Category Modal - MUST be outside photo conditionals */}
+          {showCategoryModal && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowCategoryModal(false)}>
+              <div className="bg-dark-800 rounded-xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+                <h3 className="text-lg font-bold text-white mb-4">Create New Category</h3>
+                <p className="text-gray-400 text-sm mb-4">
+                  Create a category (e.g., "Adult Male Gi", "Kids No Gi", "Mat 1") to organize photos by division.
+                </p>
+                <input
+                  type="text"
+                  placeholder="Category name..."
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  className="w-full bg-dark-700 text-white rounded-lg px-4 py-3 border border-dark-600 focus:border-red-500 focus:outline-none mb-4"
+                  autoFocus
+                  onKeyDown={(e) => e.key === 'Enter' && createCategory()}
+                />
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowCategoryModal(false)}
+                    className="flex-1 bg-dark-600 hover:bg-dark-500 text-white py-2 rounded-lg"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={createCategory}
+                    disabled={!newCategoryName.trim()}
+                    className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white py-2 rounded-lg"
+                  >
+                    Create Category
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          
         {photos.length === 0 && categories.length === 0 ? (
           <div className="text-center py-12 text-gray-400">
             <Image className="w-12 h-12 mx-auto mb-4 opacity-50" />
@@ -1382,42 +1418,6 @@ function GalleryEditor({ gallery, organization, onBack }) {
                 </>
               )}
             </div>
-            
-            {/* New Category Modal */}
-            {showCategoryModal && (
-              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowCategoryModal(false)}>
-                <div className="bg-dark-800 rounded-xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
-                  <h3 className="text-lg font-bold text-white mb-4">Create New Category</h3>
-                  <p className="text-gray-400 text-sm mb-4">
-                    Create a category (e.g., "Adult Male Gi", "Kids No Gi", "Mat 1") to organize photos by division.
-                  </p>
-                  <input
-                    type="text"
-                    placeholder="Category name..."
-                    value={newCategoryName}
-                    onChange={(e) => setNewCategoryName(e.target.value)}
-                    className="w-full bg-dark-700 text-white rounded-lg px-4 py-3 border border-dark-600 focus:border-red-500 focus:outline-none mb-4"
-                    autoFocus
-                    onKeyDown={(e) => e.key === 'Enter' && createCategory()}
-                  />
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => setShowCategoryModal(false)}
-                      className="flex-1 bg-dark-600 hover:bg-dark-500 text-white py-2 rounded-lg"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={createCategory}
-                      disabled={!newCategoryName.trim()}
-                      className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white py-2 rounded-lg"
-                    >
-                      Create Category
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
             
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
               {filteredPhotos.map(photo => (
