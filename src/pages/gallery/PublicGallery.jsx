@@ -182,15 +182,28 @@ export default function GalleryPage() {
       setCategories(categoryList)
 
       // Get photos with signed URLs - include category_id
-      // Use range to fetch ALL photos (Supabase defaults to 1000 limit)
-      const { data: photosData, error: photosError } = await supabase
-        .from('gallery_photos')
-        .select('id, filename, width, height, price, sort_order, watermarked_path, thumbnail_path, category_id')
-        .eq('gallery_id', galleryData.id)
-        .order('sort_order', { ascending: true })
-        .range(0, 9999) // Fetch up to 10,000 photos
-
-      if (photosError) throw photosError
+      // Fetch ALL photos using pagination (Supabase limits to 1000 per request)
+      let allPhotos = []
+      let offset = 0
+      const batchSize = 1000
+      
+      while (true) {
+        const { data: batch, error: batchError } = await supabase
+          .from('gallery_photos')
+          .select('id, filename, width, height, price, sort_order, watermarked_path, thumbnail_path, category_id')
+          .eq('gallery_id', galleryData.id)
+          .order('sort_order', { ascending: true })
+          .range(offset, offset + batchSize - 1)
+        
+        if (batchError) throw batchError
+        if (!batch || batch.length === 0) break
+        
+        allPhotos = [...allPhotos, ...batch]
+        if (batch.length < batchSize) break // Last batch
+        offset += batchSize
+      }
+      
+      const photosData = allPhotos
 
       // Generate signed URLs - PUBLIC gallery uses watermarked images ONLY
       const photosWithUrls = await Promise.all(photosData.map(async (photo) => {
