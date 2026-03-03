@@ -552,10 +552,12 @@ function GalleryEditor({ gallery, organization, onBack }) {
     return matchesSearch && matchesCategory
   })
   
-  // Filter clips by search query
-  const filteredClips = searchQuery
-    ? clips.filter(c => c.filename.toLowerCase().includes(searchQuery.toLowerCase()))
-    : clips
+  // Filter clips by search query AND category
+  const filteredClips = clips.filter(c => {
+    const matchesSearch = !searchQuery || c.filename.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesCategory = !selectedCategoryId || c.category_id === selectedCategoryId
+    return matchesSearch && matchesCategory
+  })
   
   // Load categories from database
   const loadCategories = async () => {
@@ -733,6 +735,33 @@ function GalleryEditor({ gallery, organization, onBack }) {
     }
   }
 
+  // Move selected videos/clips to a category
+  const moveSelectedClipsToCategory = async (targetCategoryId) => {
+    if (selectedClips.size === 0) return
+    setMovingToCategory(true)
+    
+    try {
+      const ids = Array.from(selectedClips)
+      const { error } = await supabase
+        .from('gallery_clips')
+        .update({ category_id: targetCategoryId })
+        .in('id', ids)
+      
+      if (error) throw error
+      
+      // Update local state
+      setClips(clips.map(c => 
+        selectedClips.has(c.id) ? { ...c, category_id: targetCategoryId } : c
+      ))
+      setSelectedClips(new Set())
+    } catch (err) {
+      console.error('Move clips to category error:', err)
+      alert('Failed to move videos: ' + err.message)
+    } finally {
+      setMovingToCategory(false)
+    }
+  }
+
   useEffect(() => {
     loadCategories()
     loadPhotos()
@@ -842,7 +871,7 @@ function GalleryEditor({ gallery, organization, onBack }) {
               video_url: signedUrlData.signedUrl,
               filename: file.name,
               file_size: file.size,
-              category: 'Main'
+              category_id: selectedCategoryId // Upload to currently selected category
             })
           })
           
@@ -852,16 +881,20 @@ function GalleryEditor({ gallery, organization, onBack }) {
             throw new Error(result.error || 'MUX processing failed')
           }
           
-          // 4. Update clip with original_path for download after purchase
+          // 4. Update clip with original_path and category_id for download after purchase
           if (result.clip) {
             await supabase
               .from('gallery_clips')
-              .update({ original_path: originalPath })
+              .update({ 
+                original_path: originalPath,
+                category_id: selectedCategoryId // Assign to selected category
+              })
               .eq('id', result.clip.id)
             
             uploadedClips.push({
               ...result.clip,
               original_path: originalPath,
+              category_id: selectedCategoryId,
               // MUX thumbnail (will be available after processing)
               thumbnail_url: result.clip.mux_playback_id 
                 ? `https://image.mux.com/${result.clip.mux_playback_id}/thumbnail.jpg`
@@ -1519,21 +1552,106 @@ function GalleryEditor({ gallery, organization, onBack }) {
 
       {/* Video Clips Grid */}
       {activeTab === 'videos' && (
-        clips.length === 0 ? (
+        <>
+          {/* Category Management Bar for Videos */}
+          <div className="mb-4 pb-4 border-b border-dark-600">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-gray-400">Categories</h3>
+              <button
+                onClick={() => setShowCategoryModal(true)}
+                className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg flex items-center gap-2"
+              >
+                <Plus className="w-3 h-3" />
+                Add Category
+              </button>
+            </div>
+            
+            {/* Category Tabs */}
+            <div className="flex flex-wrap gap-2">
+              {/* All Videos Tab */}
+              <button
+                onClick={() => setSelectedCategoryId(null)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                  selectedCategoryId === null
+                    ? 'bg-red-600 text-white'
+                    : 'bg-dark-700 text-gray-300 hover:bg-dark-600'
+                }`}
+              >
+                All ({clips.length})
+              </button>
+              
+              {/* Category Tabs */}
+              {categories.map(cat => (
+                <div key={cat.id} className="relative group">
+                  <button
+                    onClick={() => setSelectedCategoryId(cat.id)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                      selectedCategoryId === cat.id
+                        ? 'bg-red-600 text-white'
+                        : 'bg-dark-700 text-gray-300 hover:bg-dark-600'
+                    }`}
+                  >
+                    {cat.name} ({clips.filter(c => c.category_id === cat.id).length})
+                  </button>
+                </div>
+              ))}
+              
+              {categories.length === 0 && (
+                <span className="text-gray-500 text-sm italic">No categories yet. Create one to organize your videos.</span>
+              )}
+            </div>
+          </div>
+          
+          {/* Upload hint when category selected */}
+          {selectedCategoryId && (
+            <div className="mb-4 px-3 py-2 bg-blue-900/30 border border-blue-700/50 rounded-lg text-sm text-blue-300">
+              📁 Uploading to: <strong>{categories.find(c => c.id === selectedCategoryId)?.name}</strong>
+            </div>
+          )}
+          
+        {clips.length === 0 && categories.length === 0 ? (
           <div className="text-center py-12 text-gray-400">
             <svg className="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
             </svg>
-            No videos yet. Upload videos to get started!
+            No videos yet. Create a category and upload some videos to get started!
+          </div>
+        ) : filteredClips.length === 0 ? (
+          <div className="text-center py-12 text-gray-400">
+            <svg className="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            No videos in this category. Upload some or select a different category.
           </div>
         ) : (
           <>
             {/* Selection Controls for Videos */}
             <div className="flex flex-wrap items-center gap-3 mb-4">
-              <span className="text-gray-400 text-sm">{clips.length} video{clips.length !== 1 ? 's' : ''}</span>
+              <span className="text-gray-400 text-sm">{filteredClips.length} video{filteredClips.length !== 1 ? 's' : ''}</span>
               {selectedClips.size > 0 && (
                 <>
                   <span className="text-gray-400 text-sm">{selectedClips.size} selected</span>
+                  
+                  {/* Move to Category Dropdown */}
+                  {categories.length > 0 && (
+                    <select
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          moveSelectedClipsToCategory(e.target.value === 'uncategorized' ? null : e.target.value)
+                          e.target.value = ''
+                        }
+                      }}
+                      className="px-3 py-1.5 bg-dark-700 text-white text-sm rounded-lg border border-dark-600"
+                      defaultValue=""
+                    >
+                      <option value="">Move to Category ▾</option>
+                      <option value="uncategorized">— Uncategorized —</option>
+                      {categories.map(cat => (
+                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                      ))}
+                    </select>
+                  )}
+                  
                   <button
                     onClick={deleteSelectedClips}
                     disabled={deleting}
@@ -1617,7 +1735,8 @@ function GalleryEditor({ gallery, organization, onBack }) {
               ))}
             </div>
           </>
-        )
+        )}
+        </>
       )}
 
       {/* Gallery Settings */}
