@@ -770,16 +770,29 @@ function GalleryEditor({ gallery, organization, onBack }) {
 
   const loadPhotos = async () => {
     try {
-      const { data, error } = await supabase
-        .from('gallery_photos')
-        .select('*')
-        .eq('gallery_id', gallery.id)
-        .order('sort_order', { ascending: true })
-
-      if (error) throw error
+      // Fetch ALL photos using pagination (Supabase limits to 1000 per request)
+      let allPhotos = []
+      let offset = 0
+      const batchSize = 1000
+      
+      while (true) {
+        const { data: batch, error: batchError } = await supabase
+          .from('gallery_photos')
+          .select('*')
+          .eq('gallery_id', gallery.id)
+          .order('sort_order', { ascending: true })
+          .range(offset, offset + batchSize - 1)
+        
+        if (batchError) throw batchError
+        if (!batch || batch.length === 0) break
+        
+        allPhotos = [...allPhotos, ...batch]
+        if (batch.length < batchSize) break // Last batch
+        offset += batchSize
+      }
 
       // Get signed URLs for thumbnails
-      const photosWithUrls = await Promise.all((data || []).map(async (photo) => {
+      const photosWithUrls = await Promise.all(allPhotos.map(async (photo) => {
         const { data: thumbUrl } = await supabase.storage
           .from('galleries')
           .createSignedUrl(photo.thumbnail_path || photo.watermarked_path, 3600)
