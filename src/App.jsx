@@ -90,6 +90,8 @@ const ProposalAdmin = lazy(() => import('./pages/portal/ProposalAdmin'))
 const GalleryAdmin = lazy(() => import('./pages/portal/GalleryAdmin'))
 const GalleryOrders = lazy(() => import('./pages/portal/GalleryOrders'))
 const AthleteTracker = lazy(() => import('./pages/portal/AthleteTracker'))
+const VideoGalleryAdmin = lazy(() => import('./pages/portal/video-galleries/VideoGalleryAdmin'))
+const PublicVideoGallery = lazy(() => import('./pages/video-gallery/PublicVideoGallery'))
 
 // Error Boundary for lazy loading failures
 class ErrorBoundary extends Component {
@@ -201,9 +203,12 @@ function App() {
         <Route path="/watch/:eventId" element={<LazyRoute><WatchPage /></LazyRoute>} />
         <Route path="/my-purchases" element={<LazyRoute><MyPurchasesPage /></LazyRoute>} />
 
-        {/* Galleries */}
+        {/* Photo Galleries */}
         <Route path="/gallery/:slug" element={<LazyRoute><PublicGallery /></LazyRoute>} />
         <Route path="/gallery/download/:token" element={<LazyRoute><DownloadPage /></LazyRoute>} />
+        
+        {/* Video Galleries */}
+        <Route path="/video-gallery/:slug" element={<LazyRoute><PublicVideoGallery /></LazyRoute>} />
 
         {/* Public views */}
         <Route path="/contract/:shareToken" element={<LazyRoute><ContractPublicView /></LazyRoute>} />
@@ -235,6 +240,7 @@ function App() {
         <Route path="/portal/content-admin" element={<ProtectedRoute><PortalLayout><LazyRoute><ContentAdmin /></LazyRoute></PortalLayout></ProtectedRoute>} />
         <Route path="/portal/galleries" element={<ProtectedRoute><PortalLayout><LazyRoute><GalleryAdmin /></LazyRoute></PortalLayout></ProtectedRoute>} />
         <Route path="/portal/gallery-orders" element={<ProtectedRoute><PortalLayout><LazyRoute><GalleryOrders /></LazyRoute></PortalLayout></ProtectedRoute>} />
+        <Route path="/portal/video-galleries" element={<ProtectedRoute><PortalLayout><LazyRoute><VideoGalleryAdmin /></LazyRoute></PortalLayout></ProtectedRoute>} />
         <Route path="/portal/athlete-tracker" element={<ProtectedRoute><PortalLayout><LazyRoute><AthleteTracker /></LazyRoute></PortalLayout></ProtectedRoute>} />
         <Route path="/portal/orders" element={<ProtectedRoute><PortalLayout><LazyRoute><OrderManagement /></LazyRoute></PortalLayout></ProtectedRoute>} />
         <Route path="/portal/pricing" element={<ProtectedRoute><PortalLayout><LazyRoute><PricingCalculator /></LazyRoute></PortalLayout></ProtectedRoute>} />

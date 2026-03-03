@@ -58,20 +58,26 @@ function calculateTieredPrice(quantity, pricingTiers, defaultPrice) {
   return { total, breakdown, savings, flatTotal }
 }
 
+const GALLERY_API_URL = 'https://clawdbots-mini.tailcfdc1.ts.net:5230'
+
 export default function GalleryPage() {
   const { slug } = useParams()
   const [searchParams] = useSearchParams()
   const [gallery, setGallery] = useState(null)
   const [photos, setPhotos] = useState([])
+  const [clips, setClips] = useState([])
   const [selectedPhotos, setSelectedPhotos] = useState(new Set())
+  const [selectedClips, setSelectedClips] = useState(new Set())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [showCheckout, setShowCheckout] = useState(false)
   const [purchasing, setPurchasing] = useState(false)
   const [lightboxPhoto, setLightboxPhoto] = useState(null)
+  const [lightboxClip, setLightboxClip] = useState(null)
   const [filterCategory, setFilterCategory] = useState('All')
   const [categories, setCategories] = useState(['All'])
   const [showCategoryTabs, setShowCategoryTabs] = useState(true)
+  const [activeMediaTab, setActiveMediaTab] = useState('photos') // 'photos' or 'videos'
   const lastScrollY = useRef(0)
   
   // Hide category tabs on scroll down, show on scroll up
@@ -187,6 +193,25 @@ export default function GalleryPage() {
           .filter(c => c && c !== 'All')
       )]
       setCategories(uniqueCategories)
+
+      // Fetch video clips via API
+      try {
+        const clipsRes = await fetch(`${GALLERY_API_URL}/api/galleries/${galleryData.id}/clips`)
+        if (clipsRes.ok) {
+          const clipsData = await clipsRes.json()
+          // Filter to only completed clips and add price
+          const processedClips = (clipsData || [])
+            .filter(c => c.processing_status === 'completed')
+            .map(c => ({
+              ...c,
+              price: c.price || galleryData.price_per_video || 1500
+            }))
+          setClips(processedClips)
+        }
+      } catch (clipErr) {
+        console.error('Load clips error:', clipErr)
+        // Don't fail the whole gallery if clips fail to load
+      }
     } catch (err) {
       console.error('Load gallery error:', err)
       setError('Gallery not found')
@@ -203,6 +228,16 @@ export default function GalleryPage() {
       newSelected.add(photoId)
     }
     setSelectedPhotos(newSelected)
+  }
+
+  const toggleClip = (clipId) => {
+    const newSelected = new Set(selectedClips)
+    if (newSelected.has(clipId)) {
+      newSelected.delete(clipId)
+    } else {
+      newSelected.add(clipId)
+    }
+    setSelectedClips(newSelected)
   }
 
   const selectAll = () => {
@@ -420,7 +455,34 @@ export default function GalleryPage() {
           </div>
         )}
 
+        {/* Photos/Videos Tabs (only show if there are videos) */}
+        {clips.length > 0 && (
+          <div className="flex border-b border-dark-600 mb-4">
+            <button
+              onClick={() => setActiveMediaTab('photos')}
+              className={`px-4 py-2 font-medium transition ${
+                activeMediaTab === 'photos' 
+                  ? 'text-red-500 border-b-2 border-red-500' 
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              📷 Photos ({photos.length})
+            </button>
+            <button
+              onClick={() => setActiveMediaTab('videos')}
+              className={`px-4 py-2 font-medium transition ${
+                activeMediaTab === 'videos' 
+                  ? 'text-red-500 border-b-2 border-red-500' 
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              🎬 Videos ({clips.length})
+            </button>
+          </div>
+        )}
+
         {/* Photo Grid */}
+        {activeMediaTab === 'photos' && (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 md:gap-4 mb-24 md:mb-8">
           {photos
             .filter(photo => filterCategory === 'All' || (photo.category || 'Main') === filterCategory)
@@ -472,9 +534,96 @@ export default function GalleryPage() {
             </div>
           ))}
         </div>
+        )}
+
+        {/* Video Clips Grid */}
+        {activeMediaTab === 'videos' && clips.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-24 md:mb-8">
+            {clips.map((clip) => (
+              <div
+                key={clip.id}
+                className={`relative group cursor-pointer rounded-lg overflow-hidden bg-dark-800 ${
+                  selectedClips.has(clip.id) ? 'ring-2 ring-red-500' : ''
+                }`}
+                onClick={() => setLightboxClip(clip)}
+              >
+                {/* Video thumbnail */}
+                <div className="aspect-video relative">
+                  {clip.thumbnail_url ? (
+                    <img
+                      src={clip.thumbnail_url}
+                      alt={clip.filename}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-dark-700 flex items-center justify-center">
+                      <svg className="w-12 h-12 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                  )}
+                  
+                  {/* Play icon overlay */}
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/40 transition">
+                    <div className="w-14 h-14 bg-white/90 rounded-full flex items-center justify-center">
+                      <svg className="w-6 h-6 text-dark-900 ml-1" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    </div>
+                  </div>
+                  
+                  {/* Duration badge */}
+                  {clip.duration_seconds && (
+                    <div className="absolute bottom-2 right-2 bg-black/70 px-2 py-0.5 rounded text-xs text-white">
+                      {Math.floor(clip.duration_seconds / 60)}:{String(Math.floor(clip.duration_seconds % 60)).padStart(2, '0')}
+                    </div>
+                  )}
+                  
+                  {/* Selection indicator */}
+                  <div className={`absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center transition-all ${
+                    selectedClips.has(clip.id)
+                      ? 'bg-red-500 text-white'
+                      : 'bg-black/40 text-white md:opacity-0 md:group-hover:opacity-100'
+                  }`}>
+                    {selectedClips.has(clip.id) ? (
+                      <Check className="w-4 h-4" />
+                    ) : (
+                      <Plus className="w-4 h-4" />
+                    )}
+                  </div>
+                </div>
+                
+                {/* Clip info */}
+                <div className="p-3">
+                  <p className="text-white text-sm truncate">{clip.title || clip.filename}</p>
+                  <div className="flex items-center justify-between mt-1">
+                    <span className="text-gray-400 text-xs">{clip.category || 'Main'}</span>
+                    <span className="text-red-400 font-semibold text-sm">${(clip.price / 100).toFixed(2)}</span>
+                  </div>
+                </div>
+                
+                {/* Quick add button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggleClip(clip.id)
+                  }}
+                  className={`absolute bottom-14 left-3 px-3 py-1 rounded-full text-xs font-semibold transition-all md:opacity-0 md:group-hover:opacity-100 ${
+                    selectedClips.has(clip.id)
+                      ? 'bg-green-500 text-white'
+                      : 'bg-black/60 backdrop-blur-sm text-white'
+                  }`}
+                >
+                  {selectedClips.has(clip.id) ? 'Added' : 'Add to Cart'}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Sleek Floating Cart - Mobile Optimized */}
-        {(selectedPhotos.size > 0 || gallery.package_enabled) && (
+        {(selectedPhotos.size > 0 || selectedClips.size > 0 || gallery.package_enabled) && (
           <div className="fixed bottom-0 left-0 right-0 md:bottom-4 md:left-auto md:right-8 md:w-96 z-40">
             {/* Mobile: Slim pill bar */}
             <div className="md:hidden bg-dark-900/95 backdrop-blur-lg border-t border-dark-700 px-4 py-3 safe-area-pb">
@@ -482,7 +631,12 @@ export default function GalleryPage() {
                 {/* Cart indicator pill */}
                 <div className="flex items-center gap-2 bg-dark-700 rounded-full px-3 py-1.5">
                   <ShoppingCart className="w-4 h-4 text-red-500" />
-                  <span className="text-white font-semibold text-sm">{selectedPhotos.size}</span>
+                  <span className="text-white font-semibold text-sm">
+                    {selectedPhotos.size + selectedClips.size}
+                    {selectedClips.size > 0 && selectedPhotos.size > 0 && (
+                      <span className="text-gray-400 text-xs ml-1">({selectedPhotos.size}📷 {selectedClips.size}🎬)</span>
+                    )}
+                  </span>
                 </div>
                 
                 {/* Price */}

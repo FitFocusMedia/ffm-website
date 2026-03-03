@@ -558,10 +558,21 @@ export default function EventsPage() {
 
   // Categorize events
   const now = new Date()
-  const liveEvents = filteredEvents.filter(e => e.status === 'live' || e.is_live)
+  
+  // Fix: Check both status AND end_time to determine if truly live
+  // An event marked as 'live' but with end_time in the past should be treated as ended
+  const liveEvents = filteredEvents.filter(e => {
+    const isMarkedLive = e.status === 'live' || e.is_live
+    const hasEnded = e.end_time && new Date(e.end_time) < now
+    return isMarkedLive && !hasEnded
+  })
+  
   const upcomingEvents = filteredEvents.filter(e => {
     const start = new Date(e.start_time)
-    return start > now && e.status !== 'ended' && e.status !== 'live' && !e.is_live
+    const end = e.end_time ? new Date(e.end_time) : null
+    const hasEnded = end && end < now
+    const isLive = (e.status === 'live' || e.is_live) && !hasEnded
+    return start > now && e.status !== 'ended' && !isLive && !hasEnded
   }).sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
   
   const thisWeekEvents = upcomingEvents.filter(e => {
@@ -574,9 +585,10 @@ export default function EventsPage() {
     return hoursUntil > 168
   })
   
-  const pastEvents = filteredEvents.filter(e => 
-    e.status === 'ended' || new Date(e.end_time) < now
-  ).sort((a, b) => new Date(b.start_time) - new Date(a.start_time))
+  const pastEvents = filteredEvents.filter(e => {
+    const hasEnded = e.end_time && new Date(e.end_time) < now
+    return e.status === 'ended' || hasEnded
+  }).sort((a, b) => new Date(b.start_time) - new Date(a.start_time))
 
   // Featured event (next upcoming or current live)
   const featuredEvent = liveEvents[0] || upcomingEvents[0]

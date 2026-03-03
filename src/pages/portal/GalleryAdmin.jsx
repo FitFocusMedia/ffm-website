@@ -519,24 +519,90 @@ function CreateGalleryModal({ organization, onClose, onCreate }) {
   )
 }
 
+const GALLERY_API_URL = 'https://clawdbots-mini.tailcfdc1.ts.net:5230'
+
 function GalleryEditor({ gallery, organization, onBack }) {
   const [currentGallery, setCurrentGallery] = useState(gallery)
   const [photos, setPhotos] = useState([])
+  const [clips, setClips] = useState([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 })
+  const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0, type: 'photos' })
   const [dragActive, setDragActive] = useState(false)
   const [selectedPhotos, setSelectedPhotos] = useState(new Set())
+  const [selectedClips, setSelectedClips] = useState(new Set())
   const [deleting, setDeleting] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [activeTab, setActiveTab] = useState('photos') // 'photos' or 'videos'
   
-  // Filter photos by search query
-  const filteredPhotos = searchQuery 
-    ? photos.filter(p => p.filename.toLowerCase().includes(searchQuery.toLowerCase()))
-    : photos
+  // Category/Division management
+  const [selectedCategory, setSelectedCategory] = useState('all')
+  const [showCategoryModal, setShowCategoryModal] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [movingToCategory, setMovingToCategory] = useState(false)
+  
+  // Get unique categories from photos
+  const categories = [...new Set(photos.map(p => p.category || 'Main'))].sort((a, b) => {
+    if (a === 'Main') return -1
+    if (b === 'Main') return 1
+    return a.localeCompare(b)
+  })
+  
+  // Filter photos by search query AND category
+  const filteredPhotos = photos.filter(p => {
+    const matchesSearch = !searchQuery || p.filename.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesCategory = selectedCategory === 'all' || (p.category || 'Main') === selectedCategory
+    return matchesSearch && matchesCategory
+  })
+  
+  // Filter clips by search query
+  const filteredClips = searchQuery
+    ? clips.filter(c => c.filename.toLowerCase().includes(searchQuery.toLowerCase()))
+    : clips
+  
+  // Move selected photos to a category
+  const moveSelectedToCategory = async (targetCategory) => {
+    if (selectedPhotos.size === 0) return
+    setMovingToCategory(true)
+    
+    try {
+      const ids = Array.from(selectedPhotos)
+      const { error } = await supabase
+        .from('gallery_photos')
+        .update({ category: targetCategory })
+        .in('id', ids)
+      
+      if (error) throw error
+      
+      // Update local state
+      setPhotos(photos.map(p => 
+        selectedPhotos.has(p.id) ? { ...p, category: targetCategory } : p
+      ))
+      setSelectedPhotos(new Set())
+    } catch (err) {
+      console.error('Move to category error:', err)
+      alert('Failed to move photos: ' + err.message)
+    } finally {
+      setMovingToCategory(false)
+    }
+  }
+  
+  // Create new category
+  const createCategory = async () => {
+    if (!newCategoryName.trim()) return
+    
+    // Just update the selected photos with the new category name
+    if (selectedPhotos.size > 0) {
+      await moveSelectedToCategory(newCategoryName.trim())
+    }
+    
+    setNewCategoryName('')
+    setShowCategoryModal(false)
+  }
 
   useEffect(() => {
     loadPhotos()
+    loadClips()
   }, [gallery.id])
 
   const loadPhotos = async () => {
@@ -565,15 +631,65 @@ function GalleryEditor({ gallery, organization, onBack }) {
     }
   }
 
+  const loadClips = async () => {
+    try {
+      const res = await fetch(`${GALLERY_API_URL}/api/galleries/${gallery.id}/clips`)
+      if (res.ok) {
+        const data = await res.json()
+        setClips(data || [])
+      }
+    } catch (err) {
+      console.error('Load clips error:', err)
+    }
+  }
+
   const handleFiles = async (files) => {
-    const imageFiles = Array.from(files).filter(f => 
+    const allFiles = Array.from(files)
+    const imageFiles = allFiles.filter(f => 
       f.type.startsWith('image/') && f.size <= 50 * 1024 * 1024
     )
+    const videoFiles = allFiles.filter(f => 
+      (f.type.startsWith('video/') || f.name.match(/\.(mp4|mov|avi|webm|m4v)$/i)) && 
+      f.size <= 2 * 1024 * 1024 * 1024
+    )
+    
+    // Handle video uploads via API (FFmpeg processing)
+    if (videoFiles.length > 0) {
+      setActiveTab('videos')
+      setUploading(true)
+      setUploadProgress({ current: 0, total: videoFiles.length, type: 'videos' })
+      
+      const formData = new FormData()
+      videoFiles.forEach(f => formData.append('videos', f))
+      formData.append('category', 'Main')
+      
+      try {
+        const res = await fetch(`${GALLERY_API_URL}/api/galleries/${gallery.id}/clips`, {
+          method: 'POST',
+          body: formData
+        })
+        const result = await res.json()
+        
+        if (result.clips?.length > 0) {
+          setClips([...clips, ...result.clips])
+        }
+        
+        if (result.errors?.length > 0) {
+          alert(`Processed ${result.processed} videos. ${result.failed} failed.`)
+        }
+      } catch (err) {
+        console.error('Video upload error:', err)
+        alert('Failed to upload videos: ' + err.message)
+      }
+      
+      setUploading(false)
+      setUploadProgress({ current: 0, total: 0, type: 'photos' })
+    }
     
     if (imageFiles.length === 0) return
 
     setUploading(true)
-    setUploadProgress({ current: 0, total: imageFiles.length })
+    setUploadProgress({ current: 0, total: imageFiles.length, type: 'photos' })
 
     const uploadedPhotos = []
     let sortOrder = photos.length
@@ -729,6 +845,36 @@ function GalleryEditor({ gallery, organization, onBack }) {
   const publishGallery = () => updateGallery({ status: 'published', published_at: new Date().toISOString() })
   const unpublishGallery = () => updateGallery({ status: 'draft' })
 
+  const deleteClip = async (clipId) => {
+    if (!confirm('Delete this video clip?')) return
+    try {
+      await fetch(`${GALLERY_API_URL}/api/galleries/${gallery.id}/clips/${clipId}`, { method: 'DELETE' })
+      setClips(clips.filter(c => c.id !== clipId))
+    } catch (err) {
+      console.error('Delete clip error:', err)
+      alert('Failed to delete clip')
+    }
+  }
+
+  const deleteSelectedClips = async () => {
+    if (selectedClips.size === 0) return
+    if (!confirm(`Delete ${selectedClips.size} selected video clips?`)) return
+    
+    setDeleting(true)
+    try {
+      for (const clipId of selectedClips) {
+        await fetch(`${GALLERY_API_URL}/api/galleries/${gallery.id}/clips/${clipId}`, { method: 'DELETE' })
+      }
+      setClips(clips.filter(c => !selectedClips.has(c.id)))
+      setSelectedClips(new Set())
+    } catch (err) {
+      console.error('Delete selected clips error:', err)
+      alert('Failed to delete some clips')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   const handleDrop = (e) => {
     e.preventDefault()
     setDragActive(false)
@@ -812,13 +958,13 @@ function GalleryEditor({ gallery, organization, onBack }) {
         className={`border-2 border-dashed rounded-xl p-8 mb-6 text-center cursor-pointer transition-colors ${
           dragActive ? 'border-red-500 bg-red-500/10' : 'border-dark-600 hover:border-dark-500'
         } ${uploading ? 'opacity-50 pointer-events-none' : ''}`}
-        onClick={() => !uploading && document.getElementById('photo-upload')?.click()}
+        onClick={() => !uploading && document.getElementById('media-upload')?.click()}
       >
         <input
-          id="photo-upload"
+          id="media-upload"
           type="file"
           multiple
-          accept="image/jpeg,image/png,image/webp"
+          accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm,.mov,.mp4,.avi,.webm,.m4v"
           className="hidden"
           onChange={(e) => e.target.files && handleFiles(e.target.files)}
         />
@@ -826,122 +972,355 @@ function GalleryEditor({ gallery, organization, onBack }) {
           <div>
             <Loader2 className="w-8 h-8 text-red-500 animate-spin mx-auto mb-2" />
             <div className="text-white mb-2">
-              Uploading {uploadProgress.current} of {uploadProgress.total}...
+              {uploadProgress.type === 'videos' 
+                ? 'Processing videos (watermarking + compression)...'
+                : `Uploading ${uploadProgress.current} of ${uploadProgress.total}...`
+              }
             </div>
-            <div className="w-64 mx-auto bg-dark-700 rounded-full h-2">
-              <div
-                className="bg-red-600 h-2 rounded-full transition-all"
-                style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
-              />
-            </div>
+            {uploadProgress.type === 'photos' && (
+              <div className="w-64 mx-auto bg-dark-700 rounded-full h-2">
+                <div
+                  className="bg-red-600 h-2 rounded-full transition-all"
+                  style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
+                />
+              </div>
+            )}
+            {uploadProgress.type === 'videos' && (
+              <p className="text-gray-400 text-sm mt-2">This may take a while for large files...</p>
+            )}
           </div>
         ) : dragActive ? (
           <div className="text-red-400">
             <Upload className="w-8 h-8 mx-auto mb-2" />
-            Drop photos here...
+            Drop files here...
           </div>
         ) : (
           <div>
             <Upload className="w-8 h-8 text-gray-500 mx-auto mb-2" />
-            <p className="text-gray-300 mb-1">Drag & drop photos here, or click to select</p>
-            <p className="text-gray-500 text-sm">JPEG, PNG, WebP up to 50MB each</p>
+            <p className="text-gray-300 mb-1">Drag & drop photos or videos here, or click to select</p>
+            <p className="text-gray-500 text-sm">Photos: JPEG, PNG, WebP (50MB) • Videos: MP4, MOV, WebM (2GB)</p>
           </div>
         )}
       </div>
 
+      {/* Tabs: Photos | Videos */}
+      <div className="flex border-b border-dark-600 mb-4">
+        <button
+          onClick={() => setActiveTab('photos')}
+          className={`px-4 py-2 font-medium transition ${
+            activeTab === 'photos' 
+              ? 'text-red-500 border-b-2 border-red-500' 
+              : 'text-gray-400 hover:text-white'
+          }`}
+        >
+          Photos ({photos.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('videos')}
+          className={`px-4 py-2 font-medium transition ${
+            activeTab === 'videos' 
+              ? 'text-red-500 border-b-2 border-red-500' 
+              : 'text-gray-400 hover:text-white'
+          }`}
+        >
+          Videos ({clips.length})
+        </button>
+      </div>
+
       {/* Photo Grid */}
-      {photos.length === 0 ? (
-        <div className="text-center py-12 text-gray-400">
-          <Image className="w-12 h-12 mx-auto mb-4 opacity-50" />
-          No photos yet. Upload some photos to get started!
-        </div>
-      ) : (
-        <>
-          {/* Search + Selection Controls */}
-          <div className="flex flex-wrap items-center gap-3 mb-4">
-            {/* Search */}
-            <div className="relative flex-1 min-w-[200px] max-w-[300px]">
-              <input
-                type="text"
-                placeholder="Search by filename..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-dark-700 text-white rounded-lg px-3 py-1.5 pl-9 text-sm border border-dark-600 focus:border-red-500 focus:outline-none"
-              />
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              {searchQuery && (
-                <button 
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+      {activeTab === 'photos' && (
+        photos.length === 0 ? (
+          <div className="text-center py-12 text-gray-400">
+            <Image className="w-12 h-12 mx-auto mb-4 opacity-50" />
+            No photos yet. Upload some photos to get started!
+          </div>
+        ) : (
+          <>
+            {/* Category Filter Tabs */}
+            {categories.length > 1 && (
+              <div className="flex flex-wrap gap-2 mb-4 pb-3 border-b border-dark-600">
+                <button
+                  onClick={() => setSelectedCategory('all')}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+                    selectedCategory === 'all'
+                      ? 'bg-red-600 text-white'
+                      : 'bg-dark-700 text-gray-300 hover:bg-dark-600'
+                  }`}
                 >
-                  ✕
+                  All ({photos.length})
                 </button>
+                {categories.map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+                      selectedCategory === cat
+                        ? 'bg-red-600 text-white'
+                        : 'bg-dark-700 text-gray-300 hover:bg-dark-600'
+                    }`}
+                  >
+                    {cat} ({photos.filter(p => (p.category || 'Main') === cat).length})
+                  </button>
+                ))}
+              </div>
+            )}
+            
+            {/* Search + Selection Controls */}
+            <div className="flex flex-wrap items-center gap-3 mb-4">
+              {/* Search */}
+              <div className="relative flex-1 min-w-[200px] max-w-[300px]">
+                <input
+                  type="text"
+                  placeholder="Search by filename..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-dark-700 text-white rounded-lg px-3 py-1.5 pl-9 text-sm border border-dark-600 focus:border-red-500 focus:outline-none"
+                />
+                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                {searchQuery && (
+                  <button 
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+              
+              {(searchQuery || selectedCategory !== 'all') && (
+                <span className="text-gray-400 text-sm">{filteredPhotos.length} of {photos.length}</span>
+              )}
+              
+              <button
+                onClick={selectedPhotos.size === filteredPhotos.length ? deselectAll : selectAll}
+                className="px-3 py-1.5 bg-dark-600 hover:bg-dark-500 text-white text-sm rounded-lg"
+              >
+                {selectedPhotos.size === filteredPhotos.length && filteredPhotos.length > 0 ? 'Deselect All' : 'Select All'}
+              </button>
+              {selectedPhotos.size > 0 && (
+                <>
+                  <span className="text-gray-400 text-sm">{selectedPhotos.size} selected</span>
+                  
+                  {/* Move to Category Dropdown */}
+                  <div className="relative group">
+                    <button
+                      disabled={movingToCategory}
+                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white text-sm rounded-lg flex items-center gap-2"
+                    >
+                      {movingToCategory ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                      Move to Category ▾
+                    </button>
+                    <div className="absolute top-full left-0 mt-1 bg-dark-700 border border-dark-600 rounded-lg shadow-xl z-20 min-w-[180px] hidden group-hover:block">
+                      {categories.map(cat => (
+                        <button
+                          key={cat}
+                          onClick={() => moveSelectedToCategory(cat)}
+                          className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-dark-600 hover:text-white first:rounded-t-lg"
+                        >
+                          {cat}
+                        </button>
+                      ))}
+                      <div className="border-t border-dark-600">
+                        <button
+                          onClick={() => setShowCategoryModal(true)}
+                          className="block w-full text-left px-4 py-2 text-sm text-green-400 hover:bg-dark-600 rounded-b-lg"
+                        >
+                          + New Category...
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <button
+                    onClick={deleteSelected}
+                    disabled={deleting}
+                    className="px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white text-sm rounded-lg flex items-center gap-2"
+                  >
+                    {deleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                    Delete Selected
+                  </button>
+                </>
               )}
             </div>
             
-            {searchQuery && (
-              <span className="text-gray-400 text-sm">{filteredPhotos.length} of {photos.length}</span>
-            )}
-            
-            <button
-              onClick={selectedPhotos.size === filteredPhotos.length ? deselectAll : selectAll}
-              className="px-3 py-1.5 bg-dark-600 hover:bg-dark-500 text-white text-sm rounded-lg"
-            >
-              {selectedPhotos.size === filteredPhotos.length && filteredPhotos.length > 0 ? 'Deselect All' : 'Select All'}
-            </button>
-            {selectedPhotos.size > 0 && (
-              <>
-                <span className="text-gray-400 text-sm">{selectedPhotos.size} selected</span>
-                <button
-                  onClick={deleteSelected}
-                  disabled={deleting}
-                  className="px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white text-sm rounded-lg flex items-center gap-2"
-                >
-                  {deleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
-                  Delete Selected
-                </button>
-              </>
-            )}
-          </div>
-          
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {filteredPhotos.map(photo => (
-              <div 
-                key={photo.id} 
-                className={`relative group cursor-pointer ${selectedPhotos.has(photo.id) ? 'ring-2 ring-red-500' : ''}`}
-                onClick={() => toggleSelect(photo.id)}
-              >
-                <img
-                  src={photo.thumbnail_url}
-                  alt={photo.filename}
-                  className="w-full aspect-square object-cover rounded-lg bg-dark-700"
-                />
-                {/* Selection checkbox */}
-                <div className={`absolute top-2 left-2 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                  selectedPhotos.has(photo.id) 
-                    ? 'bg-red-500 border-red-500' 
-                    : 'border-white/50 bg-black/30 group-hover:border-white'
-                }`}>
-                  {selectedPhotos.has(photo.id) && (
-                    <Check className="w-3 h-3 text-white" />
-                  )}
-                </div>
-                {/* Delete single button */}
-                <button
-                  onClick={(e) => { e.stopPropagation(); deletePhoto(photo.id) }}
-                  className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white p-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <Trash2 className="w-3 h-3" />
-                </button>
-                <div className="absolute bottom-1 left-1 right-1 text-xs text-white truncate bg-black/50 px-1 rounded">
-                  {photo.filename}
+            {/* New Category Modal */}
+            {showCategoryModal && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowCategoryModal(false)}>
+                <div className="bg-dark-800 rounded-xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+                  <h3 className="text-lg font-bold text-white mb-4">Create New Category</h3>
+                  <p className="text-gray-400 text-sm mb-4">
+                    Create a category (e.g., "Adult Male Gi", "Kids No Gi", "Mat 1") to organize photos by division.
+                  </p>
+                  <input
+                    type="text"
+                    placeholder="Category name..."
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    className="w-full bg-dark-700 text-white rounded-lg px-4 py-3 border border-dark-600 focus:border-red-500 focus:outline-none mb-4"
+                    autoFocus
+                    onKeyDown={(e) => e.key === 'Enter' && createCategory()}
+                  />
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setShowCategoryModal(false)}
+                      className="flex-1 bg-dark-600 hover:bg-dark-500 text-white py-2 rounded-lg"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={createCategory}
+                      disabled={!newCategoryName.trim()}
+                      className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white py-2 rounded-lg"
+                    >
+                      Create & Move
+                    </button>
+                  </div>
                 </div>
               </div>
-            ))}
+            )}
+            
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              {filteredPhotos.map(photo => (
+                <div 
+                  key={photo.id} 
+                  className={`relative group cursor-pointer ${selectedPhotos.has(photo.id) ? 'ring-2 ring-red-500' : ''}`}
+                  onClick={() => toggleSelect(photo.id)}
+                >
+                  <img
+                    src={photo.thumbnail_url}
+                    alt={photo.filename}
+                    className="w-full aspect-square object-cover rounded-lg bg-dark-700"
+                  />
+                  {/* Selection checkbox */}
+                  <div className={`absolute top-2 left-2 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                    selectedPhotos.has(photo.id) 
+                      ? 'bg-red-500 border-red-500' 
+                      : 'border-white/50 bg-black/30 group-hover:border-white'
+                  }`}>
+                    {selectedPhotos.has(photo.id) && (
+                      <Check className="w-3 h-3 text-white" />
+                    )}
+                  </div>
+                  {/* Delete single button */}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); deletePhoto(photo.id) }}
+                    className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white p-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                  <div className="absolute bottom-1 left-1 right-1 text-xs text-white truncate bg-black/50 px-1 rounded">
+                    {photo.filename}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )
+      )}
+
+      {/* Video Clips Grid */}
+      {activeTab === 'videos' && (
+        clips.length === 0 ? (
+          <div className="text-center py-12 text-gray-400">
+            <svg className="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            No videos yet. Upload videos to get started!
           </div>
-        </>
+        ) : (
+          <>
+            {/* Selection Controls for Videos */}
+            <div className="flex flex-wrap items-center gap-3 mb-4">
+              <span className="text-gray-400 text-sm">{clips.length} video{clips.length !== 1 ? 's' : ''}</span>
+              {selectedClips.size > 0 && (
+                <>
+                  <span className="text-gray-400 text-sm">{selectedClips.size} selected</span>
+                  <button
+                    onClick={deleteSelectedClips}
+                    disabled={deleting}
+                    className="px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white text-sm rounded-lg flex items-center gap-2"
+                  >
+                    {deleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                    Delete Selected
+                  </button>
+                </>
+              )}
+            </div>
+            
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {filteredClips.map(clip => (
+                <div 
+                  key={clip.id} 
+                  className={`relative group cursor-pointer ${selectedClips.has(clip.id) ? 'ring-2 ring-red-500' : ''}`}
+                  onClick={() => {
+                    const newSelected = new Set(selectedClips)
+                    if (newSelected.has(clip.id)) {
+                      newSelected.delete(clip.id)
+                    } else {
+                      newSelected.add(clip.id)
+                    }
+                    setSelectedClips(newSelected)
+                  }}
+                >
+                  <div className="aspect-video bg-dark-700 rounded-lg overflow-hidden relative">
+                    {clip.thumbnail_url ? (
+                      <img
+                        src={clip.thumbnail_url}
+                        alt={clip.filename}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <svg className="w-8 h-8 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                    )}
+                    {/* Processing status */}
+                    {clip.processing_status === 'processing' && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                        <Loader2 className="w-6 h-6 text-white animate-spin" />
+                      </div>
+                    )}
+                    {clip.processing_status === 'failed' && (
+                      <div className="absolute inset-0 bg-red-900/50 flex items-center justify-center">
+                        <span className="text-white text-sm">Failed</span>
+                      </div>
+                    )}
+                    {/* Duration badge */}
+                    {clip.duration_seconds && (
+                      <div className="absolute bottom-2 right-2 bg-black/70 px-2 py-0.5 rounded text-xs text-white">
+                        {Math.floor(clip.duration_seconds / 60)}:{String(Math.floor(clip.duration_seconds % 60)).padStart(2, '0')}
+                      </div>
+                    )}
+                  </div>
+                  {/* Selection checkbox */}
+                  <div className={`absolute top-2 left-2 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                    selectedClips.has(clip.id) 
+                      ? 'bg-red-500 border-red-500' 
+                      : 'border-white/50 bg-black/30 group-hover:border-white'
+                  }`}>
+                    {selectedClips.has(clip.id) && (
+                      <Check className="w-3 h-3 text-white" />
+                    )}
+                  </div>
+                  {/* Delete single button */}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); deleteClip(clip.id) }}
+                    className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white p-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                  <div className="mt-1 text-xs text-gray-400 truncate">
+                    {clip.filename}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )
       )}
 
       {/* Gallery Settings */}
