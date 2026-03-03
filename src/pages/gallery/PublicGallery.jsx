@@ -58,7 +58,10 @@ function calculateTieredPrice(quantity, pricingTiers, defaultPrice) {
   return { total, breakdown, savings, flatTotal }
 }
 
-const GALLERY_API_URL = 'https://clawdbots-mini.tailcfdc1.ts.net:5230'
+// Gallery API URL - only available on Tailscale network
+// Video clips require the local API; photos work via Supabase
+const isProduction = typeof window !== 'undefined' && window.location.hostname === 'fitfocusmedia.com.au'
+const GALLERY_API_URL = isProduction ? null : 'https://clawdbots-mini.tailcfdc1.ts.net:5230'
 
 export default function GalleryPage() {
   const { slug } = useParams()
@@ -194,23 +197,25 @@ export default function GalleryPage() {
       )]
       setCategories(uniqueCategories)
 
-      // Fetch video clips via API
-      try {
-        const clipsRes = await fetch(`${GALLERY_API_URL}/api/galleries/${galleryData.id}/clips`)
-        if (clipsRes.ok) {
-          const clipsData = await clipsRes.json()
-          // Filter to only completed clips and add price
-          const processedClips = (clipsData || [])
-            .filter(c => c.processing_status === 'completed')
-            .map(c => ({
-              ...c,
-              price: c.price || galleryData.price_per_video || 1500
-            }))
-          setClips(processedClips)
+      // Fetch video clips via API (only if API is available - not on production)
+      if (GALLERY_API_URL) {
+        try {
+          const clipsRes = await fetch(`${GALLERY_API_URL}/api/galleries/${galleryData.id}/clips`)
+          if (clipsRes.ok) {
+            const clipsData = await clipsRes.json()
+            // Filter to only completed clips and add price
+            const processedClips = (clipsData || [])
+              .filter(c => c.processing_status === 'completed')
+              .map(c => ({
+                ...c,
+                price: c.price || galleryData.price_per_video || 1500
+              }))
+            setClips(processedClips)
+          }
+        } catch (clipErr) {
+          console.error('Load clips error:', clipErr)
+          // Don't fail the whole gallery if clips fail to load
         }
-      } catch (clipErr) {
-        console.error('Load clips error:', clipErr)
-        // Don't fail the whole gallery if clips fail to load
       }
     } catch (err) {
       console.error('Load gallery error:', err)

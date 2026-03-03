@@ -5,7 +5,9 @@ import {
   CheckCircle2, XCircle, Clock, FolderOpen, DollarSign
 } from 'lucide-react'
 
-const API_URL = 'https://clawdbots-mini.tailcfdc1.ts.net:5231'
+// Video Gallery API - only available on Tailscale network (requires local FFmpeg processing)
+const isProduction = typeof window !== 'undefined' && window.location.hostname === 'fitfocusmedia.com.au'
+const API_URL = isProduction ? null : 'https://clawdbots-mini.tailcfdc1.ts.net:5231'
 
 export default function VideoGalleryAdmin() {
   const navigate = useNavigate()

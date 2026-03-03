@@ -519,7 +519,10 @@ function CreateGalleryModal({ organization, onClose, onCreate }) {
   )
 }
 
-const GALLERY_API_URL = 'https://clawdbots-mini.tailcfdc1.ts.net:5230'
+// Gallery API URL - only available on Tailscale network (dev/admin)
+// Production site uses Supabase directly for photos; videos require Tailscale access
+const isProduction = typeof window !== 'undefined' && window.location.hostname === 'fitfocusmedia.com.au'
+const GALLERY_API_URL = isProduction ? null : 'https://clawdbots-mini.tailcfdc1.ts.net:5230'
 
 function GalleryEditor({ gallery, organization, onBack }) {
   const [currentGallery, setCurrentGallery] = useState(gallery)
@@ -632,6 +635,9 @@ function GalleryEditor({ gallery, organization, onBack }) {
   }
 
   const loadClips = async () => {
+    // Video API only available on Tailscale network (not production)
+    if (!GALLERY_API_URL) return
+    
     try {
       const res = await fetch(`${GALLERY_API_URL}/api/galleries/${gallery.id}/clips`)
       if (res.ok) {
@@ -653,37 +659,42 @@ function GalleryEditor({ gallery, organization, onBack }) {
       f.size <= 2 * 1024 * 1024 * 1024
     )
     
-    // Handle video uploads via API (FFmpeg processing)
+    // Handle video uploads via API (FFmpeg processing) - only available on Tailscale network
     if (videoFiles.length > 0) {
-      setActiveTab('videos')
-      setUploading(true)
-      setUploadProgress({ current: 0, total: videoFiles.length, type: 'videos' })
-      
-      const formData = new FormData()
-      videoFiles.forEach(f => formData.append('videos', f))
-      formData.append('category', 'Main')
-      
-      try {
-        const res = await fetch(`${GALLERY_API_URL}/api/galleries/${gallery.id}/clips`, {
-          method: 'POST',
-          body: formData
-        })
-        const result = await res.json()
+      if (!GALLERY_API_URL) {
+        alert('Video uploads are only available when connected to the admin network. Photos can still be uploaded.')
+        // Continue to process photos below
+      } else {
+        setActiveTab('videos')
+        setUploading(true)
+        setUploadProgress({ current: 0, total: videoFiles.length, type: 'videos' })
         
-        if (result.clips?.length > 0) {
-          setClips([...clips, ...result.clips])
+        const formData = new FormData()
+        videoFiles.forEach(f => formData.append('videos', f))
+        formData.append('category', 'Main')
+        
+        try {
+          const res = await fetch(`${GALLERY_API_URL}/api/galleries/${gallery.id}/clips`, {
+            method: 'POST',
+            body: formData
+          })
+          const result = await res.json()
+          
+          if (result.clips?.length > 0) {
+            setClips([...clips, ...result.clips])
+          }
+          
+          if (result.errors?.length > 0) {
+            alert(`Processed ${result.processed} videos. ${result.failed} failed.`)
+          }
+        } catch (err) {
+          console.error('Video upload error:', err)
+          alert('Failed to upload videos: ' + err.message)
         }
         
-        if (result.errors?.length > 0) {
-          alert(`Processed ${result.processed} videos. ${result.failed} failed.`)
-        }
-      } catch (err) {
-        console.error('Video upload error:', err)
-        alert('Failed to upload videos: ' + err.message)
+        setUploading(false)
+        setUploadProgress({ current: 0, total: 0, type: 'photos' })
       }
-      
-      setUploading(false)
-      setUploadProgress({ current: 0, total: 0, type: 'photos' })
     }
     
     if (imageFiles.length === 0) return
@@ -846,6 +857,7 @@ function GalleryEditor({ gallery, organization, onBack }) {
   const unpublishGallery = () => updateGallery({ status: 'draft' })
 
   const deleteClip = async (clipId) => {
+    if (!GALLERY_API_URL) return
     if (!confirm('Delete this video clip?')) return
     try {
       await fetch(`${GALLERY_API_URL}/api/galleries/${gallery.id}/clips/${clipId}`, { method: 'DELETE' })
@@ -857,6 +869,7 @@ function GalleryEditor({ gallery, organization, onBack }) {
   }
 
   const deleteSelectedClips = async () => {
+    if (!GALLERY_API_URL) return
     if (selectedClips.size === 0) return
     if (!confirm(`Delete ${selectedClips.size} selected video clips?`)) return
     
