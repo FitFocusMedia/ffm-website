@@ -182,11 +182,13 @@ export default function GalleryPage() {
       setCategories(categoryList)
 
       // Get photos with signed URLs - include category_id
+      // Use range to fetch ALL photos (Supabase defaults to 1000 limit)
       const { data: photosData, error: photosError } = await supabase
         .from('gallery_photos')
         .select('id, filename, width, height, price, sort_order, watermarked_path, thumbnail_path, category_id')
         .eq('gallery_id', galleryData.id)
         .order('sort_order', { ascending: true })
+        .range(0, 9999) // Fetch up to 10,000 photos
 
       if (photosError) throw photosError
 
