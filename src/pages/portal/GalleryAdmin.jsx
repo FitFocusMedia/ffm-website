@@ -629,6 +629,44 @@ function GalleryEditor({ gallery, organization, onBack }) {
     }
   }
   
+  // Move category left/right (swap positions)
+  const moveCategory = async (categoryId, direction) => {
+    const currentIndex = categories.findIndex(c => c.id === categoryId)
+    if (currentIndex === -1) return
+    
+    const newIndex = currentIndex + direction
+    if (newIndex < 0 || newIndex >= categories.length) return
+    
+    // Swap the two categories
+    const newCategories = [...categories]
+    const temp = newCategories[currentIndex]
+    newCategories[currentIndex] = newCategories[newIndex]
+    newCategories[newIndex] = temp
+    
+    // Update positions
+    newCategories[currentIndex].position = currentIndex
+    newCategories[newIndex].position = newIndex
+    
+    setCategories(newCategories)
+    
+    try {
+      // Update both categories in the database
+      await supabase
+        .from('gallery_categories')
+        .update({ position: currentIndex })
+        .eq('id', newCategories[currentIndex].id)
+      
+      await supabase
+        .from('gallery_categories')
+        .update({ position: newIndex })
+        .eq('id', newCategories[newIndex].id)
+    } catch (err) {
+      console.error('Move category error:', err)
+      // Revert on error
+      loadCategories()
+    }
+  }
+
   // Delete category (moves photos to uncategorized)
   const deleteCategory = async (categoryId) => {
     const category = categories.find(c => c.id === categoryId)
@@ -1260,9 +1298,29 @@ function GalleryEditor({ gallery, organization, onBack }) {
                     </button>
                   )}
                   
-                  {/* Edit/Delete buttons on hover */}
+                  {/* Edit/Delete/Move buttons on hover */}
                   {editingCategory !== cat.id && (
                     <div className="absolute -top-1 -right-1 hidden group-hover:flex gap-1">
+                      {/* Move left */}
+                      {categories.findIndex(c => c.id === cat.id) > 0 && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); moveCategory(cat.id, -1) }}
+                          className="w-5 h-5 bg-gray-600 hover:bg-gray-700 rounded-full flex items-center justify-center"
+                          title="Move left"
+                        >
+                          <span className="text-[10px] text-white">←</span>
+                        </button>
+                      )}
+                      {/* Move right */}
+                      {categories.findIndex(c => c.id === cat.id) < categories.length - 1 && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); moveCategory(cat.id, 1) }}
+                          className="w-5 h-5 bg-gray-600 hover:bg-gray-700 rounded-full flex items-center justify-center"
+                          title="Move right"
+                        >
+                          <span className="text-[10px] text-white">→</span>
+                        </button>
+                      )}
                       <button
                         onClick={(e) => { e.stopPropagation(); setEditingCategory(cat.id) }}
                         className="w-5 h-5 bg-blue-600 hover:bg-blue-700 rounded-full flex items-center justify-center"

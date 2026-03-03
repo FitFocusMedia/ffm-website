@@ -78,8 +78,8 @@ export default function GalleryPage() {
   const [purchasing, setPurchasing] = useState(false)
   const [lightboxPhoto, setLightboxPhoto] = useState(null)
   const [lightboxClip, setLightboxClip] = useState(null)
-  const [filterCategory, setFilterCategory] = useState('All')
-  const [categories, setCategories] = useState(['All'])
+  const [filterCategory, setFilterCategory] = useState('all') // category id or 'all'
+  const [categories, setCategories] = useState([{ id: 'all', name: 'All' }])
   const [showCategoryTabs, setShowCategoryTabs] = useState(true)
   const [activeMediaTab, setActiveMediaTab] = useState('photos') // 'photos' or 'videos'
   const lastScrollY = useRef(0)
@@ -163,10 +163,28 @@ export default function GalleryPage() {
       if (galleryError) throw galleryError
       setGallery(galleryData)
 
-      // Get photos with signed URLs
+      // Get categories from gallery_categories table
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from('gallery_categories')
+        .select('id, name, position')
+        .eq('gallery_id', galleryData.id)
+        .order('position', { ascending: true })
+
+      if (categoriesError) {
+        console.error('Load categories error:', categoriesError)
+      }
+      
+      // Build categories array with "All" first
+      const categoryList = categoriesData && categoriesData.length > 0
+        ? [{ id: 'all', name: 'All' }, ...categoriesData]
+        : [{ id: 'all', name: 'All' }]
+      
+      setCategories(categoryList)
+
+      // Get photos with signed URLs - include category_id
       const { data: photosData, error: photosError } = await supabase
         .from('gallery_photos')
-        .select('id, filename, width, height, price, sort_order, watermarked_path, thumbnail_path')
+        .select('id, filename, width, height, price, sort_order, watermarked_path, thumbnail_path, category_id')
         .eq('gallery_id', galleryData.id)
         .order('sort_order', { ascending: true })
 
@@ -189,14 +207,6 @@ export default function GalleryPage() {
       }))
 
       setPhotos(photosWithUrls)
-      
-      // Extract unique categories
-      const uniqueCategories = ['All', ...new Set(
-        photosData
-          .map(p => p.category || 'Main')
-          .filter(c => c && c !== 'All')
-      )]
-      setCategories(uniqueCategories)
 
       // Fetch video clips from Supabase (works on production)
       try {
@@ -444,19 +454,19 @@ export default function GalleryPage() {
             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
               {categories.map(cat => (
                 <button
-                  key={cat}
-                  onClick={() => setFilterCategory(cat)}
+                  key={cat.id}
+                  onClick={() => setFilterCategory(cat.id)}
                   className={`px-3 md:px-4 py-2 rounded-lg text-sm md:text-base font-medium whitespace-nowrap transition-all ${
-                    filterCategory === cat
+                    filterCategory === cat.id
                       ? 'bg-red-500 text-white shadow-lg'
                       : 'bg-white/10 text-gray-300 hover:bg-white/20'
                   }`}
                 >
-                  {cat}
+                  {cat.name}
                   <span className="ml-1.5 text-xs opacity-70">
-                    ({cat === 'All' 
+                    ({cat.id === 'all' 
                       ? photos.length 
-                      : photos.filter(p => (p.category || 'Main') === cat).length
+                      : photos.filter(p => p.category_id === cat.id).length
                     })
                   </span>
                 </button>
@@ -495,7 +505,7 @@ export default function GalleryPage() {
         {activeMediaTab === 'photos' && (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 md:gap-4 mb-24 md:mb-8">
           {photos
-            .filter(photo => filterCategory === 'All' || (photo.category || 'Main') === filterCategory)
+            .filter(photo => filterCategory === 'all' || photo.category_id === filterCategory)
             .map((photo, index) => (
             <div
               key={photo.id}
