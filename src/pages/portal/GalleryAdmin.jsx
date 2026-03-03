@@ -519,10 +519,9 @@ function CreateGalleryModal({ organization, onClose, onCreate }) {
   )
 }
 
-// Gallery API URL - only available on Tailscale network (dev/admin)
-// Production site uses Supabase directly for photos; videos require Tailscale access
-const isProduction = typeof window !== 'undefined' && window.location.hostname === 'fitfocusmedia.com.au'
-const GALLERY_API_URL = isProduction ? null : 'https://clawdbots-mini.tailcfdc1.ts.net:5230'
+// Video uploads now use MUX via Supabase Edge Function (works on production)
+// Photos use Supabase Storage directly
+const EDGE_FUNCTION_URL = 'https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/gallery-video-upload'
 
 function GalleryEditor({ gallery, organization, onBack }) {
   const [currentGallery, setCurrentGallery] = useState(gallery)
@@ -635,15 +634,25 @@ function GalleryEditor({ gallery, organization, onBack }) {
   }
 
   const loadClips = async () => {
-    // Video API only available on Tailscale network (not production)
-    if (!GALLERY_API_URL) return
-    
     try {
-      const res = await fetch(`${GALLERY_API_URL}/api/galleries/${gallery.id}/clips`)
-      if (res.ok) {
-        const data = await res.json()
-        setClips(data || [])
-      }
+      // Load clips from Supabase (works on production)
+      const { data, error } = await supabase
+        .from('gallery_clips')
+        .select('*')
+        .eq('gallery_id', gallery.id)
+        .order('created_at', { ascending: false })
+      
+      if (error) throw error
+      
+      // Add MUX thumbnail URLs for clips that have playback IDs
+      const clipsWithThumbnails = (data || []).map(clip => ({
+        ...clip,
+        thumbnail_url: clip.mux_playback_id 
+          ? `https://image.mux.com/${clip.mux_playback_id}/thumbnail.jpg`
+          : clip.thumbnail_url
+      }))
+      
+      setClips(clipsWithThumbnails)
     } catch (err) {
       console.error('Load clips error:', err)
     }
@@ -659,42 +668,87 @@ function GalleryEditor({ gallery, organization, onBack }) {
       f.size <= 2 * 1024 * 1024 * 1024
     )
     
-    // Handle video uploads via API (FFmpeg processing) - only available on Tailscale network
+    // Handle video uploads via MUX (works on production)
     if (videoFiles.length > 0) {
-      if (!GALLERY_API_URL) {
-        alert('Video uploads are only available when connected to the admin network. Photos can still be uploaded.')
-        // Continue to process photos below
-      } else {
-        setActiveTab('videos')
-        setUploading(true)
-        setUploadProgress({ current: 0, total: videoFiles.length, type: 'videos' })
-        
-        const formData = new FormData()
-        videoFiles.forEach(f => formData.append('videos', f))
-        formData.append('category', 'Main')
+      setActiveTab('videos')
+      setUploading(true)
+      setUploadProgress({ current: 0, total: videoFiles.length, type: 'videos' })
+      
+      const uploadedClips = []
+      
+      for (let i = 0; i < videoFiles.length; i++) {
+        const file = videoFiles[i]
+        setUploadProgress({ current: i + 1, total: videoFiles.length, type: 'videos', filename: file.name })
         
         try {
-          const res = await fetch(`${GALLERY_API_URL}/api/galleries/${gallery.id}/clips`, {
+          // 1. Upload original to Supabase Storage (for purchased downloads)
+          const ext = file.name.split('.').pop() || 'mp4'
+          const baseName = file.name.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_')
+          const timestamp = Date.now()
+          const originalPath = `${gallery.id}/videos/originals/${baseName}_${timestamp}.${ext}`
+          
+          const { error: uploadError } = await supabase.storage
+            .from('galleries')
+            .upload(originalPath, file, { contentType: file.type })
+          
+          if (uploadError) throw new Error(`Storage upload failed: ${uploadError.message}`)
+          
+          // 2. Get signed URL for MUX to access (1 hour expiry)
+          const { data: signedUrlData, error: signedError } = await supabase.storage
+            .from('galleries')
+            .createSignedUrl(originalPath, 3600)
+          
+          if (signedError) throw new Error(`Signed URL failed: ${signedError.message}`)
+          
+          // 3. Call Edge Function to create MUX asset with watermark
+          const res = await fetch(EDGE_FUNCTION_URL, {
             method: 'POST',
-            body: formData
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'create',
+              gallery_id: gallery.id,
+              video_url: signedUrlData.signedUrl,
+              filename: file.name,
+              file_size: file.size,
+              category: 'Main'
+            })
           })
+          
           const result = await res.json()
           
-          if (result.clips?.length > 0) {
-            setClips([...clips, ...result.clips])
+          if (!res.ok || result.error) {
+            throw new Error(result.error || 'MUX processing failed')
           }
           
-          if (result.errors?.length > 0) {
-            alert(`Processed ${result.processed} videos. ${result.failed} failed.`)
+          // 4. Update clip with original_path for download after purchase
+          if (result.clip) {
+            await supabase
+              .from('gallery_clips')
+              .update({ original_path: originalPath })
+              .eq('id', result.clip.id)
+            
+            uploadedClips.push({
+              ...result.clip,
+              original_path: originalPath,
+              // MUX thumbnail (will be available after processing)
+              thumbnail_url: result.clip.mux_playback_id 
+                ? `https://image.mux.com/${result.clip.mux_playback_id}/thumbnail.jpg`
+                : null
+            })
           }
+          
         } catch (err) {
-          console.error('Video upload error:', err)
-          alert('Failed to upload videos: ' + err.message)
+          console.error(`Video upload error (${file.name}):`, err)
+          alert(`Failed to upload ${file.name}: ${err.message}`)
         }
-        
-        setUploading(false)
-        setUploadProgress({ current: 0, total: 0, type: 'photos' })
       }
+      
+      if (uploadedClips.length > 0) {
+        setClips([...clips, ...uploadedClips])
+      }
+      
+      setUploading(false)
+      setUploadProgress({ current: 0, total: 0, type: 'photos' })
     }
     
     if (imageFiles.length === 0) return
@@ -857,26 +911,39 @@ function GalleryEditor({ gallery, organization, onBack }) {
   const unpublishGallery = () => updateGallery({ status: 'draft' })
 
   const deleteClip = async (clipId) => {
-    if (!GALLERY_API_URL) return
     if (!confirm('Delete this video clip?')) return
     try {
-      await fetch(`${GALLERY_API_URL}/api/galleries/${gallery.id}/clips/${clipId}`, { method: 'DELETE' })
+      // Delete via Edge Function (handles MUX + Storage + DB)
+      const res = await fetch(EDGE_FUNCTION_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', clip_id: clipId })
+      })
+      
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Delete failed')
+      }
+      
       setClips(clips.filter(c => c.id !== clipId))
     } catch (err) {
       console.error('Delete clip error:', err)
-      alert('Failed to delete clip')
+      alert('Failed to delete clip: ' + err.message)
     }
   }
 
   const deleteSelectedClips = async () => {
-    if (!GALLERY_API_URL) return
     if (selectedClips.size === 0) return
     if (!confirm(`Delete ${selectedClips.size} selected video clips?`)) return
     
     setDeleting(true)
     try {
       for (const clipId of selectedClips) {
-        await fetch(`${GALLERY_API_URL}/api/galleries/${gallery.id}/clips/${clipId}`, { method: 'DELETE' })
+        await fetch(EDGE_FUNCTION_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'delete', clip_id: clipId })
+        })
       }
       setClips(clips.filter(c => !selectedClips.has(c.id)))
       setSelectedClips(new Set())

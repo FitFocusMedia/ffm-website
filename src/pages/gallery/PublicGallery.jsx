@@ -1,7 +1,10 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { ShoppingCart, Download, Check, X, Loader2, Tag, ChevronLeft, ChevronRight, Plus, Minus, Heart, ChevronUp, ChevronDown, LayoutGrid } from 'lucide-react'
+import { ShoppingCart, Download, Check, X, Loader2, Tag, ChevronLeft, ChevronRight, Plus, Minus, Heart, ChevronUp, ChevronDown, LayoutGrid, Play } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+
+// Lazy load MuxPlayer for video preview (heavy component)
+const MuxPlayer = lazy(() => import('@mux/mux-player-react'))
 
 // Tiered pricing calculation (matches backend logic)
 function calculateTieredPrice(quantity, pricingTiers, defaultPrice) {
@@ -58,10 +61,8 @@ function calculateTieredPrice(quantity, pricingTiers, defaultPrice) {
   return { total, breakdown, savings, flatTotal }
 }
 
-// Gallery API URL - only available on Tailscale network
-// Video clips require the local API; photos work via Supabase
-const isProduction = typeof window !== 'undefined' && window.location.hostname === 'fitfocusmedia.com.au'
-const GALLERY_API_URL = isProduction ? null : 'https://clawdbots-mini.tailcfdc1.ts.net:5230'
+// Note: Video clips now use MUX for streaming (via Supabase Edge Function)
+// Photos use Supabase Storage directly
 
 export default function GalleryPage() {
   const { slug } = useParams()
@@ -197,25 +198,29 @@ export default function GalleryPage() {
       )]
       setCategories(uniqueCategories)
 
-      // Fetch video clips via API (only if API is available - not on production)
-      if (GALLERY_API_URL) {
-        try {
-          const clipsRes = await fetch(`${GALLERY_API_URL}/api/galleries/${galleryData.id}/clips`)
-          if (clipsRes.ok) {
-            const clipsData = await clipsRes.json()
-            // Filter to only completed clips and add price
-            const processedClips = (clipsData || [])
-              .filter(c => c.processing_status === 'completed')
-              .map(c => ({
-                ...c,
-                price: c.price || galleryData.price_per_video || 1500
-              }))
-            setClips(processedClips)
-          }
-        } catch (clipErr) {
-          console.error('Load clips error:', clipErr)
-          // Don't fail the whole gallery if clips fail to load
+      // Fetch video clips from Supabase (works on production)
+      try {
+        const { data: clipsData, error: clipsError } = await supabase
+          .from('gallery_clips')
+          .select('*')
+          .eq('gallery_id', galleryData.id)
+          .eq('processing_status', 'completed')
+          .order('created_at', { ascending: false })
+        
+        if (!clipsError && clipsData) {
+          // Add MUX thumbnail URLs and prices
+          const processedClips = clipsData.map(c => ({
+            ...c,
+            price: c.price || galleryData.price_per_video || 1500,
+            thumbnail_url: c.mux_playback_id 
+              ? `https://image.mux.com/${c.mux_playback_id}/thumbnail.jpg`
+              : c.thumbnail_url
+          }))
+          setClips(processedClips)
         }
+      } catch (clipErr) {
+        console.error('Load clips error:', clipErr)
+        // Don't fail the whole gallery if clips fail to load
       }
     } catch (err) {
       console.error('Load gallery error:', err)
@@ -752,7 +757,7 @@ export default function GalleryPage() {
           </div>
         )}
 
-        {/* Lightbox */}
+        {/* Photo Lightbox */}
         {lightboxPhoto && (
           <Lightbox
             photos={photos}
@@ -778,6 +783,68 @@ export default function GalleryPage() {
               }
             }}
           />
+        )}
+        
+        {/* Video Lightbox (MUX Player) */}
+        {lightboxClip && lightboxClip.mux_playback_id && (
+          <div 
+            className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4"
+            onClick={() => setLightboxClip(null)}
+          >
+            {/* Close button */}
+            <button 
+              className="absolute top-4 right-4 text-white/70 hover:text-white z-10"
+              onClick={() => setLightboxClip(null)}
+            >
+              <X className="w-8 h-8" />
+            </button>
+            
+            {/* Video container */}
+            <div 
+              className="relative w-full max-w-5xl aspect-video"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Suspense fallback={
+                <div className="w-full h-full bg-dark-800 flex items-center justify-center">
+                  <Loader2 className="w-12 h-12 text-red-500 animate-spin" />
+                </div>
+              }>
+                <MuxPlayer
+                  playbackId={lightboxClip.mux_playback_id}
+                  streamType="on-demand"
+                  autoPlay
+                  style={{ width: '100%', height: '100%', borderRadius: '0.5rem' }}
+                />
+              </Suspense>
+              
+              {/* Video info bar */}
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 rounded-b-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-white font-semibold">{lightboxClip.filename || lightboxClip.title}</h3>
+                    {lightboxClip.duration_seconds && (
+                      <span className="text-gray-400 text-sm">
+                        {Math.floor(lightboxClip.duration_seconds / 60)}:{String(Math.floor(lightboxClip.duration_seconds % 60)).padStart(2, '0')}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      toggleClip(lightboxClip.id)
+                    }}
+                    className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                      selectedClips.has(lightboxClip.id)
+                        ? 'bg-green-500 text-white'
+                        : 'bg-red-500 hover:bg-red-600 text-white'
+                    }`}
+                  >
+                    {selectedClips.has(lightboxClip.id) ? 'Added to Cart' : `Add to Cart - $${(lightboxClip.price / 100).toFixed(2)}`}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>
