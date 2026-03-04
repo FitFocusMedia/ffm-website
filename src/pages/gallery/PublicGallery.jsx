@@ -433,6 +433,7 @@ export default function GalleryPage() {
           email,
           customer_name: customerName,
           photo_ids: isPackage ? [] : Array.from(selectedPhotos),
+          clip_ids: Array.from(selectedClips),
           is_package: isPackage
         })
       })
