@@ -1880,8 +1880,17 @@ function GalleryEditor({ gallery, organization, onBack }) {
           </div>
         </div>
         
-        {/* Tiered Pricing Section */}
+        {/* Tiered Pricing Section - Photos */}
         <PricingTiersEditor 
+          gallery={currentGallery} 
+          onUpdate={(updates) => {
+            updateGallery(updates)
+            setCurrentGallery({ ...currentGallery, ...updates })
+          }} 
+        />
+        
+        {/* Tiered Pricing Section - Videos */}
+        <VideoPricingTiersEditor 
           gallery={currentGallery} 
           onUpdate={(updates) => {
             updateGallery(updates)
@@ -2113,6 +2122,210 @@ function PricingTiersEditor({ gallery, onUpdate }) {
         >
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
           {edited ? 'Save Pricing' : 'Saved ✓'}
+        </button>
+      )}
+    </div>
+  )
+}
+
+// Video Tiered Pricing Editor Component (mirrors photo tier system)
+function VideoPricingTiersEditor({ gallery, onUpdate }) {
+  const [tiers, setTiers] = useState(gallery.video_pricing_tiers || [])
+  const [enabled, setEnabled] = useState(gallery.video_tiered_pricing_enabled || false)
+  const [saving, setSaving] = useState(false)
+  const [edited, setEdited] = useState(false)
+
+  const addTier = () => {
+    const lastTier = tiers[tiers.length - 1]
+    const newMin = lastTier ? (lastTier.max_qty || lastTier.min_qty) + 1 : 1
+    setTiers([...tiers, { 
+      min_qty: newMin, 
+      max_qty: newMin + 2, 
+      price_per_video: gallery.price_per_video || 1500
+    }])
+    setEdited(true)
+  }
+
+  const updateTier = (index, field, value) => {
+    const newTiers = [...tiers]
+    newTiers[index] = { ...newTiers[index], [field]: value }
+    setTiers(newTiers)
+    setEdited(true)
+  }
+
+  const removeTier = (index) => {
+    setTiers(tiers.filter((_, i) => i !== index))
+    setEdited(true)
+  }
+
+  const saveTiers = async () => {
+    setSaving(true)
+    try {
+      const formattedTiers = tiers.map(t => ({
+        min_qty: parseInt(t.min_qty) || 1,
+        max_qty: t.max_qty ? parseInt(t.max_qty) : null,
+        price_per_video: parseInt(t.price_per_video) || gallery.price_per_video || 1500
+      }))
+      
+      await onUpdate({ 
+        video_pricing_tiers: formattedTiers, 
+        video_tiered_pricing_enabled: enabled 
+      })
+      setEdited(false)
+    } catch (err) {
+      console.error('Save video tiers error:', err)
+      alert('Failed to save video pricing tiers')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const toggleEnabled = () => {
+    setEnabled(!enabled)
+    setEdited(true)
+  }
+
+  const calculateExample = (qty) => {
+    const basePrice = gallery.price_per_video || 1500
+    if (!enabled || tiers.length === 0) {
+      return qty * basePrice
+    }
+    
+    let remaining = qty
+    let total = 0
+    const sortedTiers = [...tiers].sort((a, b) => a.min_qty - b.min_qty)
+    
+    for (const tier of sortedTiers) {
+      if (remaining <= 0) break
+      const tierMax = tier.max_qty || Infinity
+      const tierCapacity = tierMax === Infinity ? remaining : (tierMax - tier.min_qty + 1)
+      const qtyInTier = Math.min(remaining, tierCapacity)
+      total += qtyInTier * tier.price_per_video
+      remaining -= qtyInTier
+    }
+    
+    if (remaining > 0) total += remaining * basePrice
+    return total
+  }
+
+  return (
+    <div className="border-t border-dark-600 pt-4 mt-4">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-md font-semibold text-white flex items-center gap-2">
+          🎬 Video Volume Discounts
+        </h3>
+        <button
+          onClick={toggleEnabled}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            enabled 
+              ? 'bg-green-600 hover:bg-green-700 text-white' 
+              : 'bg-dark-600 hover:bg-dark-500 text-gray-300'
+          }`}
+        >
+          {enabled ? '✓ Enabled' : 'Enable Discounts'}
+        </button>
+      </div>
+      
+      <p className="text-gray-400 text-sm mb-4">
+        Set volume discounts for video clips. Pricing is incremental (first 3 at tier 1 price, next 3 at tier 2, etc.)
+      </p>
+
+      {enabled && (
+        <>
+          <div className="space-y-3 mb-4">
+            {tiers.map((tier, idx) => (
+              <div key={`vtier-${idx}-${tier.min_qty}`} className="flex items-center gap-3 bg-dark-700 p-3 rounded-lg">
+                <div className="flex-1 grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">From Qty</label>
+                    <input
+                      type="number"
+                      min="1"
+                      defaultValue={tier.min_qty}
+                      onBlur={(e) => updateTier(idx, 'min_qty', parseInt(e.target.value) || 1)}
+                      className="w-full bg-dark-600 text-white rounded px-3 py-2 text-sm border border-dark-500 focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">To Qty (blank=∞)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      defaultValue={tier.max_qty || ''}
+                      placeholder="∞"
+                      onBlur={(e) => updateTier(idx, 'max_qty', e.target.value ? parseInt(e.target.value) : null)}
+                      className="w-full bg-dark-600 text-white rounded px-3 py-2 text-sm border border-dark-500 focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Price per Video</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-gray-400">$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        defaultValue={(tier.price_per_video / 100).toFixed(2)}
+                        onBlur={(e) => updateTier(idx, 'price_per_video', Math.round(parseFloat(e.target.value || 0) * 100))}
+                        className="w-full bg-dark-600 text-white rounded pl-7 pr-3 py-2 text-sm border border-dark-500 focus:border-red-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => removeTier(idx)}
+                  className="text-red-400 hover:text-red-300 p-2"
+                  title="Remove tier"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <button
+            onClick={addTier}
+            className="text-red-400 hover:text-red-300 text-sm flex items-center gap-1 mb-4"
+          >
+            <Plus className="w-4 h-4" /> Add Tier
+          </button>
+
+          {tiers.length > 0 && (
+            <div className="bg-dark-700 rounded-lg p-4 mb-4">
+              <h4 className="text-sm font-medium text-white mb-2">Preview Calculator</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 text-sm">
+                {[1, 2, 3, 5, 7, 10].map(qty => {
+                  const tieredTotal = calculateExample(qty)
+                  const flatTotal = qty * (gallery.price_per_video || 1500)
+                  const savings = flatTotal - tieredTotal
+                  return (
+                    <div key={qty} className="text-center">
+                      <div className="text-gray-400">{qty} clip{qty > 1 ? 's' : ''}</div>
+                      <div className="text-white font-medium">${(tieredTotal / 100).toFixed(2)}</div>
+                      {savings > 0 && (
+                        <div className="text-green-400 text-xs">Save ${(savings / 100).toFixed(2)}</div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {enabled && (
+        <button
+          onClick={saveTiers}
+          disabled={saving || !edited}
+          className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
+            edited 
+              ? 'bg-red-600 hover:bg-red-700 text-white' 
+              : 'bg-dark-600 text-gray-400 cursor-not-allowed'
+          }`}
+        >
+          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+          {edited ? 'Save Video Pricing' : 'Saved ✓'}
         </button>
       )}
     </div>
