@@ -792,7 +792,7 @@ export default function GalleryPage() {
                   <p className="text-white text-sm truncate">{clip.title || clip.filename}</p>
                   <div className="flex items-center justify-between mt-1">
                     <span className="text-gray-400 text-xs">{clip.category || 'Main'}</span>
-                    <span className="text-red-400 font-semibold text-sm">${(clip.price / 100).toFixed(2)}</span>
+                    <span className="text-red-400 font-semibold text-sm">${((gallery.price_per_video || clip.price || 1500) / 100).toFixed(2)}</span>
                   </div>
                 </div>
                 
@@ -1080,7 +1080,7 @@ export default function GalleryPage() {
                           : 'bg-red-500 hover:bg-red-600 text-white'
                       }`}
                     >
-                      {selectedClips.has(lightboxClip.id) ? 'Added to Cart' : `Add to Cart - $${(lightboxClip.price / 100).toFixed(2)}`}
+                      {selectedClips.has(lightboxClip.id) ? 'Added to Cart' : `Add to Cart - $${((gallery.price_per_video || lightboxClip.price || 1500) / 100).toFixed(2)}`}
                     </button>
                   </div>
                 </div>
