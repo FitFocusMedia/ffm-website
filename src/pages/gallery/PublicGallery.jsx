@@ -1062,6 +1062,7 @@ export default function GalleryPage() {
               <div 
                 className="w-full max-w-5xl flex flex-col"
                 onClick={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
               >
                 {/* Video player - swipe area for navigation */}
                 <div className="relative w-full aspect-video video-swipe-area">
@@ -1096,10 +1097,7 @@ export default function GalleryPage() {
                         e.stopPropagation()
                         toggleClip(lightboxClip.id)
                       }}
-                      onTouchEnd={(e) => {
-                        e.stopPropagation()
-                        toggleClip(lightboxClip.id)
-                      }}
+                      onTouchStart={(e) => e.stopPropagation()}
                       className={`px-4 py-2 rounded-lg font-semibold transition-all whitespace-nowrap ${
                         selectedClips.has(lightboxClip.id)
                           ? 'bg-green-500 text-white'
