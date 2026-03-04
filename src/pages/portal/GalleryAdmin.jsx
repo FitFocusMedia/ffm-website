@@ -1112,6 +1112,7 @@ function GalleryEditor({ gallery, organization, onBack }) {
 
   const updateGallery = async (updates) => {
     try {
+      console.log('Updating gallery with:', updates)
       const { data, error } = await supabase
         .from('galleries')
         .update(updates)
@@ -1119,10 +1120,16 @@ function GalleryEditor({ gallery, organization, onBack }) {
         .select()
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('Supabase update error:', error)
+        alert(`Failed to save: ${error.message}`)
+        throw error
+      }
+      console.log('Update successful:', data)
       setCurrentGallery(data)
     } catch (err) {
       console.error('Update gallery error:', err)
+      alert(`Update failed: ${err.message}`)
     }
   }
 
