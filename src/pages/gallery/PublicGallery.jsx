@@ -204,9 +204,24 @@ export default function GalleryPage() {
         console.error('Load categories error:', categoriesError)
       }
       
+      // Fetch counts for each category
+      let categoriesWithCounts = []
+      if (categoriesData && categoriesData.length > 0) {
+        categoriesWithCounts = await Promise.all(
+          categoriesData.map(async (cat) => {
+            const { count } = await supabase
+              .from('gallery_photos')
+              .select('id', { count: 'exact', head: true })
+              .eq('gallery_id', galleryData.id)
+              .eq('category_id', cat.id)
+            return { ...cat, photoCount: count || 0 }
+          })
+        )
+      }
+      
       // Build categories array with "All" first
-      const categoryList = categoriesData && categoriesData.length > 0
-        ? [{ id: 'all', name: 'All' }, ...categoriesData]
+      const categoryList = categoriesWithCounts.length > 0
+        ? [{ id: 'all', name: 'All' }, ...categoriesWithCounts]
         : [{ id: 'all', name: 'All' }]
       
       setCategories(categoryList)
@@ -601,12 +616,12 @@ export default function GalleryPage() {
           >
             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
               {categories.map(cat => {
-                // Use clips or photos based on active tab
-                const items = activeMediaTab === 'videos' ? clips : photos
-                // For "All" photos, use totalPhotoCount (since we paginate)
+                // Use stored category counts (fetched from DB) instead of filtering loaded photos
                 const count = cat.id === 'all' 
                   ? (activeMediaTab === 'videos' ? clips.length : totalPhotoCount)
-                  : items.filter(item => item.category_id === cat.id).length
+                  : (activeMediaTab === 'videos' 
+                      ? clips.filter(c => c.category_id === cat.id).length 
+                      : (cat.photoCount ?? 0))
                 
                 return (
                   <button
