@@ -999,15 +999,22 @@ export default function GalleryPage() {
               style={{ touchAction: 'none' }}
               onClick={() => setLightboxClip(null)}
               onTouchStart={(e) => {
-                e.preventDefault()
-                const touch = e.touches[0]
-                e.currentTarget.dataset.touchStartX = touch.clientX
+                // Only handle swipe if touch started on overlay background (not buttons)
+                if (e.target === e.currentTarget || e.target.closest('.video-swipe-area')) {
+                  const touch = e.touches[0]
+                  e.currentTarget.dataset.touchStartX = touch.clientX
+                  e.currentTarget.dataset.swipeEnabled = 'true'
+                } else {
+                  e.currentTarget.dataset.swipeEnabled = 'false'
+                }
               }}
               onTouchMove={(e) => {
-                e.preventDefault()
+                if (e.currentTarget.dataset.swipeEnabled === 'true') {
+                  e.preventDefault()
+                }
               }}
               onTouchEnd={(e) => {
-                e.preventDefault()
+                if (e.currentTarget.dataset.swipeEnabled !== 'true') return
                 const startX = parseFloat(e.currentTarget.dataset.touchStartX || '0')
                 const endX = e.changedTouches[0].clientX
                 const diff = startX - endX
@@ -1056,8 +1063,8 @@ export default function GalleryPage() {
                 className="w-full max-w-5xl flex flex-col"
                 onClick={(e) => e.stopPropagation()}
               >
-                {/* Video player */}
-                <div className="relative w-full aspect-video">
+                {/* Video player - swipe area for navigation */}
+                <div className="relative w-full aspect-video video-swipe-area">
                   <Suspense fallback={
                     <div className="w-full h-full bg-dark-800 flex items-center justify-center rounded-t-lg">
                       <Loader2 className="w-12 h-12 text-red-500 animate-spin" />
