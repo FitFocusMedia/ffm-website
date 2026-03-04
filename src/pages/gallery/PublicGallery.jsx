@@ -872,8 +872,9 @@ export default function GalleryPage() {
             >
               {/* Close button */}
               <button 
-                className="absolute top-4 right-4 text-white/70 hover:text-white z-10"
-                onClick={() => setLightboxClip(null)}
+                className="absolute top-4 right-4 text-white/70 hover:text-white z-20"
+                onClick={(e) => { e.stopPropagation(); setLightboxClip(null) }}
+                onTouchEnd={(e) => { e.stopPropagation(); setLightboxClip(null) }}
               >
                 <X className="w-8 h-8" />
               </button>
@@ -881,16 +882,18 @@ export default function GalleryPage() {
               {/* Navigation arrows */}
               {prevClip && (
                 <button
-                  className="absolute left-2 md:left-4 top-1/2 -translate-y-1/2 w-10 h-10 md:w-12 md:h-12 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center text-white z-10"
+                  className="absolute left-2 md:left-4 top-1/2 -translate-y-1/2 w-10 h-10 md:w-12 md:h-12 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center text-white z-20"
                   onClick={(e) => { e.stopPropagation(); setLightboxClip(prevClip) }}
+                  onTouchEnd={(e) => { e.stopPropagation(); setLightboxClip(prevClip) }}
                 >
                   <ChevronLeft className="w-6 h-6" />
                 </button>
               )}
               {nextClip && (
                 <button
-                  className="absolute right-2 md:right-4 top-1/2 -translate-y-1/2 w-10 h-10 md:w-12 md:h-12 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center text-white z-10"
+                  className="absolute right-2 md:right-4 top-1/2 -translate-y-1/2 w-10 h-10 md:w-12 md:h-12 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center text-white z-20"
                   onClick={(e) => { e.stopPropagation(); setLightboxClip(nextClip) }}
+                  onTouchEnd={(e) => { e.stopPropagation(); setLightboxClip(nextClip) }}
                 >
                   <ChevronRight className="w-6 h-6" />
                 </button>
