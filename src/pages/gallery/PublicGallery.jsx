@@ -84,13 +84,8 @@ export default function GalleryPage() {
   const [activeMediaTab, setActiveMediaTab] = useState('photos') // 'photos' or 'videos'
   const lastScrollY = useRef(0)
   
-  // Pagination state for photos
+  // Total photo count (set after loading)
   const [totalPhotoCount, setTotalPhotoCount] = useState(0)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [hasMorePhotos, setHasMorePhotos] = useState(true)
-  const PHOTOS_PER_PAGE = 100
-  const loadMoreTriggerRef = useRef(null)
-  const galleryDataRef = useRef(null) // Store gallery data for loadMorePhotos
   
   // Hide category tabs on scroll down, show on scroll up
   useEffect(() => {
@@ -211,32 +206,29 @@ export default function GalleryPage() {
       
       setCategories(categoryList)
 
-      // Store gallery data for loadMorePhotos
-      galleryDataRef.current = galleryData
-
-      // Get total photo count first
-      const { count: photoCount, error: countError } = await supabase
-        .from('gallery_photos')
-        .select('id', { count: 'exact', head: true })
-        .eq('gallery_id', galleryData.id)
+      // Load ALL photos using batching (Supabase limits 1000 per request)
+      let allPhotos = []
+      let offset = 0
+      const batchSize = 1000
       
-      if (!countError && photoCount !== null) {
-        setTotalPhotoCount(photoCount)
-        setHasMorePhotos(photoCount > PHOTOS_PER_PAGE)
+      while (true) {
+        const { data: batch, error: batchError } = await supabase
+          .from('gallery_photos')
+          .select('id, filename, width, height, price, sort_order, watermarked_path, thumbnail_path, category_id')
+          .eq('gallery_id', galleryData.id)
+          .order('sort_order', { ascending: true })
+          .range(offset, offset + batchSize - 1)
+        
+        if (batchError) throw batchError
+        if (!batch || batch.length === 0) break
+        
+        allPhotos = [...allPhotos, ...batch]
+        if (batch.length < batchSize) break
+        offset += batchSize
       }
 
-      // Load first batch of photos (100) with signed URLs
-      const { data: initialPhotos, error: photosError } = await supabase
-        .from('gallery_photos')
-        .select('id, filename, width, height, price, sort_order, watermarked_path, thumbnail_path, category_id')
-        .eq('gallery_id', galleryData.id)
-        .order('sort_order', { ascending: true })
-        .range(0, PHOTOS_PER_PAGE - 1)
-      
-      if (photosError) throw photosError
-
-      // Generate signed URLs for initial batch only
-      const photosWithUrls = await Promise.all((initialPhotos || []).map(async (photo) => {
+      // Generate signed URLs for all photos
+      const photosWithUrls = await Promise.all(allPhotos.map(async (photo) => {
         const { data: wmUrl } = await supabase.storage
           .from('galleries')
           .createSignedUrl(photo.watermarked_path, 3600)
@@ -250,6 +242,7 @@ export default function GalleryPage() {
       }))
 
       setPhotos(photosWithUrls)
+      setTotalPhotoCount(photosWithUrls.length)
 
       // Fetch video clips from Supabase (works on production)
       try {
@@ -284,65 +277,6 @@ export default function GalleryPage() {
   }
 
   // Load more photos (pagination)
-  const loadMorePhotos = useCallback(async () => {
-    if (loadingMore || !hasMorePhotos || !galleryDataRef.current) return
-    
-    setLoadingMore(true)
-    try {
-      const currentCount = photos.length
-      const { data: morePhotos, error } = await supabase
-        .from('gallery_photos')
-        .select('id, filename, width, height, price, sort_order, watermarked_path, thumbnail_path, category_id')
-        .eq('gallery_id', galleryDataRef.current.id)
-        .order('sort_order', { ascending: true })
-        .range(currentCount, currentCount + PHOTOS_PER_PAGE - 1)
-      
-      if (error) throw error
-      
-      if (!morePhotos || morePhotos.length === 0) {
-        setHasMorePhotos(false)
-        return
-      }
-      
-      // Generate signed URLs for new batch
-      const photosWithUrls = await Promise.all(morePhotos.map(async (photo) => {
-        const { data: wmUrl } = await supabase.storage
-          .from('galleries')
-          .createSignedUrl(photo.watermarked_path, 3600)
-
-        return {
-          ...photo,
-          watermarked_url: wmUrl?.signedUrl,
-          thumbnail_url: wmUrl?.signedUrl,
-          price: photo.price || galleryDataRef.current.price_per_photo
-        }
-      }))
-      
-      setPhotos(prev => [...prev, ...photosWithUrls])
-      setHasMorePhotos(currentCount + morePhotos.length < totalPhotoCount)
-    } catch (err) {
-      console.error('Load more photos error:', err)
-    } finally {
-      setLoadingMore(false)
-    }
-  }, [photos.length, loadingMore, hasMorePhotos, totalPhotoCount])
-
-  // Intersection observer for infinite scroll - trigger when 300 photos away from bottom
-  useEffect(() => {
-    if (!loadMoreTriggerRef.current || !hasMorePhotos) return
-    
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && !loadingMore) {
-          loadMorePhotos()
-        }
-      },
-      { rootMargin: '1500px' } // Trigger 1500px before reaching the element (~300 photos worth)
-    )
-    
-    observer.observe(loadMoreTriggerRef.current)
-    return () => observer.disconnect()
-  }, [loadMorePhotos, hasMorePhotos, loadingMore])
 
   const togglePhoto = (photoId) => {
     const newSelected = new Set(selectedPhotos)
@@ -570,7 +504,7 @@ export default function GalleryPage() {
             onClick={selectAll}
             className="text-sm text-gray-400 hover:text-white"
           >
-            Select Visible ({photos.length})
+            Select All ({photos.length})
           </button>
           {selectedPhotos.size > 0 && (
             <>
@@ -708,24 +642,6 @@ export default function GalleryPage() {
             </div>
           ))}
           
-          {/* Load more trigger - invisible element that triggers loading */}
-          {hasMorePhotos && (
-            <div 
-              ref={loadMoreTriggerRef} 
-              className="col-span-full flex items-center justify-center py-8"
-            >
-              {loadingMore ? (
-                <div className="flex items-center gap-2 text-gray-400">
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>Loading more photos...</span>
-                </div>
-              ) : (
-                <div className="text-gray-500 text-sm">
-                  {photos.length} of {totalPhotoCount} photos loaded
-                </div>
-              )}
-            </div>
-          )}
         </div>
         )}
 
