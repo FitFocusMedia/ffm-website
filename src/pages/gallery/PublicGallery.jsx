@@ -467,25 +467,30 @@ export default function GalleryPage() {
             }`}
           >
             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-              {categories.map(cat => (
-                <button
-                  key={cat.id}
-                  onClick={() => setFilterCategory(cat.id)}
-                  className={`px-3 md:px-4 py-2 rounded-lg text-sm md:text-base font-medium whitespace-nowrap transition-all ${
-                    filterCategory === cat.id
-                      ? 'bg-red-500 text-white shadow-lg'
-                      : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                  }`}
-                >
-                  {cat.name}
-                  <span className="ml-1.5 text-xs opacity-70">
-                    ({cat.id === 'all' 
-                      ? photos.length 
-                      : photos.filter(p => p.category_id === cat.id).length
-                    })
-                  </span>
-                </button>
-              ))}
+              {categories.map(cat => {
+                // Use clips or photos based on active tab
+                const items = activeMediaTab === 'videos' ? clips : photos
+                const count = cat.id === 'all' 
+                  ? items.length 
+                  : items.filter(item => item.category_id === cat.id).length
+                
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => setFilterCategory(cat.id)}
+                    className={`px-3 md:px-4 py-2 rounded-lg text-sm md:text-base font-medium whitespace-nowrap transition-all ${
+                      filterCategory === cat.id
+                        ? 'bg-red-500 text-white shadow-lg'
+                        : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                    }`}
+                  >
+                    {cat.name}
+                    <span className="ml-1.5 text-xs opacity-70">
+                      ({count})
+                    </span>
+                  </button>
+                )
+              })}
             </div>
           </div>
         )}
@@ -574,7 +579,9 @@ export default function GalleryPage() {
         {/* Video Clips Grid */}
         {activeMediaTab === 'videos' && clips.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-24 md:mb-8">
-            {clips.map((clip) => (
+            {clips
+              .filter(clip => filterCategory === 'all' || clip.category_id === filterCategory)
+              .map((clip) => (
               <div
                 key={clip.id}
                 className={`relative group cursor-pointer rounded-lg overflow-hidden bg-dark-800 ${
@@ -810,70 +817,115 @@ export default function GalleryPage() {
           />
         )}
         
-        {/* Video Lightbox (MUX Player) */}
-        {lightboxClip && lightboxClip.mux_playback_id && (
-          <div 
-            className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4"
-            onClick={() => setLightboxClip(null)}
-          >
-            {/* Close button */}
-            <button 
-              className="absolute top-4 right-4 text-white/70 hover:text-white z-10"
-              onClick={() => setLightboxClip(null)}
-            >
-              <X className="w-8 h-8" />
-            </button>
-            
-            {/* Video container + info bar wrapper */}
+        {/* Video Lightbox (MUX Player) with Navigation */}
+        {lightboxClip && lightboxClip.mux_playback_id && (() => {
+          // Get filtered clips for navigation (same filter as grid)
+          const filteredClips = clips.filter(c => filterCategory === 'all' || c.category_id === filterCategory)
+          const currentIndex = filteredClips.findIndex(c => c.id === lightboxClip.id)
+          const prevClip = currentIndex > 0 ? filteredClips[currentIndex - 1] : null
+          const nextClip = currentIndex < filteredClips.length - 1 ? filteredClips[currentIndex + 1] : null
+          
+          return (
             <div 
-              className="w-full max-w-5xl flex flex-col"
-              onClick={(e) => e.stopPropagation()}
+              className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4"
+              onClick={() => setLightboxClip(null)}
+              onTouchStart={(e) => {
+                const touch = e.touches[0]
+                e.currentTarget.dataset.touchStartX = touch.clientX
+              }}
+              onTouchEnd={(e) => {
+                const startX = parseFloat(e.currentTarget.dataset.touchStartX || '0')
+                const endX = e.changedTouches[0].clientX
+                const diff = startX - endX
+                if (Math.abs(diff) > 50) {
+                  if (diff > 0 && nextClip) setLightboxClip(nextClip)
+                  else if (diff < 0 && prevClip) setLightboxClip(prevClip)
+                }
+              }}
             >
-              {/* Video player */}
-              <div className="relative w-full aspect-video">
-                <Suspense fallback={
-                  <div className="w-full h-full bg-dark-800 flex items-center justify-center rounded-t-lg">
-                    <Loader2 className="w-12 h-12 text-red-500 animate-spin" />
-                  </div>
-                }>
-                  <MuxPlayer
-                    playbackId={lightboxClip.mux_playback_id}
-                    streamType="on-demand"
-                    autoPlay
-                    style={{ width: '100%', height: '100%', borderRadius: '0.5rem 0.5rem 0 0' }}
-                  />
-                </Suspense>
+              {/* Close button */}
+              <button 
+                className="absolute top-4 right-4 text-white/70 hover:text-white z-10"
+                onClick={() => setLightboxClip(null)}
+              >
+                <X className="w-8 h-8" />
+              </button>
+              
+              {/* Navigation arrows */}
+              {prevClip && (
+                <button
+                  className="absolute left-2 md:left-4 top-1/2 -translate-y-1/2 w-10 h-10 md:w-12 md:h-12 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center text-white z-10"
+                  onClick={(e) => { e.stopPropagation(); setLightboxClip(prevClip) }}
+                >
+                  <ChevronLeft className="w-6 h-6" />
+                </button>
+              )}
+              {nextClip && (
+                <button
+                  className="absolute right-2 md:right-4 top-1/2 -translate-y-1/2 w-10 h-10 md:w-12 md:h-12 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center text-white z-10"
+                  onClick={(e) => { e.stopPropagation(); setLightboxClip(nextClip) }}
+                >
+                  <ChevronRight className="w-6 h-6" />
+                </button>
+              )}
+              
+              {/* Counter */}
+              <div className="absolute top-4 left-4 text-white/70 text-sm z-10">
+                {currentIndex + 1} / {filteredClips.length}
               </div>
               
-              {/* Video info bar - BELOW the video player */}
-              <div className="bg-dark-800 p-4 rounded-b-lg">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="min-w-0 flex-1">
-                    <h3 className="text-white font-semibold truncate">{lightboxClip.filename || lightboxClip.title}</h3>
-                    {lightboxClip.duration_seconds && (
-                      <span className="text-gray-400 text-sm">
-                        {Math.floor(lightboxClip.duration_seconds / 60)}:{String(Math.floor(lightboxClip.duration_seconds % 60)).padStart(2, '0')}
-                      </span>
-                    )}
+              {/* Video container + info bar wrapper */}
+              <div 
+                className="w-full max-w-5xl flex flex-col"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Video player */}
+                <div className="relative w-full aspect-video">
+                  <Suspense fallback={
+                    <div className="w-full h-full bg-dark-800 flex items-center justify-center rounded-t-lg">
+                      <Loader2 className="w-12 h-12 text-red-500 animate-spin" />
+                    </div>
+                  }>
+                    <MuxPlayer
+                      key={lightboxClip.id}
+                      playbackId={lightboxClip.mux_playback_id}
+                      streamType="on-demand"
+                      autoPlay
+                      style={{ width: '100%', height: '100%', borderRadius: '0.5rem 0.5rem 0 0' }}
+                    />
+                  </Suspense>
+                </div>
+                
+                {/* Video info bar - BELOW the video player */}
+                <div className="bg-dark-800 p-4 rounded-b-lg">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-white font-semibold truncate">{lightboxClip.filename || lightboxClip.title}</h3>
+                      {lightboxClip.duration_seconds && (
+                        <span className="text-gray-400 text-sm">
+                          {Math.floor(lightboxClip.duration_seconds / 60)}:{String(Math.floor(lightboxClip.duration_seconds % 60)).padStart(2, '0')}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        toggleClip(lightboxClip.id)
+                      }}
+                      className={`px-4 py-2 rounded-lg font-semibold transition-all whitespace-nowrap ${
+                        selectedClips.has(lightboxClip.id)
+                          ? 'bg-green-500 text-white'
+                          : 'bg-red-500 hover:bg-red-600 text-white'
+                      }`}
+                    >
+                      {selectedClips.has(lightboxClip.id) ? 'Added to Cart' : `Add to Cart - $${(lightboxClip.price / 100).toFixed(2)}`}
+                    </button>
                   </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      toggleClip(lightboxClip.id)
-                    }}
-                    className={`px-4 py-2 rounded-lg font-semibold transition-all whitespace-nowrap ${
-                      selectedClips.has(lightboxClip.id)
-                        ? 'bg-green-500 text-white'
-                        : 'bg-red-500 hover:bg-red-600 text-white'
-                    }`}
-                  >
-                    {selectedClips.has(lightboxClip.id) ? 'Added to Cart' : `Add to Cart - $${(lightboxClip.price / 100).toFixed(2)}`}
-                  </button>
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          )
+        })()}
       </div>
     </div>
   )
