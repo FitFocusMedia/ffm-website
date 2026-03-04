@@ -364,8 +364,21 @@ export default function GalleryPage() {
     setSelectedClips(newSelected)
   }
 
-  const selectAll = () => {
-    setSelectedPhotos(new Set(photos.map(p => p.id)))
+  const selectAll = async () => {
+    // Fetch ALL photo IDs from database (not just loaded ones)
+    try {
+      const { data, error } = await supabase
+        .from('gallery_photos')
+        .select('id')
+        .eq('gallery_id', gallery.id)
+      
+      if (error) throw error
+      setSelectedPhotos(new Set(data.map(p => p.id)))
+    } catch (err) {
+      console.error('Select all error:', err)
+      // Fallback to loaded photos
+      setSelectedPhotos(new Set(photos.map(p => p.id)))
+    }
   }
 
   const clearSelection = () => {
@@ -568,7 +581,7 @@ export default function GalleryPage() {
             onClick={selectAll}
             className="text-sm text-gray-400 hover:text-white"
           >
-            Select All ({photos.length})
+            Select All ({totalPhotoCount || photos.length})
           </button>
           {selectedPhotos.size > 0 && (
             <>
