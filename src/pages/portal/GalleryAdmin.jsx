@@ -1840,6 +1840,22 @@ function GalleryEditor({ gallery, organization, onBack }) {
           </div>
           
           <div>
+            <label className="block text-gray-400 text-sm mb-1">Price per Video ($)</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              defaultValue={((currentGallery.price_per_video || 1500) / 100).toFixed(2)}
+              onBlur={(e) => {
+                const cents = Math.round(parseFloat(e.target.value || 0) * 100)
+                updateGallery({ price_per_video: cents })
+                setCurrentGallery({ ...currentGallery, price_per_video: cents })
+              }}
+              className="w-full bg-dark-700 text-white rounded-lg px-3 py-2 border border-dark-600 focus:border-red-500 focus:outline-none"
+            />
+          </div>
+          
+          <div>
             <label className="flex items-center gap-2 text-gray-400 text-sm mb-1 cursor-pointer">
               <input
                 type="checkbox"

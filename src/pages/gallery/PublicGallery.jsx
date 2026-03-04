@@ -146,6 +146,27 @@ export default function GalleryPage() {
     loadGallery()
   }, [slug])
 
+  // Lock body scroll when video lightbox is open
+  useEffect(() => {
+    if (lightboxClip) {
+      const scrollY = window.scrollY
+      document.body.style.position = 'fixed'
+      document.body.style.top = `-${scrollY}px`
+      document.body.style.left = '0'
+      document.body.style.right = '0'
+      document.body.style.overflow = 'hidden'
+      
+      return () => {
+        document.body.style.position = ''
+        document.body.style.top = ''
+        document.body.style.left = ''
+        document.body.style.right = ''
+        document.body.style.overflow = ''
+        window.scrollTo(0, scrollY)
+      }
+    }
+  }, [lightboxClip])
+
   const loadGallery = async () => {
     try {
       // Get gallery
@@ -827,13 +848,19 @@ export default function GalleryPage() {
           
           return (
             <div 
-              className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4"
+              className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4 touch-none"
+              style={{ touchAction: 'none' }}
               onClick={() => setLightboxClip(null)}
               onTouchStart={(e) => {
+                e.preventDefault()
                 const touch = e.touches[0]
                 e.currentTarget.dataset.touchStartX = touch.clientX
               }}
+              onTouchMove={(e) => {
+                e.preventDefault()
+              }}
               onTouchEnd={(e) => {
+                e.preventDefault()
                 const startX = parseFloat(e.currentTarget.dataset.touchStartX || '0')
                 const endX = e.changedTouches[0].clientX
                 const diff = startX - endX
