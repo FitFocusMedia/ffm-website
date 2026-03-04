@@ -769,6 +769,42 @@ function GalleryEditor({ gallery, organization, onBack }) {
     loadClips()
   }, [gallery.id])
 
+  // Auto-poll for processing video status updates
+  useEffect(() => {
+    const processingClips = clips.filter(c => c.processing_status === 'processing')
+    if (processingClips.length === 0) return
+
+    const pollInterval = setInterval(async () => {
+      console.log(`Polling status for ${processingClips.length} processing clips...`)
+      
+      for (const clip of processingClips) {
+        try {
+          const res = await fetch(EDGE_FUNCTION_URL, {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+            },
+            body: JSON.stringify({ action: 'status', clip_id: clip.id })
+          })
+          
+          if (res.ok) {
+            const data = await res.json()
+            if (data.status === 'ready' || data.status === 'errored') {
+              // Reload clips to get updated data
+              loadClips()
+              break // Stop polling after finding an update
+            }
+          }
+        } catch (err) {
+          console.error('Poll status error:', err)
+        }
+      }
+    }, 10000) // Poll every 10 seconds
+
+    return () => clearInterval(pollInterval)
+  }, [clips])
+
   const loadPhotos = async () => {
     try {
       // Fetch ALL photos using pagination (Supabase limits to 1000 per request)
@@ -1716,17 +1752,36 @@ function GalleryEditor({ gallery, organization, onBack }) {
                         </svg>
                       </div>
                     )}
-                    {/* Processing status */}
+                    {/* Processing status overlay */}
                     {clip.processing_status === 'processing' && (
-                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                        <Loader2 className="w-6 h-6 text-white animate-spin" />
+                      <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center">
+                        <Loader2 className="w-8 h-8 text-blue-400 animate-spin mb-2" />
+                        <span className="text-white text-xs font-medium">Processing...</span>
+                        <span className="text-gray-400 text-xs mt-1">MUX is adding watermark</span>
                       </div>
                     )}
                     {clip.processing_status === 'failed' && (
-                      <div className="absolute inset-0 bg-red-900/50 flex items-center justify-center">
-                        <span className="text-white text-sm">Failed</span>
+                      <div className="absolute inset-0 bg-red-900/60 flex flex-col items-center justify-center">
+                        <X className="w-8 h-8 text-red-400 mb-2" />
+                        <span className="text-white text-sm font-medium">Failed</span>
+                        <span className="text-red-300 text-xs mt-1">Processing error</span>
                       </div>
                     )}
+                    {clip.processing_status === 'completed' && !clip.thumbnail_url && (
+                      <div className="absolute inset-0 bg-green-900/40 flex items-center justify-center">
+                        <Check className="w-8 h-8 text-green-400" />
+                      </div>
+                    )}
+                    {/* Status badge */}
+                    <div className={`absolute top-2 left-8 px-2 py-0.5 rounded text-xs font-medium ${
+                      clip.processing_status === 'completed' ? 'bg-green-500/80 text-white' :
+                      clip.processing_status === 'processing' ? 'bg-blue-500/80 text-white' :
+                      'bg-red-500/80 text-white'
+                    }`}>
+                      {clip.processing_status === 'completed' ? '✓ Ready' :
+                       clip.processing_status === 'processing' ? '⏳ Processing' :
+                       '✗ Failed'}
+                    </div>
                     {/* Duration badge */}
                     {clip.duration_seconds && (
                       <div className="absolute bottom-2 right-2 bg-black/70 px-2 py-0.5 rounded text-xs text-white">
