@@ -925,6 +925,8 @@ export default function GalleryPage() {
             gallery={gallery}
             selectedCount={selectedPhotos.size}
             priceCalc={priceCalc}
+            selectedClipsCount={selectedClips.size}
+            videoPriceCalc={videoPriceCalc}
             isPackage={selectedPhotos.size === photos.length && gallery.package_enabled}
             packagePrice={gallery.package_price}
             onClose={() => setShowCheckout(false)}
@@ -1105,11 +1107,14 @@ export default function GalleryPage() {
   )
 }
 
-function CheckoutModal({ gallery, selectedCount, priceCalc, isPackage, packagePrice, onClose, onCheckout, purchasing, error }) {
+function CheckoutModal({ gallery, selectedCount, priceCalc, selectedClipsCount = 0, videoPriceCalc = { total: 0, flatTotal: 0, savings: 0 }, isPackage, packagePrice, onClose, onCheckout, purchasing, error }) {
   const [email, setEmail] = useState('')
   const [customerName, setCustomerName] = useState('')
 
-  const finalTotal = isPackage && packagePrice ? packagePrice : priceCalc.total
+  const combinedFlatTotal = priceCalc.flatTotal + videoPriceCalc.flatTotal
+  const combinedTotal = priceCalc.total + videoPriceCalc.total
+  const combinedSavings = priceCalc.savings + videoPriceCalc.savings
+  const finalTotal = isPackage && packagePrice ? packagePrice : combinedTotal
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -1122,24 +1127,35 @@ function CheckoutModal({ gallery, selectedCount, priceCalc, isPackage, packagePr
         <h2 className="text-xl font-bold text-white mb-4">Complete Purchase</h2>
         
         <div className="mb-6 p-4 bg-dark-700 rounded-lg">
-          <div className="flex justify-between text-gray-300 mb-2">
-            <span>{selectedCount} photos</span>
-            <span>${(priceCalc.flatTotal / 100).toFixed(2)}</span>
-          </div>
+          {/* Photos */}
+          {selectedCount > 0 && (
+            <div className="flex justify-between text-gray-300 mb-2">
+              <span>{selectedCount} photo{selectedCount !== 1 ? 's' : ''}</span>
+              <span>${(priceCalc.flatTotal / 100).toFixed(2)}</span>
+            </div>
+          )}
+          
+          {/* Videos */}
+          {selectedClipsCount > 0 && (
+            <div className="flex justify-between text-gray-300 mb-2">
+              <span>{selectedClipsCount} video{selectedClipsCount !== 1 ? 's' : ''}</span>
+              <span>${(videoPriceCalc.flatTotal / 100).toFixed(2)}</span>
+            </div>
+          )}
           
           {/* Volume Discount */}
-          {priceCalc.savings > 0 && !isPackage && (
+          {combinedSavings > 0 && !isPackage && (
             <div className="flex justify-between text-green-400 mb-2">
               <span>Volume Discount</span>
-              <span>-${(priceCalc.savings / 100).toFixed(2)}</span>
+              <span>-${(combinedSavings / 100).toFixed(2)}</span>
             </div>
           )}
           
           {/* Package Discount */}
-          {isPackage && packagePrice && priceCalc.flatTotal > packagePrice && (
+          {isPackage && packagePrice && combinedFlatTotal > packagePrice && (
             <div className="flex justify-between text-green-400 mb-2">
               <span>Package Discount</span>
-              <span>-${((priceCalc.flatTotal - packagePrice) / 100).toFixed(2)}</span>
+              <span>-${((combinedFlatTotal - packagePrice) / 100).toFixed(2)}</span>
             </div>
           )}
           
