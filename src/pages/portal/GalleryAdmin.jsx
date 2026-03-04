@@ -522,6 +522,7 @@ function CreateGalleryModal({ organization, onClose, onCreate }) {
 // Video uploads now use MUX via Supabase Edge Function (works on production)
 // Photos use Supabase Storage directly
 const EDGE_FUNCTION_URL = 'https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/gallery-video-upload'
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdvbmFsZ3ViZ2xkZ3BrY2VrYXhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA4NTk3NDIsImV4cCI6MjA4NjQzNTc0Mn0.GuvFAgWtB0bJ_yf_6NKfPK3Gv-vJH7WhHcJFzvqm9Ew'
 
 function GalleryEditor({ gallery, organization, onBack }) {
   const [currentGallery, setCurrentGallery] = useState(gallery)
@@ -877,7 +878,10 @@ function GalleryEditor({ gallery, organization, onBack }) {
           // 3. Call Edge Function to create MUX asset with watermark
           const res = await fetch(EDGE_FUNCTION_URL, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+            },
             body: JSON.stringify({
               action: 'create',
               gallery_id: gallery.id,
@@ -1095,7 +1099,10 @@ function GalleryEditor({ gallery, organization, onBack }) {
       // Delete via Edge Function (handles MUX + Storage + DB)
       const res = await fetch(EDGE_FUNCTION_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        },
         body: JSON.stringify({ action: 'delete', clip_id: clipId })
       })
       
@@ -1120,7 +1127,10 @@ function GalleryEditor({ gallery, organization, onBack }) {
       for (const clipId of selectedClips) {
         await fetch(EDGE_FUNCTION_URL, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+          },
           body: JSON.stringify({ action: 'delete', clip_id: clipId })
         })
       }
