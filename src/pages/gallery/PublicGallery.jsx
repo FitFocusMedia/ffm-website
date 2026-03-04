@@ -824,29 +824,32 @@ export default function GalleryPage() {
               <X className="w-8 h-8" />
             </button>
             
-            {/* Video container */}
+            {/* Video container + info bar wrapper */}
             <div 
-              className="relative w-full max-w-5xl aspect-video"
+              className="w-full max-w-5xl flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
-              <Suspense fallback={
-                <div className="w-full h-full bg-dark-800 flex items-center justify-center">
-                  <Loader2 className="w-12 h-12 text-red-500 animate-spin" />
-                </div>
-              }>
-                <MuxPlayer
-                  playbackId={lightboxClip.mux_playback_id}
-                  streamType="on-demand"
-                  autoPlay
-                  style={{ width: '100%', height: '100%', borderRadius: '0.5rem' }}
-                />
-              </Suspense>
+              {/* Video player */}
+              <div className="relative w-full aspect-video">
+                <Suspense fallback={
+                  <div className="w-full h-full bg-dark-800 flex items-center justify-center rounded-t-lg">
+                    <Loader2 className="w-12 h-12 text-red-500 animate-spin" />
+                  </div>
+                }>
+                  <MuxPlayer
+                    playbackId={lightboxClip.mux_playback_id}
+                    streamType="on-demand"
+                    autoPlay
+                    style={{ width: '100%', height: '100%', borderRadius: '0.5rem 0.5rem 0 0' }}
+                  />
+                </Suspense>
+              </div>
               
-              {/* Video info bar */}
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 rounded-b-lg">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-white font-semibold">{lightboxClip.filename || lightboxClip.title}</h3>
+              {/* Video info bar - BELOW the video player */}
+              <div className="bg-dark-800 p-4 rounded-b-lg">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-white font-semibold truncate">{lightboxClip.filename || lightboxClip.title}</h3>
                     {lightboxClip.duration_seconds && (
                       <span className="text-gray-400 text-sm">
                         {Math.floor(lightboxClip.duration_seconds / 60)}:{String(Math.floor(lightboxClip.duration_seconds % 60)).padStart(2, '0')}
@@ -858,7 +861,7 @@ export default function GalleryPage() {
                       e.stopPropagation()
                       toggleClip(lightboxClip.id)
                     }}
-                    className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                    className={`px-4 py-2 rounded-lg font-semibold transition-all whitespace-nowrap ${
                       selectedClips.has(lightboxClip.id)
                         ? 'bg-green-500 text-white'
                         : 'bg-red-500 hover:bg-red-600 text-white'
