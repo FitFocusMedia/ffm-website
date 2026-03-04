@@ -879,23 +879,23 @@ function GalleryEditor({ gallery, organization, onBack }) {
       f.size <= 2 * 1024 * 1024 * 1024
     )
     
-    // Handle video uploads via MUX (works on production)
+    // Handle video uploads via MUX (works on production) - PARALLEL PROCESSING
     if (videoFiles.length > 0) {
       setActiveTab('videos')
       setUploading(true)
       setUploadProgress({ current: 0, total: videoFiles.length, type: 'videos' })
       
       const uploadedClips = []
+      const CONCURRENCY_LIMIT = 4 // Process 4 videos at a time
+      let completedCount = 0
       
-      for (let i = 0; i < videoFiles.length; i++) {
-        const file = videoFiles[i]
-        setUploadProgress({ current: i + 1, total: videoFiles.length, type: 'videos', filename: file.name })
-        
+      // Helper to process a single video
+      const processVideo = async (file) => {
         try {
           // 1. Upload original to Supabase Storage (for purchased downloads)
           const ext = file.name.split('.').pop() || 'mp4'
           const baseName = file.name.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_')
-          const timestamp = Date.now()
+          const timestamp = Date.now() + Math.random().toString(36).slice(2, 7) // Unique per parallel upload
           const originalPath = `${gallery.id}/videos/originals/${baseName}_${timestamp}.${ext}`
           
           const { error: uploadError } = await supabase.storage
@@ -944,7 +944,7 @@ function GalleryEditor({ gallery, organization, onBack }) {
               })
               .eq('id', result.clip.id)
             
-            uploadedClips.push({
+            return {
               ...result.clip,
               original_path: originalPath,
               category_id: selectedCategoryId,
@@ -952,13 +952,44 @@ function GalleryEditor({ gallery, organization, onBack }) {
               thumbnail_url: result.clip.mux_playback_id 
                 ? `https://image.mux.com/${result.clip.mux_playback_id}/thumbnail.jpg`
                 : null
-            })
+            }
           }
-          
+          return null
         } catch (err) {
           console.error(`Video upload error (${file.name}):`, err)
-          alert(`Failed to upload ${file.name}: ${err.message}`)
+          return { error: true, filename: file.name, message: err.message }
+        } finally {
+          // Update progress after each video completes
+          completedCount++
+          setUploadProgress({ 
+            current: completedCount, 
+            total: videoFiles.length, 
+            type: 'videos', 
+            filename: `Processing ${CONCURRENCY_LIMIT} videos in parallel...`
+          })
         }
+      }
+      
+      // Process videos in batches of CONCURRENCY_LIMIT
+      for (let i = 0; i < videoFiles.length; i += CONCURRENCY_LIMIT) {
+        const batch = videoFiles.slice(i, i + CONCURRENCY_LIMIT)
+        const results = await Promise.all(batch.map(processVideo))
+        
+        // Collect successful uploads
+        for (const result of results) {
+          if (result && !result.error) {
+            uploadedClips.push(result)
+          } else if (result?.error) {
+            // Show error but continue with other uploads
+            console.error(`Failed: ${result.filename} - ${result.message}`)
+          }
+        }
+      }
+      
+      // Show any errors at the end
+      const failedCount = videoFiles.length - uploadedClips.length
+      if (failedCount > 0) {
+        alert(`${failedCount} video(s) failed to upload. Check console for details.`)
       }
       
       if (uploadedClips.length > 0) {
@@ -1302,7 +1333,7 @@ function GalleryEditor({ gallery, organization, onBack }) {
               </div>
             )}
             {uploadProgress.type === 'videos' && (
-              <p className="text-gray-400 text-sm">Watermarking + compression (large files take longer)</p>
+              <p className="text-gray-400 text-sm">Processing 4 videos in parallel • Watermarking + compression</p>
             )}
           </div>
         ) : dragActive ? (
