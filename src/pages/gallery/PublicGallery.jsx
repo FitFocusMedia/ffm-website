@@ -1089,6 +1089,10 @@ export default function GalleryPage() {
                         e.stopPropagation()
                         toggleClip(lightboxClip.id)
                       }}
+                      onTouchEnd={(e) => {
+                        e.stopPropagation()
+                        toggleClip(lightboxClip.id)
+                      }}
                       className={`px-4 py-2 rounded-lg font-semibold transition-all whitespace-nowrap ${
                         selectedClips.has(lightboxClip.id)
                           ? 'bg-green-500 text-white'
