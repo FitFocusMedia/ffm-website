@@ -183,6 +183,7 @@ export default function GalleryPage() {
         .select(`
           id, title, description, slug, price_per_photo, package_price, package_enabled,
           pricing_tiers, tiered_pricing_enabled,
+          price_per_video, video_pricing_tiers, video_tiered_pricing_enabled,
           organizations(id, name, display_name)
         `)
         .eq('slug', slug)
@@ -371,7 +372,7 @@ export default function GalleryPage() {
     setSelectedPhotos(new Set())
   }
 
-  // Calculate pricing with tiered discounts
+  // Calculate pricing with tiered discounts (photos)
   const priceCalc = useMemo(() => {
     const quantity = selectedPhotos.size
     if (quantity === 0 || !gallery) {
@@ -388,7 +389,35 @@ export default function GalleryPage() {
     return { total, savings: 0, breakdown: [], flatTotal: total }
   }, [selectedPhotos.size, gallery])
 
-  const getTotal = () => priceCalc.total
+  // Calculate pricing with tiered discounts (videos)
+  const videoPriceCalc = useMemo(() => {
+    const quantity = selectedClips.size
+    if (quantity === 0 || !gallery) {
+      return { total: 0, savings: 0, breakdown: [], flatTotal: 0 }
+    }
+    
+    const basePrice = gallery.price_per_video || 1500
+    
+    // Check if video tiered pricing is enabled
+    if (gallery.video_tiered_pricing_enabled && gallery.video_pricing_tiers?.length > 0) {
+      // Use the same calculateTieredPrice but with video fields
+      const tiers = gallery.video_pricing_tiers.map(t => ({
+        ...t,
+        price_per_photo: t.price_per_video // Map to what calculateTieredPrice expects
+      }))
+      return calculateTieredPrice(quantity, tiers, basePrice)
+    }
+    
+    // Flat pricing
+    const total = quantity * basePrice
+    return { total, savings: 0, breakdown: [], flatTotal: total }
+  }, [selectedClips.size, gallery])
+
+  const getTotal = () => priceCalc.total + videoPriceCalc.total
+  
+  // Combined total for display
+  const combinedTotal = priceCalc.total + videoPriceCalc.total
+  const combinedSavings = priceCalc.savings + videoPriceCalc.savings
 
   const handleCheckout = async (email, customerName, isPackage = false) => {
     setPurchasing(true)
@@ -496,27 +525,41 @@ export default function GalleryPage() {
             )}
           </div>
           
-          {/* Volume Discounts */}
-          {gallery.tiered_pricing_enabled && gallery.pricing_tiers?.length > 0 && (
-            <div className="bg-gradient-to-r from-green-500/10 to-green-500/5 border border-green-500/30 rounded-lg p-4">
-              <div className="flex items-center gap-2 text-green-400 font-semibold mb-3">
-                <Tag className="w-4 h-4" />
-                Volume Discounts
+          {/* Volume Discounts - switches between photo/video tiers based on active tab */}
+          {(() => {
+            const isVideoTab = activeMediaTab === 'videos'
+            const tiersEnabled = isVideoTab 
+              ? gallery.video_tiered_pricing_enabled 
+              : gallery.tiered_pricing_enabled
+            const tiers = isVideoTab 
+              ? gallery.video_pricing_tiers 
+              : gallery.pricing_tiers
+            const itemType = isVideoTab ? 'clips' : 'photos'
+            const priceField = isVideoTab ? 'price_per_video' : 'price_per_photo'
+            
+            if (!tiersEnabled || !tiers?.length) return null
+            
+            return (
+              <div className="bg-gradient-to-r from-green-500/10 to-green-500/5 border border-green-500/30 rounded-lg p-4">
+                <div className="flex items-center gap-2 text-green-400 font-semibold mb-3">
+                  <Tag className="w-4 h-4" />
+                  Volume Discounts {isVideoTab ? '(Videos)' : ''}
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 text-sm">
+                  {tiers.map((tier, i) => (
+                    <div key={i} className="bg-dark-800/50 rounded px-3 py-2">
+                      <span className="text-gray-400">
+                        {tier.max_qty ? `${tier.min_qty}-${tier.max_qty}` : `${tier.min_qty}+`} {itemType}:
+                      </span>
+                      <span className="text-white ml-2 font-semibold">
+                        ${((tier[priceField] || tier.price_per_photo || tier.price_per_video) / 100).toFixed(2)} each
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 text-sm">
-                {gallery.pricing_tiers.map((tier, i) => (
-                  <div key={i} className="bg-dark-800/50 rounded px-3 py-2">
-                    <span className="text-gray-400">
-                      {tier.max_qty ? `${tier.min_qty}-${tier.max_qty}` : `${tier.min_qty}+`} photos:
-                    </span>
-                    <span className="text-white ml-2 font-semibold">
-                      ${(tier.price_per_photo / 100).toFixed(2)} each
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+            )
+          })()}
         </div>
 
         {/* Selection Controls */}
@@ -791,12 +834,12 @@ export default function GalleryPage() {
                 
                 {/* Price */}
                 <div className="flex-1 text-right">
-                  {priceCalc.savings > 0 && (
+                  {combinedSavings > 0 && (
                     <span className="text-gray-500 text-xs line-through mr-2">
-                      ${(priceCalc.flatTotal / 100).toFixed(2)}
+                      ${((priceCalc.flatTotal + videoPriceCalc.flatTotal) / 100).toFixed(2)}
                     </span>
                   )}
-                  <span className="text-white font-bold">${(priceCalc.total / 100).toFixed(2)}</span>
+                  <span className="text-white font-bold">${(combinedTotal / 100).toFixed(2)}</span>
                 </div>
                 
                 {/* Checkout button */}
@@ -829,21 +872,23 @@ export default function GalleryPage() {
                 <div className="flex items-center gap-2">
                   <ShoppingCart className="w-5 h-5 text-red-500" />
                   <span className="text-white font-semibold">
-                    {selectedPhotos.size} photos selected
+                    {selectedPhotos.size > 0 && `${selectedPhotos.size} photos`}
+                    {selectedPhotos.size > 0 && selectedClips.size > 0 && ' + '}
+                    {selectedClips.size > 0 && `${selectedClips.size} videos`}
                   </span>
                 </div>
                 <span className="text-white font-bold">
-                  ${(priceCalc.total / 100).toFixed(2)}
+                  ${(combinedTotal / 100).toFixed(2)}
                 </span>
               </div>
               
-              {priceCalc.savings > 0 && (
+              {combinedSavings > 0 && (
                 <div className="flex items-center justify-between mb-3 text-sm">
                   <span className="text-gray-400">
-                    <span className="line-through">${(priceCalc.flatTotal / 100).toFixed(2)}</span>
+                    <span className="line-through">${((priceCalc.flatTotal + videoPriceCalc.flatTotal) / 100).toFixed(2)}</span>
                   </span>
                   <span className="text-green-400 font-semibold">
-                    Volume discount: -${(priceCalc.savings / 100).toFixed(2)}
+                    Volume discount: -${(combinedSavings / 100).toFixed(2)}
                   </span>
                 </div>
               )}
