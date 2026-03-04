@@ -1164,13 +1164,14 @@ function CheckoutModal({ gallery, selectedCount, priceCalc, isPackage, packagePr
           </div>
 
           <div>
-            <label className="block text-gray-400 mb-1">Name (optional)</label>
+            <label className="block text-gray-400 mb-1">Name *</label>
             <input
               type="text"
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
               className="w-full bg-dark-700 text-white rounded-lg px-4 py-3 border border-dark-600 focus:border-red-500 focus:outline-none"
               placeholder="Your name"
+              required
             />
           </div>
 
