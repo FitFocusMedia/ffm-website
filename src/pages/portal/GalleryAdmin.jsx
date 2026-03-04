@@ -1157,6 +1157,10 @@ function GalleryEditor({ gallery, organization, onBack }) {
 
   const selectAll = () => setSelectedPhotos(new Set(filteredPhotos.map(p => p.id)))
   const deselectAll = () => setSelectedPhotos(new Set())
+  
+  // Video/clip select all
+  const selectAllClips = () => setSelectedClips(new Set(filteredClips.map(c => c.id)))
+  const deselectAllClips = () => setSelectedClips(new Set())
 
   const deleteSelected = async () => {
     if (selectedPhotos.size === 0) return
@@ -1784,6 +1788,15 @@ function GalleryEditor({ gallery, organization, onBack }) {
             {/* Selection Controls for Videos */}
             <div className="flex flex-wrap items-center gap-3 mb-4">
               <span className="text-gray-400 text-sm">{filteredClips.length} video{filteredClips.length !== 1 ? 's' : ''}</span>
+              
+              {/* Select All / Deselect All for Videos */}
+              <button
+                onClick={selectedClips.size === filteredClips.length && filteredClips.length > 0 ? deselectAllClips : selectAllClips}
+                className="px-3 py-1.5 bg-dark-700 hover:bg-dark-600 text-white text-sm rounded-lg"
+              >
+                {selectedClips.size === filteredClips.length && filteredClips.length > 0 ? 'Deselect All' : `Select All (${filteredClips.length})`}
+              </button>
+              
               {selectedClips.size > 0 && (
                 <>
                   <span className="text-gray-400 text-sm">{selectedClips.size} selected</span>
