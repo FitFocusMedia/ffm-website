@@ -983,8 +983,7 @@ export default function GalleryPage() {
           
           return (
             <div 
-              className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4 touch-none"
-              style={{ touchAction: 'none' }}
+              className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4"
               onClick={() => setLightboxClip(null)}
               onTouchStart={(e) => {
                 // Only handle swipe if touch started on overlay background (not buttons)
@@ -1081,11 +1080,12 @@ export default function GalleryPage() {
                       )}
                     </div>
                     <button
-                      onClick={(e) => {
+                      onPointerUp={(e) => {
                         e.stopPropagation()
+                        e.preventDefault()
                         toggleClip(lightboxClip.id)
                       }}
-                      onTouchStart={(e) => e.stopPropagation()}
+                      style={{ touchAction: 'manipulation' }}
                       className={`px-4 py-2 rounded-lg font-semibold transition-all whitespace-nowrap ${
                         selectedClips.has(lightboxClip.id)
                           ? 'bg-green-500 text-white'
