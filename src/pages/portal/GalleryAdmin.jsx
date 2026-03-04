@@ -1285,12 +1285,16 @@ function GalleryEditor({ gallery, organization, onBack }) {
             <Loader2 className="w-8 h-8 text-red-500 animate-spin mx-auto mb-2" />
             <div className="text-white mb-2">
               {uploadProgress.type === 'videos' 
-                ? 'Processing videos (watermarking + compression)...'
+                ? `Processing video ${uploadProgress.current} of ${uploadProgress.total}...`
                 : `Uploading ${uploadProgress.current} of ${uploadProgress.total}...`
               }
             </div>
-            {uploadProgress.type === 'photos' && (
-              <div className="w-64 mx-auto bg-dark-700 rounded-full h-2">
+            {uploadProgress.type === 'videos' && uploadProgress.filename && (
+              <p className="text-gray-300 text-sm mb-2 truncate max-w-md mx-auto">{uploadProgress.filename}</p>
+            )}
+            {/* Progress bar for both photos and videos */}
+            {uploadProgress.total > 0 && (
+              <div className="w-64 mx-auto bg-dark-700 rounded-full h-2 mb-2">
                 <div
                   className="bg-red-600 h-2 rounded-full transition-all"
                   style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
@@ -1298,7 +1302,7 @@ function GalleryEditor({ gallery, organization, onBack }) {
               </div>
             )}
             {uploadProgress.type === 'videos' && (
-              <p className="text-gray-400 text-sm mt-2">This may take a while for large files...</p>
+              <p className="text-gray-400 text-sm">Watermarking + compression (large files take longer)</p>
             )}
           </div>
         ) : dragActive ? (
