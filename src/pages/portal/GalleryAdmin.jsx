@@ -883,11 +883,40 @@ function GalleryEditor({ gallery, organization, onBack }) {
     if (videoFiles.length > 0) {
       setActiveTab('videos')
       setUploading(true)
-      setUploadProgress({ current: 0, total: videoFiles.length, type: 'videos' })
+      
+      // Calculate total bytes for ETA estimation
+      const totalBytes = videoFiles.reduce((sum, f) => sum + f.size, 0)
+      const startTime = Date.now()
+      let completedBytes = 0
+      
+      setUploadProgress({ 
+        current: 0, 
+        total: videoFiles.length, 
+        type: 'videos',
+        totalBytes,
+        completedBytes: 0,
+        speed: 0,
+        eta: null
+      })
       
       const uploadedClips = []
       const CONCURRENCY_LIMIT = 4 // Process 4 videos at a time
       let completedCount = 0
+      
+      // Helper to format bytes
+      const formatBytes = (bytes) => {
+        if (bytes < 1024) return bytes + ' B'
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+        if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+        return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB'
+      }
+      
+      // Helper to format time
+      const formatEta = (seconds) => {
+        if (seconds < 60) return `${Math.round(seconds)}s`
+        if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`
+        return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`
+      }
       
       // Helper to process a single video
       const processVideo = async (file) => {
@@ -948,24 +977,40 @@ function GalleryEditor({ gallery, organization, onBack }) {
               ...result.clip,
               original_path: originalPath,
               category_id: selectedCategoryId,
+              fileSize: file.size, // Track for progress
               // MUX thumbnail (will be available after processing)
               thumbnail_url: result.clip.mux_playback_id 
                 ? `https://image.mux.com/${result.clip.mux_playback_id}/thumbnail.jpg`
                 : null
             }
           }
-          return null
+          return { fileSize: file.size } // Still track size even if no clip returned
         } catch (err) {
           console.error(`Video upload error (${file.name}):`, err)
-          return { error: true, filename: file.name, message: err.message }
+          return { error: true, filename: file.name, message: err.message, fileSize: file.size }
         } finally {
           // Update progress after each video completes
           completedCount++
+          completedBytes += file.size
+          
+          // Calculate speed and ETA
+          const elapsedSeconds = (Date.now() - startTime) / 1000
+          const speed = elapsedSeconds > 0 ? completedBytes / elapsedSeconds : 0
+          const remainingBytes = totalBytes - completedBytes
+          const eta = speed > 0 ? remainingBytes / speed : null
+          
           setUploadProgress({ 
             current: completedCount, 
             total: videoFiles.length, 
             type: 'videos', 
-            filename: `Processing ${CONCURRENCY_LIMIT} videos in parallel...`
+            filename: `Processing ${CONCURRENCY_LIMIT} videos in parallel...`,
+            totalBytes,
+            completedBytes,
+            speed,
+            eta,
+            speedDisplay: formatBytes(speed) + '/s',
+            etaDisplay: eta ? formatEta(eta) : 'Calculating...',
+            percentBytes: Math.round((completedBytes / totalBytes) * 100)
           })
         }
       }
@@ -1328,8 +1373,18 @@ function GalleryEditor({ gallery, organization, onBack }) {
               <div className="w-64 mx-auto bg-dark-700 rounded-full h-2 mb-2">
                 <div
                   className="bg-red-600 h-2 rounded-full transition-all"
-                  style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
+                  style={{ width: `${uploadProgress.percentBytes || (uploadProgress.current / uploadProgress.total) * 100}%` }}
                 />
+              </div>
+            )}
+            {/* Speed and ETA for video uploads */}
+            {uploadProgress.type === 'videos' && uploadProgress.speedDisplay && (
+              <div className="flex justify-center gap-4 text-sm mb-2">
+                <span className="text-green-400">⚡ {uploadProgress.speedDisplay}</span>
+                <span className="text-blue-400">⏱ ETA: {uploadProgress.etaDisplay}</span>
+                {uploadProgress.percentBytes && (
+                  <span className="text-gray-400">{uploadProgress.percentBytes}%</span>
+                )}
               </div>
             )}
             {uploadProgress.type === 'videos' && (
