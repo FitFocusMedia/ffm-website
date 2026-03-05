@@ -1113,13 +1113,21 @@ function GalleryEditor({ gallery, organization, onBack }) {
           .createSignedUrl(thumbnailPath, 3600)
 
         uploadedPhotos.push({ ...photo, thumbnail_url: thumbUrl?.signedUrl })
+        
+        // Incremental refresh: update UI every 10 uploads so thumbnails appear progressively
+        if (uploadedPhotos.length % 10 === 0) {
+          setPhotos(prev => [...prev, ...uploadedPhotos.splice(0)])
+        }
       } catch (err) {
         console.error(`Failed to upload ${file.name}:`, err)
         alert(`Failed to upload ${file.name}: ${err.message}`)
       }
     }
 
-    setPhotos([...photos, ...uploadedPhotos])
+    // Add any remaining photos not yet added
+    if (uploadedPhotos.length > 0) {
+      setPhotos(prev => [...prev, ...uploadedPhotos])
+    }
     setUploading(false)
     setUploadProgress({ current: 0, total: 0 })
   }
