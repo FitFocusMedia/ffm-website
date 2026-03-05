@@ -851,25 +851,25 @@ export default function ContentAdmin() {
               No galleries yet. Create one to start selling event photos.
             </div>
           ) : (
-            <div className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden">
-              <table className="w-full text-sm">
+            <div className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-x-auto">
+              <table className="w-full text-sm min-w-[700px]">
                 <thead className="bg-gray-800">
                   <tr>
-                    <th className="text-left p-3">Gallery Name</th>
-                    <th className="text-left p-3">Event</th>
-                    <th className="text-center p-3">Photos</th>
-                    <th className="text-right p-3">Price/Photo</th>
-                    <th className="text-center p-3">Status</th>
-                    <th className="text-right p-3">Actions</th>
+                    <th className="text-left p-3 whitespace-nowrap">Gallery Name</th>
+                    <th className="text-left p-3 whitespace-nowrap">Event</th>
+                    <th className="text-center p-3 whitespace-nowrap">Photos</th>
+                    <th className="text-right p-3 whitespace-nowrap">Price/Photo</th>
+                    <th className="text-center p-3 whitespace-nowrap">Status</th>
+                    <th className="text-right p-3 whitespace-nowrap">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {galleries.map(gallery => (
                     <tr key={gallery.id} className="border-t border-gray-800">
-                      <td className="p-3 font-medium">{gallery.title}</td>
-                      <td className="p-3 text-gray-400">{gallery.events?.name || '—'}</td>
+                      <td className="p-3 font-medium whitespace-nowrap">{gallery.title}</td>
+                      <td className="p-3 text-gray-400 whitespace-nowrap">{gallery.events?.name || '—'}</td>
                       <td className="p-3 text-center">{gallery.gallery_photos?.[0]?.count || 0}</td>
-                      <td className="p-3 text-right font-semibold text-green-400">${(gallery.price_per_photo / 100).toFixed(2)}</td>
+                      <td className="p-3 text-right font-semibold text-green-400 whitespace-nowrap">${(gallery.price_per_photo / 100).toFixed(2)}</td>
                       <td className="p-3 text-center">
                         <span className={`px-2 py-1 rounded text-xs ${
                           gallery.status === 'published' ? 'bg-green-600' :
@@ -878,7 +878,7 @@ export default function ContentAdmin() {
                           {gallery.status}
                         </span>
                       </td>
-                      <td className="p-3 text-right space-x-2">
+                      <td className="p-3 text-right space-x-2 whitespace-nowrap">
                         <a href={`/#/portal/galleries?edit=${gallery.id}`} className="text-blue-400 hover:text-blue-300">Edit</a>
                         {gallery.status === 'published' && (
                           <a href={`/#/gallery/${gallery.slug}`} target="_blank" className="text-green-400 hover:text-green-300">View</a>
