@@ -241,18 +241,39 @@ export default function GalleryPage() {
       setPhotos(photosWithUrls)
       setTotalPhotoCount(photosWithUrls.length)
 
-      // Fetch video clips from Supabase (works on production)
+      // Fetch video clips from Supabase with pagination (Supabase has 1000 row default limit)
       try {
-        const { data: clipsData, error: clipsError } = await supabase
-          .from('gallery_clips')
-          .select('*')
-          .eq('gallery_id', galleryData.id)
-          .eq('processing_status', 'completed')
-          .order('created_at', { ascending: false })
+        let allClips = []
+        let clipPage = 0
+        const clipPageSize = 1000
+        let hasMoreClips = true
         
-        if (!clipsError && clipsData) {
+        while (hasMoreClips) {
+          const { data: clipsData, error: clipsError } = await supabase
+            .from('gallery_clips')
+            .select('*')
+            .eq('gallery_id', galleryData.id)
+            .eq('processing_status', 'completed')
+            .order('created_at', { ascending: false })
+            .range(clipPage * clipPageSize, (clipPage + 1) * clipPageSize - 1)
+          
+          if (clipsError) {
+            console.error('Load clips error:', clipsError)
+            break
+          }
+          
+          if (clipsData && clipsData.length > 0) {
+            allClips = [...allClips, ...clipsData]
+            clipPage++
+            hasMoreClips = clipsData.length === clipPageSize
+          } else {
+            hasMoreClips = false
+          }
+        }
+        
+        if (allClips.length > 0) {
           // Add MUX thumbnail URLs and prices
-          const processedClips = clipsData.map(c => ({
+          const processedClips = allClips.map(c => ({
             ...c,
             price: c.price || galleryData.price_per_video || 1500,
             thumbnail_url: c.mux_playback_id 
