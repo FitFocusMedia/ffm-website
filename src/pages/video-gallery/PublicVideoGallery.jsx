@@ -61,14 +61,33 @@ export default function PublicVideoGallery() {
       if (galleryError) throw galleryError
       setGallery(galleryData)
 
-      // Get clips
-      const { data: clipsData, error: clipsError } = await supabase
-        .from('video_clips')
-        .select('*')
-        .eq('gallery_id', galleryData.id)
-        .order('sort_order', { ascending: true })
-
-      if (clipsError) throw clipsError
+      // Get clips - use range to override Supabase's 1000 row default limit
+      // Fetch in batches if needed for very large galleries
+      let allClips = []
+      let page = 0
+      const pageSize = 1000
+      let hasMore = true
+      
+      while (hasMore) {
+        const { data: clipsData, error: clipsError } = await supabase
+          .from('video_clips')
+          .select('*')
+          .eq('gallery_id', galleryData.id)
+          .order('sort_order', { ascending: true })
+          .range(page * pageSize, (page + 1) * pageSize - 1)
+        
+        if (clipsError) throw clipsError
+        
+        if (clipsData && clipsData.length > 0) {
+          allClips = [...allClips, ...clipsData]
+          page++
+          hasMore = clipsData.length === pageSize
+        } else {
+          hasMore = false
+        }
+      }
+      
+      const clipsData = allClips
 
       // Get signed URLs for clips
       const clipsWithUrls = await Promise.all(clipsData.map(async (clip) => {
