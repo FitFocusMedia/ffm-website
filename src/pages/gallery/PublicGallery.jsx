@@ -227,19 +227,39 @@ export default function GalleryPage() {
         offset += batchSize
       }
 
-      // Generate signed URLs for all photos
-      const photosWithUrls = await Promise.all(allPhotos.map(async (photo) => {
-        const { data: wmUrl } = await supabase.storage
-          .from('galleries')
-          .createSignedUrl(photo.watermarked_path, 3600)
-
-        return {
-          ...photo,
-          watermarked_url: wmUrl?.signedUrl,
-          thumbnail_url: wmUrl?.signedUrl,
-          price: photo.price || galleryData.price_per_photo
+      // Generate signed URLs in batches to avoid rate limiting
+      // Process 20 at a time to stay within Supabase limits
+      const batchSignedUrls = async (photos, batchSize = 20) => {
+        const results = []
+        for (let i = 0; i < photos.length; i += batchSize) {
+          const batch = photos.slice(i, i + batchSize)
+          const batchResults = await Promise.all(batch.map(async (photo) => {
+            try {
+              const { data: wmUrl } = await supabase.storage
+                .from('galleries')
+                .createSignedUrl(photo.watermarked_path, 3600)
+              return {
+                ...photo,
+                watermarked_url: wmUrl?.signedUrl,
+                thumbnail_url: wmUrl?.signedUrl,
+                price: photo.price || galleryData.price_per_photo
+              }
+            } catch (err) {
+              console.warn(`Failed to get signed URL for ${photo.filename}:`, err)
+              return {
+                ...photo,
+                watermarked_url: null,
+                thumbnail_url: null,
+                price: photo.price || galleryData.price_per_photo
+              }
+            }
+          }))
+          results.push(...batchResults)
         }
-      }))
+        return results
+      }
+      
+      const photosWithUrls = await batchSignedUrls(allPhotos, 20)
 
       setPhotos(photosWithUrls)
       setTotalPhotoCount(photosWithUrls.length)
