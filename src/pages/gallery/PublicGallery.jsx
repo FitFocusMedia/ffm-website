@@ -786,7 +786,7 @@ export default function GalleryPage() {
                 {/* Checkout button */}
                 <button
                   onClick={() => setShowCheckout(true)}
-                  disabled={selectedPhotos.size === 0}
+                  disabled={selectedPhotos.size === 0 && selectedClips.size === 0}
                   className="bg-red-500 hover:bg-red-600 disabled:bg-gray-600 text-white font-semibold px-5 py-2 rounded-full transition-all active:scale-95"
                 >
                   Checkout
@@ -836,7 +836,7 @@ export default function GalleryPage() {
 
               <button
                 onClick={() => setShowCheckout(true)}
-                disabled={selectedPhotos.size === 0}
+                disabled={selectedPhotos.size === 0 && selectedClips.size === 0}
                 className="w-full bg-red-500 hover:bg-red-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-lg transition-colors"
               >
                 Checkout
