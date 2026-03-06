@@ -192,7 +192,7 @@ export default function EventPage() {
       const eventStart = new Date(event.start_time)
       const fallbackEnd = new Date(eventStart.getTime() + 8 * 60 * 60 * 1000)
       const eventHasEnded = eventEnd ? new Date() > eventEnd : new Date() > fallbackEnd
-      const isVodPurchase = eventHasEnded && event.vod_enabled && event.vod_playback_id
+      const isVodPurchase = eventHasEnded && event.vod_enabled
       
       const response = await fetch(checkoutApiUrl, {
         method: 'POST',
@@ -428,13 +428,15 @@ export default function EventPage() {
   }
   
   const eventDate = parseAsLocalTime(event.start_time)
-  const isLive = event.is_live || event.status === 'live'
   const eventEnd = event.end_time ? parseAsLocalTime(event.end_time) : null
   const fallbackEnd = new Date(eventDate.getTime() + 8 * 60 * 60 * 1000) // 8 hours after start
   const isPast = event.status === 'ended' || (eventEnd ? eventEnd < new Date() : fallbackEnd < new Date())
+  // Don't show as live if event has ended
+  const isLive = !isPast && (event.is_live || event.status === 'live')
   
   // VOD availability
-  const isVodAvailable = isPast && event.vod_enabled && event.vod_playback_id
+  // VOD is available if event ended + vod_enabled (streams have bunny_video_id or vod_playback_id)
+  const isVodAvailable = isPast && event.vod_enabled
   const vodExpired = event.vod_available_until && new Date(event.vod_available_until) < new Date()
   const vodPrice = event.vod_price ?? event.price // Use VOD price (including $0) or fall back to live price
 
