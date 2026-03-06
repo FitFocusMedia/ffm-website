@@ -268,6 +268,23 @@ export default function WatchPage() {
   const loadEvent = async () => {
     try {
       const data = await getLivestreamEvent(eventId)
+      
+      // Check if there's a gallery linked to this event
+      try {
+        const { data: galleryData } = await supabase
+          .from('galleries')
+          .select('slug')
+          .eq('event_id', eventId)
+          .eq('status', 'published')
+          .single()
+        
+        if (galleryData?.slug) {
+          data.gallery_slug = galleryData.slug
+        }
+      } catch (galleryErr) {
+        // No gallery found, that's fine
+      }
+      
       setEvent(data)
       
       // Load streams if multi-stream event
@@ -1101,7 +1118,38 @@ export default function WatchPage() {
           </div>
         )}
 
-        {/* Photo Gallery Cross-Sell - TODO: Re-enable when gallery page and discount code are set up */}
+        {/* Photo Gallery Cross-Sell - Links to event gallery if available */}
+        {event.gallery_slug && (
+          <div className="bg-gradient-to-br from-dark-800/40 to-dark-900/60 rounded-2xl p-6 border border-yellow-500/20 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full"></div>
+            
+            <div className="relative flex flex-col md:flex-row items-center gap-6">
+              <div className="flex-shrink-0 w-20 h-20 rounded-2xl bg-gradient-to-br from-yellow-500/20 to-orange-500/20 flex items-center justify-center border border-yellow-500/30">
+                <span className="text-4xl">📸</span>
+              </div>
+              
+              <div className="flex-grow text-center md:text-left">
+                <span className="inline-block px-3 py-1 bg-yellow-500/20 text-yellow-400 text-xs font-semibold rounded-full mb-2 border border-yellow-500/30">
+                  COMPETED AT THIS EVENT?
+                </span>
+                <h3 className="text-xl font-bold text-white mb-2">Get Your Professional Photos</h3>
+                <p className="text-gray-400 text-sm mb-0">
+                  Our photographers captured every moment on the mats. Find your competition memories!
+                </p>
+              </div>
+              
+              <div className="flex-shrink-0">
+                <Link
+                  to={`/gallery/${event.gallery_slug}`}
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-dark-950 font-bold rounded-xl transition-all duration-300 shadow-lg shadow-yellow-500/25"
+                >
+                  View Photo Gallery
+                  <span className="text-lg">→</span>
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
