@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Plus, Edit, Trash2, Eye, DollarSign, Users, Calendar, ToggleLeft, ToggleRight, Download, Radio, Copy, ExternalLink, BarChart3, MapPin, TrendingUp, Shield, RefreshCw, Film, Tag, Archive, Play, StopCircle, Tv, Layers, DoorOpen, DoorClosed, Pencil } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Plus, Edit, Trash2, Eye, DollarSign, Users, Calendar, ToggleLeft, ToggleRight, Download, Radio, Copy, ExternalLink, BarChart3, MapPin, TrendingUp, Shield, RefreshCw, Film, Tag, Archive, Play, StopCircle, Tv, Layers, DoorOpen, DoorClosed, Pencil, GripVertical } from 'lucide-react'
 import { 
   getAllLivestreamEvents, 
   createLivestreamEvent, 
@@ -1569,6 +1569,9 @@ function MultiStreamManager({ eventId, event, onEventUpdate }) {
   const [expandedStream, setExpandedStream] = useState(null)
   const [editingStreamId, setEditingStreamId] = useState(null)
   const [editingStreamName, setEditingStreamName] = useState('')
+  const [draggedStream, setDraggedStream] = useState(null)
+  const [dragOverStream, setDragOverStream] = useState(null)
+  const dragCounter = useRef(0)
 
   // Check if event has existing single stream that can be converted
   const hasExistingSingleStream = event?.mux_stream_id && !event?.is_multi_stream
@@ -1583,11 +1586,83 @@ function MultiStreamManager({ eventId, event, onEventUpdate }) {
   const loadStreams = async () => {
     try {
       const data = await getEventStreams(eventId)
-      setStreams(data || [])
+      // Sort by display_order
+      const sorted = (data || []).sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
+      setStreams(sorted)
     } catch (err) {
       console.error('Failed to load streams:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Drag and drop handlers
+  const handleDragStart = (e, stream) => {
+    setDraggedStream(stream)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', stream.id)
+    // Add visual feedback
+    setTimeout(() => {
+      e.target.style.opacity = '0.5'
+    }, 0)
+  }
+
+  const handleDragEnd = (e) => {
+    e.target.style.opacity = '1'
+    setDraggedStream(null)
+    setDragOverStream(null)
+    dragCounter.current = 0
+  }
+
+  const handleDragEnter = (e, stream) => {
+    e.preventDefault()
+    dragCounter.current++
+    if (stream.id !== draggedStream?.id) {
+      setDragOverStream(stream.id)
+    }
+  }
+
+  const handleDragLeave = (e) => {
+    dragCounter.current--
+    if (dragCounter.current === 0) {
+      setDragOverStream(null)
+    }
+  }
+
+  const handleDragOver = (e) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+  }
+
+  const handleDrop = async (e, targetStream) => {
+    e.preventDefault()
+    setDragOverStream(null)
+    dragCounter.current = 0
+    
+    if (!draggedStream || draggedStream.id === targetStream.id) return
+    
+    // Calculate new order
+    const draggedIndex = streams.findIndex(s => s.id === draggedStream.id)
+    const targetIndex = streams.findIndex(s => s.id === targetStream.id)
+    
+    // Create new array with updated order
+    const newStreams = [...streams]
+    newStreams.splice(draggedIndex, 1)
+    newStreams.splice(targetIndex, 0, draggedStream)
+    
+    // Update local state immediately for responsiveness
+    setStreams(newStreams)
+    setDraggedStream(null)
+    
+    // Update display_order in database
+    try {
+      await Promise.all(newStreams.map((stream, index) => 
+        updateEventStream(stream.id, { display_order: index })
+      ))
+    } catch (err) {
+      console.error('Failed to update stream order:', err)
+      // Reload to get correct order from DB
+      await loadStreams()
     }
   }
 
@@ -1994,7 +2069,20 @@ function MultiStreamManager({ eventId, event, onEventUpdate }) {
           {streams.map((stream, index) => (
             <div 
               key={stream.id}
-              className={`bg-dark-800 rounded-lg border ${stream.is_default ? 'border-purple-500/50' : 'border-dark-700'} overflow-hidden`}
+              draggable
+              onDragStart={(e) => handleDragStart(e, stream)}
+              onDragEnd={handleDragEnd}
+              onDragEnter={(e) => handleDragEnter(e, stream)}
+              onDragLeave={handleDragLeave}
+              onDragOver={handleDragOver}
+              onDrop={(e) => handleDrop(e, stream)}
+              className={`bg-dark-800 rounded-lg border transition-all duration-150 ${
+                stream.is_default ? 'border-purple-500/50' : 'border-dark-700'
+              } ${
+                dragOverStream === stream.id ? 'border-purple-500 border-2 scale-[1.02]' : ''
+              } ${
+                draggedStream?.id === stream.id ? 'opacity-50' : ''
+              } overflow-hidden`}
             >
               {/* Stream Header */}
               <div 
@@ -2002,6 +2090,14 @@ function MultiStreamManager({ eventId, event, onEventUpdate }) {
                 onClick={() => setExpandedStream(expandedStream === stream.id ? null : stream.id)}
               >
                 <div className="flex items-center gap-3">
+                  {/* Drag Handle */}
+                  <div 
+                    className="cursor-grab active:cursor-grabbing p-1 text-gray-500 hover:text-gray-300 transition-colors"
+                    onClick={(e) => e.stopPropagation()}
+                    title="Drag to reorder"
+                  >
+                    <GripVertical className="w-5 h-5" />
+                  </div>
                   <div className="flex items-center justify-center w-8 h-8 bg-purple-500/20 rounded-lg">
                     <Radio className="w-4 h-4 text-purple-500" />
                   </div>
@@ -2177,7 +2273,7 @@ function MultiStreamManager({ eventId, event, onEventUpdate }) {
       
       {streams.length > 0 && (
         <p className="text-xs text-gray-500 mt-3">
-          💡 Viewers will see a stream selector to switch between streams during the event.
+          💡 Drag streams to reorder them. Viewers will see a stream selector to switch between streams.
         </p>
       )}
     </div>
