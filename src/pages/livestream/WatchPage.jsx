@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { Calendar, MapPin, AlertCircle, RefreshCw, Clock, Bell, Play, Sparkles, Lock, Mail, Users, Tv, DoorClosed, Film, PlayCircle } from 'lucide-react'
 import { 
@@ -42,8 +42,18 @@ export default function WatchPage() {
   const [showStreamSelector, setShowStreamSelector] = useState(false)
   const [streamLiveStatuses, setStreamLiveStatuses] = useState({})
   
-  // VOD Replay support
-  const [isVodMode, setIsVodMode] = useState(false)
+  // VOD Replay support - calculate synchronously to avoid flash of wrong content
+  // Compute VOD mode based on event end time
+  const isVodMode = useMemo(() => {
+    if (!event) return false
+    const now = new Date()
+    const eventEnd = event.end_time ? new Date(event.end_time) : null
+    const eventStart = event.start_time ? new Date(event.start_time) : null
+    if (!eventStart) return false
+    const fallbackEnd = new Date(eventStart.getTime() + 8 * 60 * 60 * 1000)
+    const eventHasEnded = eventEnd ? now > eventEnd : now > fallbackEnd
+    return eventHasEnded && event.vod_enabled
+  }, [event])
   const [vodExpired, setVodExpired] = useState(false)
   
   // Fetch real MUX status for streams via Supabase edge function
@@ -118,32 +128,18 @@ export default function WatchPage() {
     }
   }, [event])
 
-  // Check for VOD mode (event ended + VOD enabled)
+  // Check if VOD has expired (isVodMode is now computed via useMemo above)
   useEffect(() => {
-    if (!event) return
+    if (!event || !isVodMode) return
     
-    const now = new Date()
-    const eventEnd = event.end_time ? new Date(event.end_time) : null
-    const eventStart = new Date(event.start_time)
-    
-    // Consider event "ended" if:
-    // - end_time is set and has passed, OR
-    // - start_time + 8 hours has passed (fallback for events without end_time)
-    const fallbackEnd = new Date(eventStart.getTime() + 8 * 60 * 60 * 1000)
-    const eventHasEnded = eventEnd ? now > eventEnd : now > fallbackEnd
-    
-    if (eventHasEnded && event.vod_enabled) {
-      setIsVodMode(true)
-      
-      // Check if VOD has expired
-      if (event.vod_available_until) {
-        const vodExpiry = new Date(event.vod_available_until)
-        if (now > vodExpiry) {
-          setVodExpired(true)
-        }
+    if (event.vod_available_until) {
+      const now = new Date()
+      const vodExpiry = new Date(event.vod_available_until)
+      if (now > vodExpiry) {
+        setVodExpired(true)
       }
     }
-  }, [event])
+  }, [event, isVodMode])
 
   const checkGeoBlocking = async () => {
     try {
