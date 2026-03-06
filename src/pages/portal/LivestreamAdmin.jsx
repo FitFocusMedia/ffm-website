@@ -18,6 +18,7 @@ import {
 } from '../../lib/supabase'
 import GeoBlockingMap from '../../components/GeoBlockingMap'
 import StreamStatusBadge from '../../components/StreamStatusBadge'
+import VODSourceManager from '../../components/VODSourceManager'
 
 export default function LivestreamAdmin() {
   const [events, setEvents] = useState([])
@@ -2253,6 +2254,12 @@ function MultiStreamManager({ eventId, event, onEventUpdate }) {
                           )}
                         </div>
                       )}
+                      
+                      {/* Bunny VOD Source Manager */}
+                      <VODSourceManager 
+                        stream={stream} 
+                        onUpdate={() => loadStreams(selectedEvent.id)}
+                      />
                     </>
                   ) : (
                     <button
