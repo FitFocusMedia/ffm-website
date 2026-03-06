@@ -2258,7 +2258,7 @@ function MultiStreamManager({ eventId, event, onEventUpdate }) {
                       {/* Bunny VOD Source Manager */}
                       <VODSourceManager 
                         stream={stream} 
-                        onUpdate={() => loadStreams(selectedEvent.id)}
+                        onUpdate={() => loadStreams(event.id)}
                       />
                     </>
                   ) : (
