@@ -245,7 +245,7 @@ function EventCard({ event, featured = false, compact = false }) {
             LIVE
           </div>
         )}
-        {isPast && event.mux_playback_id && (
+        {isPast && event.vod_enabled && (
           <div className="absolute top-3 left-3 px-2.5 py-1 bg-green-600 text-white text-xs font-medium rounded-full shadow-lg">
             Replay
           </div>
@@ -261,9 +261,9 @@ function EventCard({ event, featured = false, compact = false }) {
           </div>
         )}
         
-        {/* Price Tag */}
+        {/* Price Tag - show VOD price for past events */}
         <div className="absolute bottom-3 right-3 px-2.5 py-1 bg-black/80 backdrop-blur-sm text-white font-bold text-sm rounded-lg">
-          ${event.price}
+          ${isPast && event.vod_price ? event.vod_price : event.price}
         </div>
         
         {/* Organization Badge */}
