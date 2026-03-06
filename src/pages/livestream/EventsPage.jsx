@@ -773,10 +773,10 @@ export default function EventsPage() {
           )}
 
           {/* Replays / VOD */}
-          {pastEvents.filter(e => e.vod_enabled && (e.mux_playback_id || e.vod_playback_id)).length > 0 && (
+          {pastEvents.filter(e => e.vod_enabled).length > 0 && (
             <EventRow 
               title="Replays Available" 
-              events={pastEvents.filter(e => e.vod_enabled && (e.mux_playback_id || e.vod_playback_id))}
+              events={pastEvents.filter(e => e.vod_enabled)}
               icon={<Play className="w-5 h-5 text-green-500" />}
             />
           )}
