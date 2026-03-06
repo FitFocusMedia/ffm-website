@@ -212,9 +212,9 @@ export default function PremiumPlayer({
           controls={false}
           onClick={togglePlayPause}
         />
-      ) : (
+      ) : playbackId ? (
         <MuxPlayer
-          playbackId={playbackId || 'demo-playback-id'}
+          playbackId={playbackId}
           metadata={{
             video_title: title,
             viewer_user_id: viewerEmail
@@ -224,6 +224,22 @@ export default function PremiumPlayer({
           poster={poster}
           className="w-full aspect-video"
         />
+      ) : (
+        // No valid source available
+        <div className="w-full aspect-video bg-dark-900 flex items-center justify-center">
+          <div className="text-center p-8">
+            <div className="text-6xl mb-4">🎬</div>
+            <h3 className="text-xl font-bold text-white mb-2">
+              {isLive ? 'Stream Starting Soon' : 'Replay Processing'}
+            </h3>
+            <p className="text-gray-400">
+              {isLive 
+                ? 'The live stream will begin shortly. Please wait...'
+                : 'This replay is being prepared. Please check back soon.'
+              }
+            </p>
+          </div>
+        </div>
       )}
 
       {/* Live Badge Overlay */}

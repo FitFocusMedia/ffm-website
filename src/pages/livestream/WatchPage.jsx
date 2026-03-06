@@ -569,10 +569,12 @@ export default function WatchPage() {
   }
 
   const eventDate = parseAsLocalTime(event.start_time)
-  const isLive = event.is_live || event.status === 'live'
   const doorsOpen = event.doors_open === true
   const previewMode = searchParams.get('preview') === 'player'
   const eventTimeHasPassed = new Date() >= eventDate
+  
+  // Don't show as live if in VOD mode (event has ended)
+  const isLive = !isVodMode && (event.is_live || event.status === 'live')
   
   // Doors closed mid-event (emergency shutdown)
   const doorsClosed = !doorsOpen && (isLive || eventTimeHasPassed) && !previewMode
@@ -823,9 +825,9 @@ export default function WatchPage() {
             )}
             
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {(isVodMode ? streams.filter(s => s.vod_playback_id || s.vod_enabled !== false) : streams).map((stream) => {
+              {(isVodMode ? streams.filter(s => s.vod_playback_id || s.bunny_video_id || s.vod_enabled !== false) : streams).map((stream) => {
                 const streamIsLive = !isVodMode && isStreamLive(stream)
-                const hasVod = !!stream.vod_playback_id
+                const hasVod = !!(stream.vod_playback_id || stream.bunny_video_id)
                 const vodDuration = stream.vod_duration_seconds 
                   ? `${Math.floor(stream.vod_duration_seconds / 3600)}h ${Math.floor((stream.vod_duration_seconds % 3600) / 60)}m`
                   : null
