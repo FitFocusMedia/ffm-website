@@ -751,14 +751,21 @@ export default function WatchPage() {
   }
 
   // Determine which playback ID to use
-  // VOD mode: use stream's vod_playback_id if available, else event's vod_playback_id
+  // VOD mode: Bunny takes priority if available, else MUX
   // Live mode: use stream's mux_playback_id if available, else event's mux_playback_id
+  
+  // Bunny video ID (takes priority for VOD if set)
+  const activeBunnyVideoId = isVodMode 
+    ? (selectedStream?.bunny_video_id || null)
+    : null
+
+  // MUX playback ID (fallback for VOD, or primary for live)
   const activePlaybackId = isVodMode 
-    ? (selectedStream?.vod_playback_id || event.vod_playback_id || selectedStream?.mux_playback_id || event.mux_playback_id)
+    ? (!activeBunnyVideoId ? (selectedStream?.vod_playback_id || event.vod_playback_id || selectedStream?.mux_playback_id || event.mux_playback_id) : null)
     : (selectedStream?.mux_playback_id || event.mux_playback_id || 'demo-playback-id')
   
-  // Check if we have multi-stream VOD (streams with vod_playback_id set)
-  const streamsWithVod = streams.filter(s => s.vod_playback_id)
+  // Check if we have multi-stream VOD (streams with vod_playback_id or bunny_video_id set)
+  const streamsWithVod = streams.filter(s => s.vod_playback_id || s.bunny_video_id)
   const hasMultiStreamVod = streamsWithVod.length > 0
   const isMultiStream = streams.length > 1 || (isVodMode && hasMultiStreamVod)
   
@@ -962,6 +969,8 @@ export default function WatchPage() {
           <div className="relative">
             <PremiumPlayer
               playbackId={activePlaybackId}
+              bunnyVideoId={activeBunnyVideoId}
+              bunnyLibraryId="612038"
               title={selectedStream ? `${event.title} - ${selectedStream.name}` : event.title}
               poster={getDirectImageUrl(event.thumbnail_url || event.player_poster_url)}
               isLive={isLive || selectedStream?.status === 'live'}

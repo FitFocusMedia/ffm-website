@@ -5,12 +5,19 @@ import {
   MessageCircle, ThumbsUp, Sparkles
 } from 'lucide-react'
 import MuxPlayer from '@mux/mux-player-react'
+import Hls from 'hls.js'
+
+// Bunny Stream CDN URL pattern
+const BUNNY_CDN_URL = 'https://vz-66967d38-080.b-cdn.net'
 
 /**
  * Premium Player Wrapper with enhanced UI/UX
+ * Supports both MUX and Bunny Stream playback
  */
 export default function PremiumPlayer({
-  playbackId,
+  playbackId,          // MUX playback ID
+  bunnyVideoId,        // Bunny Stream video GUID
+  bunnyLibraryId,      // Bunny Stream library ID (optional, uses default CDN)
   title,
   poster,
   isLive = false,
@@ -22,8 +29,84 @@ export default function PremiumPlayer({
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [showReactions, setShowReactions] = useState(false)
   const [reactions, setReactions] = useState([])
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [isMuted, setIsMuted] = useState(false)
   const containerRef = useRef(null)
+  const videoRef = useRef(null)
+  const hlsRef = useRef(null)
   const hideControlsTimer = useRef(null)
+
+  // Determine playback source
+  const isBunnySource = !!bunnyVideoId
+  const bunnyHlsUrl = bunnyVideoId 
+    ? `${BUNNY_CDN_URL}/${bunnyVideoId}/playlist.m3u8`
+    : null
+
+  // Initialize HLS.js for Bunny Stream
+  useEffect(() => {
+    if (!isBunnySource || !videoRef.current) return
+
+    const video = videoRef.current
+
+    if (Hls.isSupported()) {
+      const hls = new Hls({
+        enableWorker: true,
+        lowLatencyMode: false,
+        backBufferLength: 90
+      })
+      
+      hls.loadSource(bunnyHlsUrl)
+      hls.attachMedia(video)
+      
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        video.play().catch(err => console.log('Autoplay prevented:', err))
+      })
+      
+      hls.on(Hls.Events.ERROR, (event, data) => {
+        if (data.fatal) {
+          console.error('HLS fatal error:', data)
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            hls.startLoad()
+          } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+            hls.recoverMediaError()
+          }
+        }
+      })
+      
+      hlsRef.current = hls
+      
+      return () => {
+        hls.destroy()
+        hlsRef.current = null
+      }
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      // Native HLS support (Safari)
+      video.src = bunnyHlsUrl
+      video.addEventListener('loadedmetadata', () => {
+        video.play().catch(err => console.log('Autoplay prevented:', err))
+      })
+    }
+  }, [isBunnySource, bunnyHlsUrl])
+
+  // Track play state for Bunny player
+  useEffect(() => {
+    if (!isBunnySource || !videoRef.current) return
+    
+    const video = videoRef.current
+    const handlePlay = () => setIsPlaying(true)
+    const handlePause = () => setIsPlaying(false)
+    const handleVolumeChange = () => setIsMuted(video.muted)
+    
+    video.addEventListener('play', handlePlay)
+    video.addEventListener('pause', handlePause)
+    video.addEventListener('volumechange', handleVolumeChange)
+    
+    return () => {
+      video.removeEventListener('play', handlePlay)
+      video.removeEventListener('pause', handlePause)
+      video.removeEventListener('volumechange', handleVolumeChange)
+    }
+  }, [isBunnySource])
 
   // Auto-hide controls
   useEffect(() => {
@@ -57,30 +140,21 @@ export default function PremiumPlayer({
 
   const toggleFullscreen = async () => {
     try {
-      // Check if already in fullscreen
       const isInFullscreen = document.fullscreenElement || document.webkitFullscreenElement
       
       if (!isInFullscreen) {
-        // Try standard API first (Chrome, Firefox, Edge)
         if (containerRef.current?.requestFullscreen) {
           await containerRef.current.requestFullscreen()
-        } 
-        // Try webkit API (Safari desktop)
-        else if (containerRef.current?.webkitRequestFullscreen) {
+        } else if (containerRef.current?.webkitRequestFullscreen) {
           containerRef.current.webkitRequestFullscreen()
-        }
-        // iOS Safari - need to fullscreen the video element directly
-        else {
-          const video = containerRef.current?.querySelector('video, mux-player')?.shadowRoot?.querySelector('video') 
-            || containerRef.current?.querySelector('video')
+        } else {
+          // iOS Safari
+          const video = videoRef.current || containerRef.current?.querySelector('video')
           if (video?.webkitEnterFullscreen) {
             video.webkitEnterFullscreen()
-          } else if (video?.webkitRequestFullscreen) {
-            video.webkitRequestFullscreen()
           }
         }
       } else {
-        // Exit fullscreen
         if (document.exitFullscreen) {
           document.exitFullscreen()
         } else if (document.webkitExitFullscreen) {
@@ -89,12 +163,21 @@ export default function PremiumPlayer({
       }
     } catch (err) {
       console.warn('Fullscreen error:', err)
-      // Fallback: try to get mux-player to handle it
-      const muxPlayer = containerRef.current?.querySelector('mux-player')
-      if (muxPlayer) {
-        muxPlayer.requestFullscreen?.() || muxPlayer.webkitRequestFullscreen?.()
-      }
     }
+  }
+
+  const togglePlayPause = () => {
+    if (!videoRef.current) return
+    if (videoRef.current.paused) {
+      videoRef.current.play()
+    } else {
+      videoRef.current.pause()
+    }
+  }
+
+  const toggleMute = () => {
+    if (!videoRef.current) return
+    videoRef.current.muted = !videoRef.current.muted
   }
 
   // Reactions system
@@ -103,12 +186,10 @@ export default function PremiumPlayer({
     const reaction = {
       id,
       emoji,
-      x: Math.random() * 80 + 10, // 10-90%
+      x: Math.random() * 80 + 10,
       delay: Math.random() * 0.5
     }
     setReactions(prev => [...prev, reaction])
-    
-    // Remove after animation
     setTimeout(() => {
       setReactions(prev => prev.filter(r => r.id !== id))
     }, 3000)
@@ -121,18 +202,29 @@ export default function PremiumPlayer({
       ref={containerRef}
       className={`relative bg-black group ${className}`}
     >
-      {/* MUX Player */}
-      <MuxPlayer
-        playbackId={playbackId || 'demo-playback-id'}
-        metadata={{
-          video_title: title,
-          viewer_user_id: viewerEmail
-        }}
-        streamType={isLive ? 'live' : 'on-demand'}
-        autoPlay
-        poster={poster}
-        className="w-full aspect-video"
-      />
+      {/* Video Player - MUX or Bunny */}
+      {isBunnySource ? (
+        <video
+          ref={videoRef}
+          className="w-full aspect-video"
+          poster={poster}
+          playsInline
+          controls={false}
+          onClick={togglePlayPause}
+        />
+      ) : (
+        <MuxPlayer
+          playbackId={playbackId || 'demo-playback-id'}
+          metadata={{
+            video_title: title,
+            viewer_user_id: viewerEmail
+          }}
+          streamType={isLive ? 'live' : 'on-demand'}
+          autoPlay
+          poster={poster}
+          className="w-full aspect-video"
+        />
+      )}
 
       {/* Live Badge Overlay */}
       {isLive && (
@@ -140,6 +232,15 @@ export default function PremiumPlayer({
           <div className="flex items-center gap-2 px-3 py-1.5 bg-red-500 text-white font-bold rounded-full animate-glow">
             <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
             LIVE
+          </div>
+        </div>
+      )}
+
+      {/* Bunny Source Badge */}
+      {isBunnySource && !isLive && (
+        <div className="absolute top-4 right-4 z-10">
+          <div className="flex items-center gap-1 px-2 py-1 bg-orange-500/80 text-white text-xs font-medium rounded">
+            🐰 VOD
           </div>
         </div>
       )}
@@ -189,6 +290,25 @@ export default function PremiumPlayer({
         <div className="flex items-center justify-between">
           {/* Left Controls */}
           <div className="flex items-center gap-2">
+            {/* Bunny-specific controls */}
+            {isBunnySource && (
+              <>
+                <button 
+                  onClick={togglePlayPause}
+                  className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
+                  title={isPlaying ? 'Pause' : 'Play'}
+                >
+                  {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+                </button>
+                <button 
+                  onClick={toggleMute}
+                  className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
+                  title={isMuted ? 'Unmute' : 'Mute'}
+                >
+                  {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+                </button>
+              </>
+            )}
             <button 
               onClick={onShare}
               className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
