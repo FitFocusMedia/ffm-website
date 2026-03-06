@@ -216,16 +216,17 @@ export default function PremiumPlayer({
     )
   }
 
-  // For Bunny: just native video with controls - no overlays
+  // For Bunny: use their iframe embed player which has proper controls
   if (isBunnySource) {
+    const embedUrl = `https://iframe.mediadelivery.net/embed/${bunnyLibraryId || '612038'}/${bunnyVideoId}?autoplay=true&preload=true`
     return (
       <div className={`relative bg-black ${className}`}>
-        <video
-          ref={videoRef}
+        <iframe
+          src={embedUrl}
           className="w-full aspect-video"
-          poster={poster}
-          playsInline
-          controls
+          loading="lazy"
+          allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture"
+          allowFullScreen
         />
       </div>
     )
