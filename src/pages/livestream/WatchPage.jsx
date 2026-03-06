@@ -708,7 +708,8 @@ export default function WatchPage() {
   }
 
   // Starting Soon - Premium
-  const eventStartingSoon = eventTimeHasPassed && !isLive && !previewMode
+  // Don't show "Starting Soon" if in VOD mode - show the player instead
+  const eventStartingSoon = eventTimeHasPassed && !isLive && !previewMode && !isVodMode
   
   if (eventStartingSoon) {
     return (
