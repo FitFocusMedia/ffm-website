@@ -1000,9 +1000,9 @@ export default function WatchPage() {
               }}
             />
             
-            {/* Desktop stream selector overlay */}
+            {/* Desktop stream selector overlay - positioned at top to avoid blocking video controls */}
             {isMultiStream && (
-              <div className="hidden md:block absolute bottom-4 left-4 z-10">
+              <div className="hidden md:block absolute top-16 left-4 z-10">
                 <StreamSelectorCompact
                   streams={sortedStreams}
                   selectedStream={selectedStream}
