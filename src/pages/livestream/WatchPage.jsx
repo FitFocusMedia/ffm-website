@@ -274,11 +274,17 @@ export default function WatchPage() {
       if (data?.is_multi_stream) {
         try {
           const eventStreams = await getEventStreams(eventId)
-          setStreams(eventStreams || [])
+          // Sort streams by mat number before setting
+          const sorted = [...(eventStreams || [])].sort((a, b) => {
+            const numA = parseInt(a.name?.match(/\d+/)?.[0] || '999')
+            const numB = parseInt(b.name?.match(/\d+/)?.[0] || '999')
+            return numA - numB
+          })
+          setStreams(sorted)
           // Only auto-select stream if NOT using crew bypass (bypass users should choose)
           const bypassToken = searchParams.get('bypass')
           if (!bypassToken) {
-            const defaultStream = eventStreams?.find(s => s.is_default) || eventStreams?.[0]
+            const defaultStream = sorted?.find(s => s.is_default) || sorted?.[0]
             if (defaultStream) {
               setSelectedStream(defaultStream)
             }
