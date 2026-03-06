@@ -1208,12 +1208,23 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-400 mb-1">VOD Available Until (optional)</label>
-                  <input
-                    type="datetime-local"
-                    value={formData.vod_available_until ? formData.vod_available_until.slice(0, 16) : ''}
-                    onChange={(e) => setFormData(prev => ({ ...prev, vod_available_until: e.target.value ? new Date(e.target.value).toISOString() : '' }))}
-                    className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="datetime-local"
+                      value={formData.vod_available_until ? formData.vod_available_until.slice(0, 16) : ''}
+                      onChange={(e) => setFormData(prev => ({ ...prev, vod_available_until: e.target.value ? new Date(e.target.value).toISOString() : '' }))}
+                      className="flex-1 px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
+                    />
+                    {formData.vod_available_until && (
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, vod_available_until: null }))}
+                        className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="grid md:grid-cols-2 gap-4">
