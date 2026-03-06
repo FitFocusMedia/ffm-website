@@ -976,6 +976,7 @@ export default function WatchPage() {
                 selectedStream={selectedStream}
                 onSelect={setSelectedStream}
                 isLive={isLive}
+                isVodMode={isVodMode}
               />
             </div>
           )}
@@ -1007,6 +1008,7 @@ export default function WatchPage() {
                   streams={sortedStreams}
                   selectedStream={selectedStream}
                   onSelect={setSelectedStream}
+                  isVodMode={isVodMode}
                 />
               </div>
             )}

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Radio, Check, Tv } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
-export default function StreamSelector({ streams, selectedStream, onSelect, isLive = false }) {
+export default function StreamSelector({ streams, selectedStream, onSelect, isLive = false, isVodMode = false }) {
   const [liveStatuses, setLiveStatuses] = useState({})
   
   // Fetch real MUX status for streams that have mux_stream_id
@@ -108,9 +108,13 @@ export default function StreamSelector({ streams, selectedStream, onSelect, isLi
               
               {/* Status badge */}
               <span className={`text-xs mt-1 ${
-                streamIsLive ? 'text-red-400' : 'text-gray-500'
+                streamIsLive ? 'text-red-400' : 
+                isVodMode && (stream.bunny_video_id || stream.vod_playback_id) ? 'text-purple-400' : 
+                'text-gray-500'
               }`}>
-                {streamIsLive ? 'Live' : 'Waiting'}
+                {streamIsLive ? 'Live' : 
+                 isVodMode && (stream.bunny_video_id || stream.vod_playback_id) ? 'Replay' : 
+                 'Waiting'}
               </span>
             </button>
           )
@@ -125,7 +129,7 @@ export default function StreamSelector({ streams, selectedStream, onSelect, isLi
 }
 
 // Compact version for inside the player controls
-export function StreamSelectorCompact({ streams, selectedStream, onSelect, liveStatuses = {} }) {
+export function StreamSelectorCompact({ streams, selectedStream, onSelect, liveStatuses = {}, isVodMode = false }) {
   const [isOpen, setIsOpen] = useState(false)
   const [localLiveStatuses, setLocalLiveStatuses] = useState({})
   
@@ -226,8 +230,14 @@ export function StreamSelectorCompact({ streams, selectedStream, onSelect, liveS
                   </div>
                   <div className="flex-1">
                     <p className="font-medium">{stream.name}</p>
-                    <p className={`text-xs ${streamIsLive ? 'text-red-400' : 'text-gray-500'}`}>
-                      {streamIsLive ? 'Live' : 'Waiting'}
+                    <p className={`text-xs ${
+                      streamIsLive ? 'text-red-400' : 
+                      isVodMode && (stream.bunny_video_id || stream.vod_playback_id) ? 'text-purple-400' : 
+                      'text-gray-500'
+                    }`}>
+                      {streamIsLive ? 'Live' : 
+                       isVodMode && (stream.bunny_video_id || stream.vod_playback_id) ? 'Replay' : 
+                       'Waiting'}
                     </p>
                   </div>
                   {isSelected && <Check className="w-4 h-4 text-red-500" />}
