@@ -27,7 +27,7 @@ export default function PremiumPurchaseCard({
   const isFree = price === 0 || price === '0' || !price
   
   const liveBenefits = [
-    { icon: Zap, text: isFree ? 'Instant free access' : 'Instant access after payment', highlight: true },
+    { icon: Zap, text: isFree ? 'Instant access' : 'Instant access after payment', highlight: true },
     { icon: Play, text: 'Watch live + replay for 7 days', highlight: true },
     { icon: Star, text: 'HD quality streaming', highlight: true },
     ...(!isFree ? [{ icon: Shield, text: 'Secure payment via Stripe', highlight: true }] : [])
@@ -175,7 +175,7 @@ export default function PremiumPurchaseCard({
                 {price > 0 ? <CreditCard className="w-5 h-5" /> : <Play className="w-5 h-5" />}
                 {price > 0 
                   ? (isVod ? 'Buy Replay Access' : isPast ? 'Event Ended' : isLive ? 'Watch Now' : 'Buy Access')
-                  : 'Get Free Access'
+                  : 'Get Access'
                 }
               </>
             )}
