@@ -197,21 +197,10 @@ export default function PremiumPlayer({
 
   const reactionEmojis = ['🔥', '👏', '❤️', '😮', '💪', '🎉']
 
-  return (
-    <div 
-      ref={containerRef}
-      className={`relative bg-black group ${className}`}
-    >
-      {/* Video Player - MUX or Bunny */}
-      {isBunnySource ? (
-        <video
-          ref={videoRef}
-          className="w-full aspect-video"
-          poster={poster}
-          playsInline
-          controls={true}
-        />
-      ) : playbackId ? (
+  // For MUX: render completely clean - no overlays, let MUX handle everything
+  if (!isBunnySource && playbackId) {
+    return (
+      <div className={`relative bg-black ${className}`}>
         <MuxPlayer
           playbackId={playbackId}
           metadata={{
@@ -222,6 +211,25 @@ export default function PremiumPlayer({
           autoPlay
           poster={poster}
           className="w-full aspect-video"
+        />
+      </div>
+    )
+  }
+
+  // For Bunny or no source: use the full wrapper with custom controls
+  return (
+    <div 
+      ref={containerRef}
+      className={`relative bg-black group ${className}`}
+    >
+      {/* Video Player - Bunny or placeholder */}
+      {isBunnySource ? (
+        <video
+          ref={videoRef}
+          className="w-full aspect-video"
+          poster={poster}
+          playsInline
+          controls={true}
         />
       ) : (
         // No valid source available
@@ -241,62 +249,17 @@ export default function PremiumPlayer({
         </div>
       )}
 
-      {/* Live Badge Overlay */}
-      {isLive && (
-        <div className="absolute top-4 left-4 z-10">
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-red-500 text-white font-bold rounded-full animate-glow">
+      {/* Live Badge Overlay - Bunny only */}
+      {isLive && isBunnySource && (
+        <div className="absolute top-4 left-4 z-10 pointer-events-none">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-red-500 text-white font-bold rounded-full">
             <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
             LIVE
           </div>
         </div>
       )}
 
-      {/* Bunny Source Badge */}
-      {isBunnySource && !isLive && (
-        <div className="absolute top-4 right-4 z-10">
-          <div className="flex items-center gap-1 px-2 py-1 bg-orange-500/80 text-white text-xs font-medium rounded">
-            🐰 VOD
-          </div>
-        </div>
-      )}
-
-      {/* Floating Reactions */}
-      <div className="absolute bottom-20 right-4 pointer-events-none overflow-hidden h-64 w-16">
-        {reactions.map(reaction => (
-          <div
-            key={reaction.id}
-            className="absolute animate-float text-3xl"
-            style={{
-              left: `${reaction.x}%`,
-              animationDelay: `${reaction.delay}s`,
-              bottom: 0
-            }}
-          >
-            {reaction.emoji}
-          </div>
-        ))}
-      </div>
-
-      {/* Reaction Panel */}
-      {showReactions && (
-        <div className="absolute bottom-20 right-4 z-20 animate-scaleIn">
-          <div className="bg-dark-900/90 backdrop-blur-sm rounded-2xl p-3 border border-dark-700">
-            <div className="grid grid-cols-3 gap-2">
-              {reactionEmojis.map((emoji, i) => (
-                <button
-                  key={emoji}
-                  onClick={() => addReaction(emoji)}
-                  className="w-12 h-12 rounded-xl bg-dark-800 hover:bg-dark-700 flex items-center justify-center text-2xl transition-transform hover:scale-110 active:scale-95"
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Bottom Control Bar - ONLY for Bunny streams (MUX has native controls) */}
+      {/* Bottom Control Bar - Bunny streams only */}
       {isBunnySource && (
         <div 
           className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-4 transition-opacity duration-300 ${
@@ -304,66 +267,29 @@ export default function PremiumPlayer({
           }`}
         >
           <div className="flex items-center justify-between">
-            {/* Left Controls */}
             <div className="flex items-center gap-2">
               <button 
                 onClick={togglePlayPause}
                 className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
-                title={isPlaying ? 'Pause' : 'Play'}
               >
                 {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
               </button>
               <button 
                 onClick={toggleMute}
                 className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
-                title={isMuted ? 'Unmute' : 'Mute'}
               >
                 {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
               </button>
-              {onShare && (
-                <button 
-                  onClick={onShare}
-                  className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
-                  title="Share"
-                >
-                  <Share2 className="w-5 h-5" />
-                </button>
-              )}
             </div>
-
-            {/* Right Controls */}
-            <div className="flex items-center gap-2">
-              <button 
-                onClick={toggleFullscreen}
-                className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
-                title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-              >
-                {isFullscreen ? (
-                  <Minimize className="w-5 h-5" />
-                ) : (
-                  <Maximize className="w-5 h-5" />
-                )}
-              </button>
-            </div>
+            <button 
+              onClick={toggleFullscreen}
+              className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
+            >
+              {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
+            </button>
           </div>
         </div>
       )}
-
-      <style jsx>{`
-        @keyframes float {
-          0% {
-            transform: translateY(0) scale(1);
-            opacity: 1;
-          }
-          100% {
-            transform: translateY(-200px) scale(1.5);
-            opacity: 0;
-          }
-        }
-        .animate-float {
-          animation: float 3s ease-out forwards;
-        }
-      `}</style>
     </div>
   )
 }
