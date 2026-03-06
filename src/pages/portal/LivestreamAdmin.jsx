@@ -874,7 +874,7 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
     vod_enabled: initialEvent?.vod_enabled ?? true,  // Default ON for new events
     vod_asset_id: initialEvent?.vod_asset_id || '',
     vod_playback_id: initialEvent?.vod_playback_id || '',
-    vod_price: initialEvent?.vod_price || '',
+    vod_price: initialEvent?.vod_price ?? '',
     vod_available_until: initialEvent?.vod_available_until || '',  // Auto-calculated from end_time
     status: initialEvent?.status || 'draft',
     mux_playback_id: initialEvent?.mux_playback_id || '',
