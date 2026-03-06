@@ -436,7 +436,7 @@ export default function EventPage() {
   // VOD availability
   const isVodAvailable = isPast && event.vod_enabled && event.vod_playback_id
   const vodExpired = event.vod_available_until && new Date(event.vod_available_until) < new Date()
-  const vodPrice = event.vod_price || event.price // Use VOD price or fall back to live price
+  const vodPrice = event.vod_price ?? event.price // Use VOD price (including $0) or fall back to live price
 
   return (
     <>

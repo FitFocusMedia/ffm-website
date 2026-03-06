@@ -261,9 +261,9 @@ function EventCard({ event, featured = false, compact = false }) {
           </div>
         )}
         
-        {/* Price Tag - show VOD price for past events */}
+        {/* Price Tag - show VOD price for past events (use ?? to handle $0 correctly) */}
         <div className="absolute bottom-3 right-3 px-2.5 py-1 bg-black/80 backdrop-blur-sm text-white font-bold text-sm rounded-lg">
-          ${isPast && event.vod_price ? event.vod_price : event.price}
+          ${isPast ? (event.vod_price ?? event.price) : event.price}
         </div>
         
         {/* Organization Badge */}
