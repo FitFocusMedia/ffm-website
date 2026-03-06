@@ -216,80 +216,38 @@ export default function PremiumPlayer({
     )
   }
 
-  // For Bunny or no source: use the full wrapper with custom controls
-  return (
-    <div 
-      ref={containerRef}
-      className={`relative bg-black group ${className}`}
-    >
-      {/* Video Player - Bunny or placeholder */}
-      {isBunnySource ? (
+  // For Bunny: just native video with controls - no overlays
+  if (isBunnySource) {
+    return (
+      <div className={`relative bg-black ${className}`}>
         <video
           ref={videoRef}
           className="w-full aspect-video"
           poster={poster}
           playsInline
-          controls={true}
+          controls
         />
-      ) : (
-        // No valid source available
-        <div className="w-full aspect-video bg-dark-900 flex items-center justify-center">
-          <div className="text-center p-8">
-            <div className="text-6xl mb-4">🎬</div>
-            <h3 className="text-xl font-bold text-white mb-2">
-              {isLive ? 'Stream Starting Soon' : 'Replay Processing'}
-            </h3>
-            <p className="text-gray-400">
-              {isLive 
-                ? 'The live stream will begin shortly. Please wait...'
-                : 'This replay is being prepared. Please check back soon.'
-              }
-            </p>
-          </div>
-        </div>
-      )}
+      </div>
+    )
+  }
 
-      {/* Live Badge Overlay - Bunny only */}
-      {isLive && isBunnySource && (
-        <div className="absolute top-4 left-4 z-10 pointer-events-none">
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-red-500 text-white font-bold rounded-full">
-            <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
-            LIVE
-          </div>
+  // No valid source - placeholder
+  return (
+    <div className={`relative bg-black ${className}`}>
+      <div className="w-full aspect-video bg-dark-900 flex items-center justify-center">
+        <div className="text-center p-8">
+          <div className="text-6xl mb-4">🎬</div>
+          <h3 className="text-xl font-bold text-white mb-2">
+            {isLive ? 'Stream Starting Soon' : 'Replay Processing'}
+          </h3>
+          <p className="text-gray-400">
+            {isLive 
+              ? 'The live stream will begin shortly. Please wait...'
+              : 'This replay is being prepared. Please check back soon.'
+            }
+          </p>
         </div>
-      )}
-
-      {/* Bottom Control Bar - Bunny streams only */}
-      {isBunnySource && (
-        <div 
-          className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-4 transition-opacity duration-300 ${
-            showControls ? 'opacity-100' : 'opacity-0'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <button 
-                onClick={togglePlayPause}
-                className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
-              >
-                {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
-              </button>
-              <button 
-                onClick={toggleMute}
-                className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
-              >
-                {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
-              </button>
-            </div>
-            <button 
-              onClick={toggleFullscreen}
-              className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
-            >
-              {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
-            </button>
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   )
 }
