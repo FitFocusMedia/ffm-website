@@ -209,8 +209,7 @@ export default function PremiumPlayer({
           className="w-full aspect-video"
           poster={poster}
           playsInline
-          controls={false}
-          onClick={togglePlayPause}
+          controls={true}
         />
       ) : playbackId ? (
         <MuxPlayer

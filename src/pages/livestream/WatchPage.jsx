@@ -39,6 +39,15 @@ export default function WatchPage() {
   // Multi-stream support
   const [streams, setStreams] = useState([])
   const [selectedStream, setSelectedStream] = useState(null)
+  
+  // Sort streams by mat number (extract number from name like "Open Mat 1")
+  const sortedStreams = useMemo(() => {
+    return [...streams].sort((a, b) => {
+      const numA = parseInt(a.name?.match(/\d+/)?.[0] || '999')
+      const numB = parseInt(b.name?.match(/\d+/)?.[0] || '999')
+      return numA - numB
+    })
+  }, [streams])
   const [showStreamSelector, setShowStreamSelector] = useState(false)
   const [streamLiveStatuses, setStreamLiveStatuses] = useState({})
   
@@ -822,7 +831,7 @@ export default function WatchPage() {
             )}
             
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {(isVodMode ? streams.filter(s => s.vod_playback_id || s.bunny_video_id || s.vod_enabled !== false) : streams).map((stream) => {
+              {(isVodMode ? sortedStreams.filter(s => s.vod_playback_id || s.bunny_video_id || s.vod_enabled !== false) : sortedStreams).map((stream) => {
                 const streamIsLive = !isVodMode && isStreamLive(stream)
                 const hasVod = !!(stream.vod_playback_id || stream.bunny_video_id)
                 const vodDuration = stream.vod_duration_seconds 
@@ -957,7 +966,7 @@ export default function WatchPage() {
           {isMultiStream && (
             <div className="md:hidden">
               <StreamSelector 
-                streams={streams}
+                streams={sortedStreams}
                 selectedStream={selectedStream}
                 onSelect={setSelectedStream}
                 isLive={isLive}
@@ -989,7 +998,7 @@ export default function WatchPage() {
             {isMultiStream && (
               <div className="hidden md:block absolute bottom-4 left-4 z-10">
                 <StreamSelectorCompact
-                  streams={streams}
+                  streams={sortedStreams}
                   selectedStream={selectedStream}
                   onSelect={setSelectedStream}
                 />
@@ -1002,7 +1011,7 @@ export default function WatchPage() {
             <div className="bg-dark-900/80 backdrop-blur-sm border-t border-dark-700/50 px-4 py-3">
               <div className="flex items-center justify-center gap-2 flex-wrap">
                 <span className="text-gray-400 text-sm mr-2">Quick Switch:</span>
-                {streams.map((stream) => {
+                {sortedStreams.map((stream) => {
                   const isSelected = selectedStream?.id === stream.id
                   const streamIsLive = isStreamLive(stream)
                   
