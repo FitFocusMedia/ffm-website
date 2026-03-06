@@ -24,18 +24,20 @@ export default function PremiumPurchaseCard({
   const discount = originalPrice ? Math.round((1 - price / originalPrice) * 100) : null
 
   // Different benefits for VOD vs Live - all highlighted for trust
+  const isFree = price === 0 || price === '0' || !price
+  
   const liveBenefits = [
-    { icon: Zap, text: 'Instant access after payment', highlight: true },
+    { icon: Zap, text: isFree ? 'Instant free access' : 'Instant access after payment', highlight: true },
     { icon: Play, text: 'Watch live + replay for 7 days', highlight: true },
     { icon: Star, text: 'HD quality streaming', highlight: true },
-    { icon: Shield, text: 'Secure payment via Stripe', highlight: true }
+    ...(!isFree ? [{ icon: Shield, text: 'Secure payment via Stripe', highlight: true }] : [])
   ]
   
   const vodBenefits = [
     { icon: PlayCircle, text: 'Instant access to full replay', highlight: true },
     { icon: Film, text: 'Watch anytime, any device', highlight: true },
     { icon: Star, text: 'HD quality streaming', highlight: true },
-    { icon: Shield, text: 'Secure payment via Stripe', highlight: true }
+    ...(!isFree ? [{ icon: Shield, text: 'Secure payment via Stripe', highlight: true }] : [])
   ]
   
   const benefits = isVod ? vodBenefits : liveBenefits
@@ -104,14 +106,16 @@ export default function PremiumPurchaseCard({
             )}
           </div>
           
-          {/* Price Display */}
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-4xl font-bold text-white">${price}</span>
-            <span className="text-lg text-gray-500">{currency}</span>
-            {originalPrice && (
-              <span className="text-lg text-gray-600 line-through">${originalPrice}</span>
-            )}
-          </div>
+          {/* Price Display - hidden for free events */}
+          {price > 0 && (
+            <div className="mt-2 flex items-baseline gap-2">
+              <span className="text-4xl font-bold text-white">${price}</span>
+              <span className="text-lg text-gray-500">{currency}</span>
+              {originalPrice && (
+                <span className="text-lg text-gray-600 line-through">${originalPrice}</span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Form */}
@@ -168,8 +172,11 @@ export default function PremiumPurchaseCard({
               </>
             ) : (
               <>
-                {isVod ? <Film className="w-5 h-5" /> : <CreditCard className="w-5 h-5" />}
-                {isVod ? 'Buy Replay Access' : isPast ? 'Event Ended' : isLive ? 'Watch Now' : 'Buy Access'}
+                {price > 0 ? <CreditCard className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+                {price > 0 
+                  ? (isVod ? 'Buy Replay Access' : isPast ? 'Event Ended' : isLive ? 'Watch Now' : 'Buy Access')
+                  : 'Get Free Access'
+                }
               </>
             )}
           </button>
@@ -217,11 +224,15 @@ export default function PremiumPurchaseCard({
               <Lock className="w-3 h-3" />
               SSL Secured
             </div>
-            <div className="w-1 h-1 bg-gray-600 rounded-full"></div>
-            <div className="flex items-center gap-1">
-              <Shield className="w-3 h-3" />
-              Stripe Payments
-            </div>
+            {!isFree && (
+              <>
+                <div className="w-1 h-1 bg-gray-600 rounded-full"></div>
+                <div className="flex items-center gap-1">
+                  <Shield className="w-3 h-3" />
+                  Stripe Payments
+                </div>
+              </>
+            )}
             <div className="w-1 h-1 bg-gray-600 rounded-full"></div>
             <span>🇦🇺 Australian Business</span>
           </div>
