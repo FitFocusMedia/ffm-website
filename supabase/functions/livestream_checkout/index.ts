@@ -84,11 +84,16 @@ serve(async (req) => {
         if (newProfile) userId = newProfile.id
       }
 
-      // Demo mode - create completed order directly
-      if (settings?.demo_mode) {
-        console.log('[Checkout] Demo mode - creating order directly')
-        
-        const purchasePrice = is_vod_purchase && event.vod_price ? event.vod_price : event.price
+      // Calculate price (VOD price for replays, regular price otherwise)
+      const purchasePrice = is_vod_purchase 
+        ? (event.vod_price ?? event.price) 
+        : event.price
+      
+      // Free events ($0) or demo mode - create completed order directly, skip Stripe
+      const isFreeEvent = purchasePrice === 0 || purchasePrice === '0' || purchasePrice === null
+      
+      if (settings?.demo_mode || isFreeEvent) {
+        console.log(`[Checkout] ${isFreeEvent ? 'Free event' : 'Demo mode'} - creating order directly`)
         
         const { data: order, error: orderError } = await supabase
           .from('livestream_orders')
@@ -99,7 +104,7 @@ serve(async (req) => {
             amount: purchasePrice,
             currency: 'AUD',
             status: 'completed',
-            payment_method: 'demo',
+            payment_method: isFreeEvent ? 'free' : 'demo',
             completed_at: new Date().toISOString(),
             buyer_lat,
             buyer_lng,
@@ -136,7 +141,6 @@ serve(async (req) => {
       console.log('[Checkout] Production mode - creating Stripe session')
       
       const baseUrl = 'https://fitfocusmedia.com.au'
-      const purchasePrice = is_vod_purchase && event.vod_price ? event.vod_price : event.price
       const productDescription = is_vod_purchase 
         ? `VOD Replay: ${event.organization} - ${event.title}`
         : `Livestream access: ${event.organization} - ${event.venue}`
