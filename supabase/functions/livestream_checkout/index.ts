@@ -65,6 +65,27 @@ serve(async (req) => {
 
       const normalizedEmail = email.toLowerCase()
 
+      // Check if user already has a completed order for this event
+      const { data: existingOrder } = await supabase
+        .from('livestream_orders')
+        .select('id, email, status, vod_access_granted')
+        .eq('event_id', event_id)
+        .eq('email', normalizedEmail)
+        .eq('status', 'completed')
+        .single()
+
+      if (existingOrder) {
+        console.log(`[Checkout] User already has access: ${normalizedEmail}`)
+        const baseUrl = 'https://fitfocusmedia.com.au'
+        return new Response(
+          JSON.stringify({ 
+            already_purchased: true,
+            redirect: success_url || `${baseUrl}/#/watch/${event_id}?email=${encodeURIComponent(email)}`
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
       // Get or create user profile
       let userId: string | null = null
       const { data: profile } = await supabase

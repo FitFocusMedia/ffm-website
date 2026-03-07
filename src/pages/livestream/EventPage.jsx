@@ -213,7 +213,10 @@ export default function EventPage() {
         throw new Error(data.error || `Checkout failed (${response.status})`)
       }
       
-      if (data.demo && data.redirect) {
+      if (data.already_purchased && data.redirect) {
+        // User already has access - redirect to watch page
+        window.location.href = data.redirect
+      } else if (data.demo && data.redirect) {
         // Demo mode - edge function created order, redirect to watch
         window.location.href = data.redirect
       } else if (data.url) {
