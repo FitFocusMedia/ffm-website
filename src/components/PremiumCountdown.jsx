@@ -3,16 +3,14 @@ import { useState, useEffect, useRef } from 'react'
 /**
  * Premium Flip-Clock Style Countdown Timer
  * Used on event pages to create urgency and anticipation
+ * 
+ * Times are stored as UTC in the database and converted automatically
  */
 export default function PremiumCountdown({ targetDate, onComplete, className = '' }) {
-  const parseAsLocalTime = (dateStr) => {
-    if (!dateStr) return new Date()
-    const stripped = dateStr.replace(/[Z+].*$/, '').replace(/\.000$/, '')
-    return new Date(stripped)
-  }
-
   const calculateTimeLeft = () => {
-    const difference = parseAsLocalTime(targetDate) - new Date()
+    // Parse the UTC date directly - JavaScript handles timezone conversion automatically
+    const targetTime = new Date(targetDate)
+    const difference = targetTime - new Date()
     
     if (difference <= 0) {
       return null

@@ -4,20 +4,17 @@ import { useState, useEffect, useRef } from 'react'
  * Countdown Timer Component
  * Shows days, hours, minutes, seconds until an event
  * Used on event pages to create urgency and anticipation
+ * 
+ * Times are stored as UTC in the database and converted automatically
  */
 export default function CountdownTimer({ targetDate, onComplete, className = '' }) {
-  // Parse datetime as local time (strip any timezone suffix)
-  const parseAsLocalTime = (dateStr) => {
-    if (!dateStr) return new Date()
-    const stripped = dateStr.replace(/[Z+].*$/, '').replace(/\.000$/, '')
-    return new Date(stripped)
-  }
-
   const [timeLeft, setTimeLeft] = useState(calculateTimeLeft())
   const hasCompletedRef = useRef(false) // Prevent firing onComplete multiple times
 
   function calculateTimeLeft() {
-    const difference = parseAsLocalTime(targetDate) - new Date()
+    // Parse the UTC date directly - JavaScript handles timezone conversion automatically
+    const targetTime = new Date(targetDate)
+    const difference = targetTime - new Date()
     
     if (difference <= 0) {
       return null // Event has started/passed

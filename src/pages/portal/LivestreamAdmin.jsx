@@ -805,6 +805,32 @@ export default function LivestreamAdmin() {
               // Keep category (convert empty string to null for cleaner DB)
               if (data.category) cleanData.category = data.category
               
+              // Convert local Brisbane time (AEST, UTC+10) to UTC for database storage
+              // datetime-local inputs give us "2026-03-07T18:00" which we need to interpret as Brisbane time
+              const convertToUTC = (localDatetime) => {
+                if (!localDatetime) return null
+                // Parse as local time, then convert to ISO string (which is UTC)
+                // We need to treat the input as Brisbane time (UTC+10)
+                const brisbaneOffset = 10 * 60 // +10 hours in minutes
+                const date = new Date(localDatetime)
+                // The Date constructor interprets the string as local time (system timezone)
+                // We need to adjust if system isn't Brisbane, but for now assume it is
+                // Actually, to be safe: treat input as UTC+10, convert to UTC
+                const utcDate = new Date(date.getTime() - (brisbaneOffset * 60 * 1000))
+                return utcDate.toISOString()
+              }
+              
+              // Convert timestamps from Brisbane to UTC
+              if (cleanData.start_time && cleanData.start_time !== '') {
+                cleanData.start_time = convertToUTC(cleanData.start_time)
+              }
+              if (cleanData.end_time && cleanData.end_time !== '') {
+                cleanData.end_time = convertToUTC(cleanData.end_time)
+              }
+              if (cleanData.vod_available_until && cleanData.vod_available_until !== '') {
+                cleanData.vod_available_until = convertToUTC(cleanData.vod_available_until)
+              }
+              
               // Convert empty timestamp strings to null (Postgres rejects empty strings for timestamps)
               if (cleanData.start_time === '') cleanData.start_time = null
               if (cleanData.end_time === '') cleanData.end_time = null
@@ -859,13 +885,24 @@ export default function LivestreamAdmin() {
 
 function EventModal({ event: initialEvent, onClose, onSave }) {
   const [event, setEvent] = useState(initialEvent)
+  
+  // Convert UTC datetime to Brisbane local time for datetime-local input
+  const utcToBrisbane = (utcDatetime) => {
+    if (!utcDatetime) return ''
+    const date = new Date(utcDatetime)
+    // Add 10 hours for Brisbane (AEST = UTC+10)
+    const brisbaneDate = new Date(date.getTime() + (10 * 60 * 60 * 1000))
+    // Format as YYYY-MM-DDTHH:MM for datetime-local input
+    return brisbaneDate.toISOString().slice(0, 16)
+  }
+  
   const [formData, setFormData] = useState({
     title: initialEvent?.title || '',
     organization: initialEvent?.organization || '',
     organization_id: initialEvent?.organization_id || null,
     venue: initialEvent?.venue || '',
-    start_time: initialEvent?.start_time?.slice(0, 16) || '',
-    end_time: initialEvent?.end_time?.slice(0, 16) || '',
+    start_time: utcToBrisbane(initialEvent?.start_time),
+    end_time: utcToBrisbane(initialEvent?.end_time),
     price: initialEvent?.price || 29.99,
     description: initialEvent?.description || '',
     category: initialEvent?.category || '',
@@ -876,7 +913,7 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
     vod_asset_id: initialEvent?.vod_asset_id || '',
     vod_playback_id: initialEvent?.vod_playback_id || '',
     vod_price: initialEvent?.vod_price ?? '',
-    vod_available_until: initialEvent?.vod_available_until || '',  // Auto-calculated from end_time
+    vod_available_until: utcToBrisbane(initialEvent?.vod_available_until),  // Auto-calculated from end_time
     status: initialEvent?.status || 'draft',
     mux_playback_id: initialEvent?.mux_playback_id || '',
     mux_stream_key: initialEvent?.mux_stream_key || '',
