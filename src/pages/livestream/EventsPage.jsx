@@ -17,7 +17,9 @@ function CountdownTimer({ targetDate, large = false }) {
   }, [targetDate])
 
   function calculateTimeLeft(date) {
-    const difference = new Date(date) - new Date()
+    // Strip timezone suffix to parse as local time (event times are in AEST)
+    const stripped = String(date).replace(/[Z+].*$/, '').replace(/\.000$/, '')
+    const difference = new Date(stripped) - new Date()
     if (difference <= 0) return null
     
     return {
