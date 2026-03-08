@@ -807,7 +807,7 @@ export default function LivestreamAdmin() {
               if (data.category) cleanData.category = data.category
               
               // Convert local time in selected timezone to UTC for database storage
-              const convertToUTC = (localDatetime, timezone = formData.timezone || 'Australia/Brisbane') => {
+              const convertToUTC = (localDatetime, timezone = data.timezone || 'Australia/Brisbane') => {
                 if (!localDatetime) return null
                 // Parse the datetime-local value and interpret it in the selected timezone
                 // Format: "2026-03-07T18:00"
