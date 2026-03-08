@@ -170,14 +170,23 @@ serve(async (req) => {
 
       console.log(`[MUX Webhook] Stream active: ${streamId}`)
 
-      // Find and update event(s)
+      // Find and update event(s) - but ONLY if they haven't ended yet
       const { data: events } = await supabase
         .from('livestream_events')
-        .select('id, title')
+        .select('id, title, end_time, status')
         .eq('mux_stream_id', streamId)
 
       if (events && events.length > 0) {
         for (const event of events) {
+          // Don't mark as live if event has already ended
+          const eventEnded = event.status === 'ended' || 
+            (event.end_time && new Date(event.end_time) < new Date())
+          
+          if (eventEnded) {
+            console.log(`[MUX Webhook] ⏭️ Skipping "${event.title}" - event has ended, keeping as VOD`)
+            continue
+          }
+          
           await supabase
             .from('livestream_events')
             .update({
