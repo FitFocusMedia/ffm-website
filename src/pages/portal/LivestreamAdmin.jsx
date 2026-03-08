@@ -805,18 +805,37 @@ export default function LivestreamAdmin() {
               // Keep category (convert empty string to null for cleaner DB)
               if (data.category) cleanData.category = data.category
               
-              // Convert local Brisbane time (AEST, UTC+10) to UTC for database storage
-              // datetime-local inputs give us "2026-03-07T18:00" which we need to interpret as Brisbane time
-              const convertToUTC = (localDatetime) => {
+              // Convert local time in selected timezone to UTC for database storage
+              const convertToUTC = (localDatetime, timezone = formData.timezone || 'Australia/Brisbane') => {
                 if (!localDatetime) return null
-                // Parse as local time, then convert to ISO string (which is UTC)
-                // We need to treat the input as Brisbane time (UTC+10)
-                const brisbaneOffset = 10 * 60 // +10 hours in minutes
-                const date = new Date(localDatetime)
-                // The Date constructor interprets the string as local time (system timezone)
-                // We need to adjust if system isn't Brisbane, but for now assume it is
-                // Actually, to be safe: treat input as UTC+10, convert to UTC
-                const utcDate = new Date(date.getTime() - (brisbaneOffset * 60 * 1000))
+                // Parse the datetime-local value and interpret it in the selected timezone
+                // Format: "2026-03-07T18:00"
+                const [datePart, timePart] = localDatetime.split('T')
+                const [year, month, day] = datePart.split('-').map(Number)
+                const [hour, minute] = timePart.split(':').map(Number)
+                
+                // Create a date string with timezone and parse it
+                const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`
+                
+                // Use Intl to get the UTC offset for the selected timezone at this date
+                const formatter = new Intl.DateTimeFormat('en-US', {
+                  timeZone: timezone,
+                  year: 'numeric', month: '2-digit', day: '2-digit',
+                  hour: '2-digit', minute: '2-digit', second: '2-digit',
+                  hour12: false
+                })
+                
+                // Get offset by comparing local interpretation to a known date
+                const testDate = new Date(dateStr)
+                const utcTime = testDate.getTime()
+                const tzParts = formatter.formatToParts(testDate)
+                const tzObj = {}
+                tzParts.forEach(p => tzObj[p.type] = p.value)
+                const tzDate = new Date(`${tzObj.year}-${tzObj.month}-${tzObj.day}T${tzObj.hour}:${tzObj.minute}:${tzObj.second}Z`)
+                const offset = utcTime - tzDate.getTime()
+                
+                // Apply offset to get correct UTC
+                const utcDate = new Date(utcTime - offset)
                 return utcDate.toISOString()
               }
               
@@ -886,15 +905,29 @@ export default function LivestreamAdmin() {
 function EventModal({ event: initialEvent, onClose, onSave }) {
   const [event, setEvent] = useState(initialEvent)
   
-  // Convert UTC datetime to Brisbane local time for datetime-local input
-  const utcToBrisbane = (utcDatetime) => {
+  // Convert UTC datetime to local time for datetime-local input
+  const utcToLocal = (utcDatetime, timezone = 'Australia/Brisbane') => {
     if (!utcDatetime) return ''
     const date = new Date(utcDatetime)
-    // Add 10 hours for Brisbane (AEST = UTC+10)
-    const brisbaneDate = new Date(date.getTime() + (10 * 60 * 60 * 1000))
+    // Format in the specified timezone
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit', 
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    })
+    const parts = formatter.formatToParts(date)
+    const obj = {}
+    parts.forEach(p => obj[p.type] = p.value)
     // Format as YYYY-MM-DDTHH:MM for datetime-local input
-    return brisbaneDate.toISOString().slice(0, 16)
+    return `${obj.year}-${obj.month}-${obj.day}T${obj.hour}:${obj.minute}`
   }
+  
+  // Alias for backward compatibility
+  const utcToBrisbane = (utcDatetime) => utcToLocal(utcDatetime, 'Australia/Brisbane')
   
   const [formData, setFormData] = useState({
     title: initialEvent?.title || '',
@@ -925,7 +958,8 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
     geo_radius_km: initialEvent?.geo_radius_km || 50,
     geo_venue_address: initialEvent?.geo_venue_address || '',
     crew_bypass_token: initialEvent?.crew_bypass_token || null,
-    bypass_created_at: initialEvent?.bypass_created_at || null
+    bypass_created_at: initialEvent?.bypass_created_at || null,
+    timezone: initialEvent?.timezone || 'Australia/Brisbane'
   })
   const [saving, setSaving] = useState(false)
   const [existingEvents, setExistingEvents] = useState([])
@@ -1126,6 +1160,28 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
               className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
               required
             />
+          </div>
+
+          {/* Timezone Selector */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-400 mb-1">Timezone (for entering times)</label>
+            <select
+              value={formData.timezone || 'Australia/Brisbane'}
+              onChange={(e) => setFormData(prev => ({ ...prev, timezone: e.target.value }))}
+              className="w-full md:w-64 px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white"
+            >
+              <option value="Australia/Brisbane">Brisbane (AEST, UTC+10)</option>
+              <option value="Australia/Sydney">Sydney (AEST/AEDT)</option>
+              <option value="Australia/Melbourne">Melbourne (AEST/AEDT)</option>
+              <option value="Australia/Perth">Perth (AWST, UTC+8)</option>
+              <option value="Pacific/Auckland">Auckland (NZST, UTC+12)</option>
+              <option value="Asia/Tokyo">Tokyo (JST, UTC+9)</option>
+              <option value="Asia/Singapore">Singapore (SGT, UTC+8)</option>
+              <option value="Europe/London">London (GMT/BST)</option>
+              <option value="America/New_York">New York (EST/EDT)</option>
+              <option value="America/Los_Angeles">Los Angeles (PST/PDT)</option>
+            </select>
+            <p className="text-xs text-gray-500 mt-1">Times you enter will be interpreted in this timezone</p>
           </div>
 
           <div className="grid md:grid-cols-2 gap-4">
