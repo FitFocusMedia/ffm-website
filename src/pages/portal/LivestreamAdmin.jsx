@@ -799,6 +799,7 @@ export default function LivestreamAdmin() {
                 crew_bypass_token, 
                 bypass_created_at, 
                 geo_venue_address,
+                timezone,  // timezone is only for UI, not stored in DB
                 ...cleanData 
               } = data
               
