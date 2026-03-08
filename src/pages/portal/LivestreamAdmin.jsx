@@ -33,6 +33,12 @@ export default function LivestreamAdmin() {
   const [recordings, setRecordings] = useState([])
   const [loadingRecordings, setLoadingRecordings] = useState(false)
   const [eventFilter, setEventFilter] = useState('all') // all, upcoming, live, ended
+  
+  // Order filtering & sorting
+  const [orderSearch, setOrderSearch] = useState('')
+  const [orderStatusFilter, setOrderStatusFilter] = useState('all')
+  const [orderEventFilter, setOrderEventFilter] = useState('all')
+  const [orderSort, setOrderSort] = useState({ field: 'created_at', direction: 'desc' })
 
   useEffect(() => {
     loadData()
@@ -452,21 +458,110 @@ export default function LivestreamAdmin() {
       )}
 
       {/* Orders Tab */}
-      {activeTab === 'orders' && (
+      {activeTab === 'orders' && (() => {
+        // Filter and sort orders
+        const filteredOrders = orders
+          .filter(o => {
+            if (orderStatusFilter !== 'all' && o.status !== orderStatusFilter) return false
+            if (orderEventFilter !== 'all' && o.event_id !== orderEventFilter) return false
+            if (orderSearch && !o.email.toLowerCase().includes(orderSearch.toLowerCase())) return false
+            return true
+          })
+          .sort((a, b) => {
+            let aVal = a[orderSort.field]
+            let bVal = b[orderSort.field]
+            if (orderSort.field === 'created_at') {
+              aVal = new Date(aVal).getTime()
+              bVal = new Date(bVal).getTime()
+            }
+            if (orderSort.field === 'amount') {
+              aVal = parseFloat(aVal || 0)
+              bVal = parseFloat(bVal || 0)
+            }
+            if (orderSort.field === 'event') {
+              aVal = a.event?.title || ''
+              bVal = b.event?.title || ''
+            }
+            if (orderSort.direction === 'asc') return aVal > bVal ? 1 : -1
+            return aVal < bVal ? 1 : -1
+          })
+
+        const SortHeader = ({ field, children }) => (
+          <th 
+            className="px-4 py-3 text-left text-sm font-medium text-gray-400 cursor-pointer hover:text-white"
+            onClick={() => setOrderSort(prev => ({
+              field,
+              direction: prev.field === field && prev.direction === 'desc' ? 'asc' : 'desc'
+            }))}
+          >
+            <span className="flex items-center gap-1">
+              {children}
+              {orderSort.field === field && (
+                <span className="text-red-500">{orderSort.direction === 'desc' ? '↓' : '↑'}</span>
+              )}
+            </span>
+          </th>
+        )
+
+        return (
         <div className="bg-dark-900 rounded-xl border border-dark-800 overflow-hidden">
-          {/* Orders Header with Export */}
-          {orders.length > 0 && (
-            <div className="flex items-center justify-between px-4 py-3 border-b border-dark-800">
+          {/* Orders Filters */}
+          <div className="p-4 border-b border-dark-800 space-y-3">
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Search */}
+              <input
+                type="text"
+                placeholder="Search by email..."
+                value={orderSearch}
+                onChange={(e) => setOrderSearch(e.target.value)}
+                className="px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white placeholder-gray-500 text-sm w-64"
+              />
+              {/* Status Filter */}
+              <select
+                value={orderStatusFilter}
+                onChange={(e) => setOrderStatusFilter(e.target.value)}
+                className="px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white text-sm"
+              >
+                <option value="all">All Statuses</option>
+                <option value="completed">Completed</option>
+                <option value="pending">Pending</option>
+                <option value="refunded">Refunded</option>
+              </select>
+              {/* Event Filter */}
+              <select
+                value={orderEventFilter}
+                onChange={(e) => setOrderEventFilter(e.target.value)}
+                className="px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white text-sm"
+              >
+                <option value="all">All Events</option>
+                {events.map(e => (
+                  <option key={e.id} value={e.id}>{e.title}</option>
+                ))}
+              </select>
+              {/* Clear Filters */}
+              {(orderSearch || orderStatusFilter !== 'all' || orderEventFilter !== 'all') && (
+                <button
+                  onClick={() => { setOrderSearch(''); setOrderStatusFilter('all'); setOrderEventFilter('all'); }}
+                  className="px-3 py-2 text-sm text-red-500 hover:text-red-400"
+                >
+                  Clear Filters
+                </button>
+              )}
+            </div>
+            {/* Results summary */}
+            <div className="flex items-center justify-between">
               <p className="text-sm text-gray-400">
-                {orders.filter(o => o.status === 'completed').length} completed orders
-                <span className="text-green-500 ml-2">
-                  ${orders.filter(o => o.status === 'completed').reduce((sum, o) => sum + parseFloat(o.amount || 0), 0).toFixed(2)} total
-                </span>
+                Showing {filteredOrders.length} of {orders.length} orders
+                {filteredOrders.filter(o => o.status === 'completed').length > 0 && (
+                  <span className="text-green-500 ml-2">
+                    ${filteredOrders.filter(o => o.status === 'completed').reduce((sum, o) => sum + parseFloat(o.amount || 0), 0).toFixed(2)} total
+                  </span>
+                )}
               </p>
               <button
                 onClick={() => {
                   const headers = ['Order ID', 'Email', 'Event', 'Amount', 'Status', 'Date', 'Payment Method']
-                  const rows = orders.map(o => [
+                  const rows = filteredOrders.map(o => [
                     o.id,
                     o.email,
                     o.event?.title || '',
@@ -490,10 +585,10 @@ export default function LivestreamAdmin() {
                 Export CSV
               </button>
             </div>
-          )}
-          {orders.length === 0 ? (
+          </div>
+          {filteredOrders.length === 0 ? (
             <div className="text-center py-12 text-gray-400">
-              No orders yet.
+              {orders.length === 0 ? 'No orders yet.' : 'No orders match your filters.'}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -501,15 +596,15 @@ export default function LivestreamAdmin() {
                 <thead className="bg-dark-800">
                   <tr>
                     <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Order</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Email</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Event</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Amount</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Status</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Date</th>
+                    <SortHeader field="email">Email</SortHeader>
+                    <SortHeader field="event">Event</SortHeader>
+                    <SortHeader field="amount">Amount</SortHeader>
+                    <SortHeader field="status">Status</SortHeader>
+                    <SortHeader field="created_at">Date</SortHeader>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-dark-800">
-                  {orders.map(order => (
+                  {filteredOrders.map(order => (
                     <tr key={order.id} className="hover:bg-dark-800/50">
                       <td className="px-4 py-3">
                         <code className="text-xs text-gray-400">{order.id.slice(0, 8)}</code>
@@ -536,7 +631,8 @@ export default function LivestreamAdmin() {
             </div>
           )}
         </div>
-      )}
+        )
+      })()}
 
       {/* Analytics Tab */}
       {activeTab === 'analytics' && (
