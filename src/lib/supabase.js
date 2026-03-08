@@ -708,6 +708,7 @@ export async function createLivestreamEvent(eventData) {
  * Update a livestream event
  */
 export async function updateLivestreamEvent(id, updates) {
+  console.log('[DEBUG] updateLivestreamEvent called with:', { id, updates })
   const { data, error } = await supabase
     .from('livestream_events')
     .update({ ...updates, updated_at: new Date().toISOString() })
@@ -715,7 +716,11 @@ export async function updateLivestreamEvent(id, updates) {
     .select()
     .single()
   
-  if (error) throw error
+  if (error) {
+    console.error('[DEBUG] updateLivestreamEvent error:', error)
+    throw error
+  }
+  console.log('[DEBUG] updateLivestreamEvent result:', data)
   return data
 }
 

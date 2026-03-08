@@ -861,7 +861,11 @@ export default function LivestreamAdmin() {
               if (cleanData.price === '' || cleanData.price === undefined) cleanData.price = null
               
               if (editingEvent) {
+                console.log('[DEBUG] Saving event with data:', JSON.stringify(cleanData, null, 2))
+                console.log('[DEBUG] bunny_video_id:', cleanData.bunny_video_id)
+                console.log('[DEBUG] vod_source:', cleanData.vod_source)
                 await updateLivestreamEvent(editingEvent.id, cleanData)
+                console.log('[DEBUG] Save completed successfully')
               } else {
                 // Create new event
                 const newEvent = await createLivestreamEvent(cleanData)
