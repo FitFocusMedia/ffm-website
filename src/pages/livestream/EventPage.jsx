@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { Calendar, MapPin, Clock, AlertTriangle, Navigation, Play, Users, Star, Sparkles, Film } from 'lucide-react'
-import { getLivestreamEvent, getLivestreamSettings } from '../../lib/supabase'
+import { getLivestreamEvent, getLivestreamSettings, getLivestreamOrderByEmail } from '../../lib/supabase'
 import { getDirectImageUrl } from '../../lib/imageUtils'
 import { trackPageView, trackGeoCheck, trackGeoBlocked, trackGeoPassed, trackPurchaseView, trackCheckoutStart } from '../../lib/analytics'
 import { sanitizeEmail, isValidEmail, checkRateLimit } from '../../lib/validation'
@@ -184,6 +184,14 @@ export default function EventPage() {
     trackCheckoutStart(eventId, cleanEmail)
 
     try {
+      // FRONTEND CHECK: See if user already has access (bypasses broken Edge Function .single() bug)
+      const existingOrder = await getLivestreamOrderByEmail(eventId, cleanEmail)
+      if (existingOrder && existingOrder.status === 'completed') {
+        // User already has access - redirect directly to watch page
+        window.location.href = `/#/watch/${eventId}?email=${encodeURIComponent(cleanEmail)}`
+        return
+      }
+
       // Use Supabase edge function (JWT verification disabled)
       const checkoutApiUrl = 'https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/livestream_checkout'
       
