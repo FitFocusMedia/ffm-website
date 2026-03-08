@@ -14,9 +14,19 @@ export default function StreamStatusBadge({ event, onStatusUpdate, compact = fal
   const [liveStreamCount, setLiveStreamCount] = useState(0)
   const [hasStream, setHasStream] = useState(false)
 
+  // Check if event has ended (don't show LIVE for past events)
+  const eventEnded = event?.status === 'ended' || 
+    (event?.end_time && new Date(event.end_time) < new Date())
+
   // Check MUX status on mount and periodically
   useEffect(() => {
     if (!event?.id) return
+    
+    // Don't check MUX status for ended events - they're VOD only
+    if (eventEnded) {
+      setIsLive(false)
+      return
+    }
 
     const checkStatus = async () => {
       try {
@@ -78,7 +88,7 @@ export default function StreamStatusBadge({ event, onStatusUpdate, compact = fal
     // Poll every 30 seconds
     const interval = setInterval(checkStatus, 30000)
     return () => clearInterval(interval)
-  }, [event?.id, event?.is_multi_stream, event?.mux_stream_id])
+  }, [event?.id, event?.is_multi_stream, event?.mux_stream_id, eventEnded])
 
   const manualCheck = async () => {
     setChecking(true)
@@ -125,6 +135,16 @@ export default function StreamStatusBadge({ event, onStatusUpdate, compact = fal
     } finally {
       setChecking(false)
     }
+  }
+
+  // Event has ended - show ended badge, not live
+  if (eventEnded) {
+    return (
+      <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium bg-gray-500/20 text-gray-400 ${compact ? '' : 'mr-2'}`}>
+        <Wifi className="w-3 h-3" />
+        {!compact && 'Ended'}
+      </span>
+    )
   }
 
   // No stream configured at all
