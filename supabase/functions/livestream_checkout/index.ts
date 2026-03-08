@@ -65,16 +65,16 @@ serve(async (req) => {
 
       const normalizedEmail = email.toLowerCase()
 
-      // Check if user already has a completed order for this event
-      const { data: existingOrder } = await supabase
+      // Check if user already has a completed order for this event (use limit(1) instead of single() to handle multiple orders)
+      const { data: existingOrders } = await supabase
         .from('livestream_orders')
         .select('id, email, status, vod_access_granted')
         .eq('event_id', event_id)
         .eq('email', normalizedEmail)
         .eq('status', 'completed')
-        .single()
+        .limit(1)
 
-      if (existingOrder) {
+      if (existingOrders && existingOrders.length > 0) {
         console.log(`[Checkout] User already has access: ${normalizedEmail}`)
         const baseUrl = 'https://fitfocusmedia.com.au'
         return new Response(
