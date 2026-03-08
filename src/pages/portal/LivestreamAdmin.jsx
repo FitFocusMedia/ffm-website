@@ -912,6 +912,8 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
     vod_enabled: initialEvent?.vod_enabled ?? true,  // Default ON for new events
     vod_asset_id: initialEvent?.vod_asset_id || '',
     vod_playback_id: initialEvent?.vod_playback_id || '',
+    bunny_video_id: initialEvent?.bunny_video_id || '',
+    vod_source: initialEvent?.vod_source || 'mux',
     vod_price: initialEvent?.vod_price ?? '',
     vod_available_until: utcToBrisbane(initialEvent?.vod_available_until),  // Auto-calculated from end_time
     status: initialEvent?.status || 'draft',
@@ -1291,6 +1293,78 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
                 VOD assets are automatically created by MUX when the livestream ends. 
                 Live ticket purchasers automatically get VOD access.
               </p>
+              
+              {/* Bunny Stream VOD Source */}
+              <div className="mt-4 p-4 bg-dark-900 rounded-lg border border-dark-700">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-medium text-white flex items-center gap-2">
+                    🐰 Bunny Stream VOD
+                  </h4>
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${
+                    formData.vod_source === 'bunny' 
+                      ? 'bg-orange-500/20 text-orange-400' 
+                      : 'bg-pink-500/20 text-pink-400'
+                  }`}>
+                    {formData.vod_source === 'bunny' ? 'Using Bunny' : 'Using MUX'}
+                  </span>
+                </div>
+                
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-1">Bunny Video ID</label>
+                    <input
+                      type="text"
+                      value={formData.bunny_video_id}
+                      onChange={(e) => setFormData(prev => ({ ...prev, bunny_video_id: e.target.value }))}
+                      className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white font-mono text-sm"
+                      placeholder="e.g., a1b2c3d4-5678-90ab-cdef-1234567890ab"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Find this in Bunny Dashboard → Video Library → Video → Video GUID
+                    </p>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, vod_source: 'bunny' }))}
+                      disabled={!formData.bunny_video_id}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        formData.vod_source === 'bunny'
+                          ? 'bg-orange-600 text-white cursor-default'
+                          : formData.bunny_video_id
+                            ? 'bg-orange-600/20 text-orange-400 hover:bg-orange-600 hover:text-white'
+                            : 'bg-dark-700 text-gray-500 cursor-not-allowed'
+                      }`}
+                    >
+                      {formData.vod_source === 'bunny' ? '✓ Using Bunny' : 'Switch to Bunny'}
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, vod_source: 'mux' }))}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        formData.vod_source === 'mux'
+                          ? 'bg-pink-600 text-white cursor-default'
+                          : 'bg-pink-600/20 text-pink-400 hover:bg-pink-600 hover:text-white'
+                      }`}
+                    >
+                      {formData.vod_source === 'mux' ? '✓ Using MUX' : 'Switch to MUX'}
+                    </button>
+                    
+                    {formData.bunny_video_id && (
+                      <a
+                        href={`https://vz-66967d38-080.b-cdn.net/${formData.bunny_video_id}/playlist.m3u8`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-2 bg-dark-700 hover:bg-dark-600 text-gray-300 rounded-lg text-sm"
+                      >
+                        Preview HLS
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
