@@ -357,6 +357,16 @@ function VideoClipCard({ clip, isSelected, onToggle, isActive, onVisible }) {
         preload="metadata"
       />
 
+      {/* Watermark Overlay */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <img
+          src="https://gonalgubgldgpkcekaxe.supabase.co/storage/v1/object/public/assets/ffm-watermark.png"
+          alt=""
+          className="w-1/2 max-w-[300px] opacity-30 select-none"
+          draggable="false"
+        />
+      </div>
+
       {/* Selection Indicator */}
       {isSelected && (
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none">
