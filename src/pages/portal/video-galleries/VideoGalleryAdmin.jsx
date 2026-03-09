@@ -2,13 +2,15 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { 
   Video, Plus, Trash2, Upload, Eye, EyeOff, Loader2, 
-  CheckCircle2, XCircle, Clock, FolderOpen, DollarSign
+  CheckCircle2, XCircle, Clock, FolderOpen, DollarSign, RefreshCw
 } from 'lucide-react'
+import { supabase } from '../../../lib/supabase'
 
-// Video Gallery API - only available on Tailscale network (requires local FFmpeg processing)
-const isProduction = typeof window !== 'undefined' && window.location.hostname === 'fitfocusmedia.com.au'
-const API_URL = isProduction ? null : 'https://clawdbots-mini.tailcfdc1.ts.net:5231'
-
+/**
+ * VideoGalleryAdmin - Now uses Supabase + Edge Functions (works in production)
+ * - Gallery CRUD via Supabase directly
+ * - Video uploads via Supabase Storage + Edge Function (Bunny Stream)
+ */
 export default function VideoGalleryAdmin() {
   const navigate = useNavigate()
   const [galleries, setGalleries] = useState([])
@@ -25,9 +27,13 @@ export default function VideoGalleryAdmin() {
 
   const loadGalleries = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/video-galleries`)
-      const data = await res.json()
-      setGalleries(data)
+      const { data, error } = await supabase
+        .from('galleries')
+        .select('*, gallery_clips(*)')
+        .order('created_at', { ascending: false })
+      
+      if (error) throw error
+      setGalleries(data || [])
     } catch (err) {
       console.error('Failed to load galleries:', err)
     } finally {
@@ -35,26 +41,87 @@ export default function VideoGalleryAdmin() {
     }
   }
 
+  const loadGalleryDetail = async (galleryId) => {
+    try {
+      // Get gallery with clips
+      const { data: gallery, error: galleryError } = await supabase
+        .from('galleries')
+        .select('*')
+        .eq('id', galleryId)
+        .single()
+      
+      if (galleryError) throw galleryError
+
+      // Get clips with playback URLs via Edge Function
+      const { data: clipsData, error: clipsError } = await supabase.functions.invoke('video-gallery-upload', {
+        body: { action: 'list', gallery_id: galleryId }
+      })
+
+      if (clipsError) throw clipsError
+
+      setSelectedGallery({
+        ...gallery,
+        clips: clipsData || []
+      })
+    } catch (err) {
+      console.error('Failed to load gallery detail:', err)
+    }
+  }
+
   const createGallery = async (data) => {
     try {
-      const res = await fetch(`${API_URL}/api/video-galleries`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      })
-      const gallery = await res.json()
-      setGalleries([gallery, ...galleries])
+      // Generate slug from title
+      const slug = data.title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '')
+      
+      const { data: gallery, error } = await supabase
+        .from('galleries')
+        .insert({
+          title: data.title,
+          description: data.description,
+          slug,
+          price_per_video: data.price_per_clip,
+          package_enabled: data.package_enabled,
+          package_price: data.package_price,
+          status: 'draft'
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+      
+      setGalleries([{ ...gallery, gallery_clips: [] }, ...galleries])
       setShowCreateModal(false)
-      setSelectedGallery(gallery)
+      setSelectedGallery({ ...gallery, clips: [] })
     } catch (err) {
       console.error('Failed to create gallery:', err)
+      alert('Failed to create gallery: ' + err.message)
     }
   }
 
   const deleteGallery = async (id) => {
     if (!confirm('Delete this gallery and all its videos?')) return
     try {
-      await fetch(`${API_URL}/api/video-galleries/${id}`, { method: 'DELETE' })
+      // Delete all clips first via Edge Function
+      const gallery = galleries.find(g => g.id === id)
+      if (gallery?.gallery_clips) {
+        for (const clip of gallery.gallery_clips) {
+          await supabase.functions.invoke('video-gallery-upload', {
+            body: { action: 'delete', clip_id: clip.id }
+          })
+        }
+      }
+
+      // Delete gallery
+      const { error } = await supabase
+        .from('galleries')
+        .delete()
+        .eq('id', id)
+      
+      if (error) throw error
+      
       setGalleries(galleries.filter(g => g.id !== id))
       if (selectedGallery?.id === id) setSelectedGallery(null)
     } catch (err) {
@@ -64,14 +131,21 @@ export default function VideoGalleryAdmin() {
 
   const togglePublish = async (gallery) => {
     try {
-      const res = await fetch(`${API_URL}/api/video-galleries/${gallery.id}/publish`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ publish: gallery.status !== 'published' })
-      })
-      const updated = await res.json()
-      setGalleries(galleries.map(g => g.id === updated.id ? updated : g))
-      if (selectedGallery?.id === updated.id) setSelectedGallery(updated)
+      const newStatus = gallery.status === 'published' ? 'draft' : 'published'
+      
+      const { data: updated, error } = await supabase
+        .from('galleries')
+        .update({ status: newStatus })
+        .eq('id', gallery.id)
+        .select()
+        .single()
+      
+      if (error) throw error
+      
+      setGalleries(galleries.map(g => g.id === updated.id ? { ...g, status: updated.status } : g))
+      if (selectedGallery?.id === updated.id) {
+        setSelectedGallery({ ...selectedGallery, status: updated.status })
+      }
     } catch (err) {
       console.error('Failed to toggle publish:', err)
     }
@@ -81,49 +155,103 @@ export default function VideoGalleryAdmin() {
     setUploading(true)
     setUploadProgress({ current: 0, total: files.length, filename: '' })
     
-    const formData = new FormData()
-    for (const file of files) {
-      formData.append('videos', file)
-    }
-    formData.append('category', category)
+    const results = { processed: 0, failed: 0, errors: [] }
     
-    try {
-      setUploadProgress({ current: 0, total: files.length, filename: 'Uploading...' })
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      setUploadProgress({ current: i + 1, total: files.length, filename: file.name })
       
-      const res = await fetch(`${API_URL}/api/video-galleries/${galleryId}/clips`, {
-        method: 'POST',
-        body: formData
-      })
-      
-      const result = await res.json()
-      
-      // Refresh gallery
-      const galleryRes = await fetch(`${API_URL}/api/video-galleries/${galleryId}`)
-      const updatedGallery = await galleryRes.json()
-      setSelectedGallery(updatedGallery)
-      
-      if (result.errors?.length > 0) {
-        alert(`Processed ${result.processed} videos. ${result.failed} failed:\n${result.errors.map(e => e.filename).join('\n')}`)
+      try {
+        // Step 1: Upload to Supabase Storage
+        const filePath = `${galleryId}/${Date.now()}-${file.name}`
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('video-clips')
+          .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: false
+          })
+        
+        if (uploadError) throw uploadError
+
+        // Step 2: Get public URL
+        const { data: urlData } = supabase.storage
+          .from('video-clips')
+          .getPublicUrl(filePath)
+
+        // Step 3: Call Edge Function to process with Bunny
+        const { data, error } = await supabase.functions.invoke('video-gallery-upload', {
+          body: {
+            action: 'create',
+            gallery_id: galleryId,
+            video_url: urlData.publicUrl,
+            filename: file.name,
+            file_size: file.size,
+            category
+          }
+        })
+
+        if (error) throw error
+        
+        results.processed++
+      } catch (err) {
+        console.error(`Failed to upload ${file.name}:`, err)
+        results.failed++
+        results.errors.push({ filename: file.name, error: err.message })
       }
-    } catch (err) {
-      console.error('Upload failed:', err)
-      alert('Upload failed: ' + err.message)
-    } finally {
-      setUploading(false)
-      setUploadProgress({ current: 0, total: 0, filename: '' })
+    }
+    
+    // Refresh gallery
+    await loadGalleryDetail(galleryId)
+    
+    setUploading(false)
+    setUploadProgress({ current: 0, total: 0, filename: '' })
+    
+    if (results.errors.length > 0) {
+      alert(`Uploaded ${results.processed} videos. ${results.failed} failed:\n${results.errors.map(e => e.filename).join('\n')}`)
     }
   }
 
   const deleteClip = async (galleryId, clipId) => {
     if (!confirm('Delete this video clip?')) return
     try {
-      await fetch(`${API_URL}/api/video-galleries/${galleryId}/clips/${clipId}`, { method: 'DELETE' })
+      const { error } = await supabase.functions.invoke('video-gallery-upload', {
+        body: { action: 'delete', clip_id: clipId }
+      })
+      
+      if (error) throw error
+      
       setSelectedGallery({
         ...selectedGallery,
         clips: selectedGallery.clips.filter(c => c.id !== clipId)
       })
     } catch (err) {
       console.error('Failed to delete clip:', err)
+    }
+  }
+
+  const checkClipStatus = async (clipId) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('video-gallery-upload', {
+        body: { action: 'status', clip_id: clipId }
+      })
+      
+      if (error) throw error
+      
+      // Update clip in state
+      if (selectedGallery) {
+        setSelectedGallery({
+          ...selectedGallery,
+          clips: selectedGallery.clips.map(c => 
+            c.id === clipId 
+              ? { ...c, processing_status: data.status === 'completed' ? 'completed' : c.processing_status }
+              : c
+          )
+        })
+      }
+      
+      return data
+    } catch (err) {
+      console.error('Failed to check clip status:', err)
     }
   }
 
@@ -166,7 +294,7 @@ export default function VideoGalleryAdmin() {
                 {galleries.map(gallery => (
                   <div
                     key={gallery.id}
-                    onClick={() => setSelectedGallery(gallery)}
+                    onClick={() => loadGalleryDetail(gallery.id)}
                     className={`p-3 rounded-lg cursor-pointer transition ${
                       selectedGallery?.id === gallery.id
                         ? 'bg-red-600/20 border border-red-500'
@@ -184,7 +312,7 @@ export default function VideoGalleryAdmin() {
                       </span>
                     </div>
                     <div className="text-sm text-gray-400 mt-1">
-                      {gallery.video_clips?.length || 0} clips • ${(gallery.price_per_clip / 100).toFixed(2)} each
+                      {gallery.gallery_clips?.length || 0} clips • ${((gallery.price_per_video || 1500) / 100).toFixed(2)} each
                     </div>
                   </div>
                 ))}
@@ -202,6 +330,7 @@ export default function VideoGalleryAdmin() {
               onDelete={() => deleteGallery(selectedGallery.id)}
               onTogglePublish={() => togglePublish(selectedGallery)}
               onDeleteClip={(clipId) => deleteClip(selectedGallery.id, clipId)}
+              onCheckStatus={checkClipStatus}
               uploading={uploading}
               uploadProgress={uploadProgress}
               fileInputRef={fileInputRef}
@@ -226,7 +355,7 @@ export default function VideoGalleryAdmin() {
   )
 }
 
-function GalleryDetail({ gallery, onUpload, onDelete, onTogglePublish, onDeleteClip, uploading, uploadProgress, fileInputRef }) {
+function GalleryDetail({ gallery, onUpload, onDelete, onTogglePublish, onDeleteClip, onCheckStatus, uploading, uploadProgress, fileInputRef }) {
   const [category, setCategory] = useState('Main')
   const categories = [...new Set(gallery.clips?.map(c => c.category) || ['Main'])]
   if (!categories.includes('Main')) categories.unshift('Main')
@@ -270,7 +399,7 @@ function GalleryDetail({ gallery, onUpload, onDelete, onTogglePublish, onDeleteC
           <div className="flex items-center gap-4 mt-2 text-sm text-gray-400">
             <span className="flex items-center gap-1">
               <DollarSign className="w-4 h-4" />
-              ${(gallery.price_per_clip / 100).toFixed(2)} per clip
+              ${((gallery.price_per_video || 1500) / 100).toFixed(2)} per clip
             </span>
             {gallery.package_enabled && (
               <span>Package: ${(gallery.package_price / 100).toFixed(2)}</span>
@@ -336,10 +465,8 @@ function GalleryDetail({ gallery, onUpload, onDelete, onTogglePublish, onDeleteC
         {uploading ? (
           <div>
             <Loader2 className="w-12 h-12 mx-auto mb-4 animate-spin text-yellow-500" />
-            <p className="text-lg font-medium">Processing videos...</p>
-            <p className="text-gray-400 mt-2">
-              This may take a while for large files (watermarking + compression)
-            </p>
+            <p className="text-lg font-medium">Uploading {uploadProgress.current} of {uploadProgress.total}</p>
+            <p className="text-gray-400 mt-2">{uploadProgress.filename}</p>
           </div>
         ) : (
           <>
@@ -378,9 +505,9 @@ function GalleryDetail({ gallery, onUpload, onDelete, onTogglePublish, onDeleteC
             {gallery.clips.map(clip => (
               <div key={clip.id} className="bg-gray-700 rounded-lg overflow-hidden group">
                 <div className="aspect-video bg-gray-800 relative">
-                  {clip.thumbnail_path ? (
+                  {clip.thumbnail_url ? (
                     <img
-                      src={clip.thumbnail_url || `${API_URL}/thumb/${clip.id}`}
+                      src={clip.thumbnail_url}
                       alt={clip.filename}
                       className="w-full h-full object-cover"
                     />
@@ -391,8 +518,22 @@ function GalleryDetail({ gallery, onUpload, onDelete, onTogglePublish, onDeleteC
                   )}
                   
                   {/* Status badge */}
-                  <div className="absolute top-2 right-2">
+                  <div className="absolute top-2 right-2 flex gap-1">
                     {getStatusIcon(clip.processing_status)}
+                    {clip.processing_status === 'processing' && (
+                      <button
+                        onClick={() => onCheckStatus(clip.id)}
+                        className="p-1 bg-gray-800 rounded"
+                        title="Check status"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                  
+                  {/* Source badge */}
+                  <div className="absolute top-2 left-2 text-xs px-1.5 py-0.5 rounded bg-black/70">
+                    {clip.video_source === 'bunny' ? '🐰' : clip.mux_playback_id ? 'MUX' : '?'}
                   </div>
                   
                   {/* Duration */}
@@ -405,7 +546,7 @@ function GalleryDetail({ gallery, onUpload, onDelete, onTogglePublish, onDeleteC
                   {/* Delete button */}
                   <button
                     onClick={() => onDeleteClip(clip.id)}
-                    className="absolute top-2 left-2 p-1 bg-red-600 rounded opacity-0 group-hover:opacity-100 transition"
+                    className="absolute bottom-2 left-2 p-1 bg-red-600 rounded opacity-0 group-hover:opacity-100 transition"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -416,7 +557,7 @@ function GalleryDetail({ gallery, onUpload, onDelete, onTogglePublish, onDeleteC
                     {clip.title || clip.filename}
                   </p>
                   <p className="text-xs text-gray-400">
-                    {clip.category} • {clip.file_size ? `${(clip.file_size / 1024 / 1024).toFixed(1)} MB` : 'Processing...'}
+                    {clip.category || 'Main'} • {clip.file_size ? `${(clip.file_size / 1024 / 1024).toFixed(1)} MB` : 'Processing...'}
                   </p>
                 </div>
               </div>
