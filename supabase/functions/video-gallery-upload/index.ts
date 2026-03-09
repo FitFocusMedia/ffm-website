@@ -28,7 +28,7 @@ serve(async (req) => {
   const muxAuth = btoa(`${MUX_TOKEN_ID}:${MUX_TOKEN_SECRET}`)
 
   try {
-    const { action, gallery_id, video_url, filename, file_size, category, clip_id, bunny_video_id } = await req.json()
+    const { action, gallery_id, video_url, original_path, filename, file_size, category, clip_id, bunny_video_id } = await req.json()
 
     // ========== CREATE: Upload video to Bunny Stream (NEW) ========== 
     if (action === 'create') {
@@ -101,6 +101,7 @@ serve(async (req) => {
           filename,
           file_size: file_size || 0,
           category: category || 'Main',
+          original_path: original_path || null,
           bunny_video_id: bunnyVideo.guid,
           bunny_library_id: BUNNY_LIBRARY_ID,
           video_source: 'bunny',
@@ -276,13 +277,6 @@ serve(async (req) => {
         await supabase.storage
           .from('galleries')
           .remove([clip.original_path])
-      }
-      
-      // Also try to delete the uploaded clip file if stored
-      if (clip?.file_path) {
-        await supabase.storage
-          .from('galleries')
-          .remove([clip.file_path])
       }
 
       // Delete DB record

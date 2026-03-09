@@ -184,6 +184,7 @@ export default function VideoGalleryAdmin() {
             action: 'create',
             gallery_id: galleryId,
             video_url: urlData.publicUrl,
+            original_path: filePath,
             filename: file.name,
             file_size: file.size,
             category
