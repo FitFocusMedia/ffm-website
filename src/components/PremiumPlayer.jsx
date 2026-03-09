@@ -218,13 +218,13 @@ export default function PremiumPlayer({
 
   // For Bunny: use their iframe embed player which has proper controls
   if (isBunnySource) {
-    const embedUrl = `https://iframe.mediadelivery.net/embed/${bunnyLibraryId || '612038'}/${bunnyVideoId}?autoplay=true&preload=true`
+    const embedUrl = `https://iframe.mediadelivery.net/embed/${bunnyLibraryId || '612038'}/${bunnyVideoId}?autoplay=true&preload=true&responsive=true`
     return (
       <div className={`relative bg-black ${className}`}>
         <iframe
           src={embedUrl}
           className="w-full aspect-video"
-          loading="lazy"
+          loading="eager"
           allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture"
           allowFullScreen
         />

@@ -1031,12 +1031,12 @@ export default function GalleryPage() {
                     ) : null}
                   </Suspense>
                   
-                  {/* Watermark Overlay - z-20 ensures it's above video player */}
+                  {/* Watermark Overlay - z-20 ensures it's above video player, 100% opacity, fills player */}
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
                     <img
                       src="https://gonalgubgldgpkcekaxe.supabase.co/storage/v1/object/public/assets/ffm-watermark.png"
                       alt=""
-                      className="w-1/2 max-w-[300px] opacity-40 select-none"
+                      className="w-full h-full object-contain select-none"
                       draggable="false"
                     />
                   </div>
