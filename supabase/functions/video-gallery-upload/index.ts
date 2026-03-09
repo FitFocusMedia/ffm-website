@@ -28,7 +28,7 @@ serve(async (req) => {
   const muxAuth = btoa(`${MUX_TOKEN_ID}:${MUX_TOKEN_SECRET}`)
 
   try {
-    const { action, gallery_id, video_url, original_path, filename, file_size, category, clip_id, bunny_video_id } = await req.json()
+    const { action, gallery_id, video_url, original_path, filename, file_size, category, category_id, clip_id, bunny_video_id } = await req.json()
 
     // ========== CREATE: Upload video to Bunny Stream (NEW) ========== 
     if (action === 'create') {
@@ -101,6 +101,7 @@ serve(async (req) => {
           filename,
           file_size: file_size || 0,
           category: category || 'Main',
+          category_id: category_id || null,
           original_path: original_path || null,
           bunny_video_id: bunnyVideo.guid,
           bunny_library_id: BUNNY_LIBRARY_ID,
