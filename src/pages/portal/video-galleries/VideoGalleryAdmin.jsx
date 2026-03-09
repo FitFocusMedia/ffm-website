@@ -53,7 +53,7 @@ export default function VideoGalleryAdmin() {
       if (galleryError) throw galleryError
 
       // Get clips with playback URLs via Edge Function
-      const { data: clipsData, error: clipsError } = await supabase.functions.invoke('video-gallery-upload', {
+      const { data: clipsData, error: clipsError } = await supabase.functions.invoke('gallery-video-upload', {
         body: { action: 'list', gallery_id: galleryId }
       })
 
@@ -108,7 +108,7 @@ export default function VideoGalleryAdmin() {
       const gallery = galleries.find(g => g.id === id)
       if (gallery?.gallery_clips) {
         for (const clip of gallery.gallery_clips) {
-          await supabase.functions.invoke('video-gallery-upload', {
+          await supabase.functions.invoke('gallery-video-upload', {
             body: { action: 'delete', clip_id: clip.id }
           })
         }
@@ -179,7 +179,7 @@ export default function VideoGalleryAdmin() {
           .getPublicUrl(filePath)
 
         // Step 3: Call Edge Function to process with Bunny
-        const { data, error } = await supabase.functions.invoke('video-gallery-upload', {
+        const { data, error } = await supabase.functions.invoke('gallery-video-upload', {
           body: {
             action: 'create',
             gallery_id: galleryId,
@@ -215,7 +215,7 @@ export default function VideoGalleryAdmin() {
   const deleteClip = async (galleryId, clipId) => {
     if (!confirm('Delete this video clip?')) return
     try {
-      const { error } = await supabase.functions.invoke('video-gallery-upload', {
+      const { error } = await supabase.functions.invoke('gallery-video-upload', {
         body: { action: 'delete', clip_id: clipId }
       })
       
@@ -232,7 +232,7 @@ export default function VideoGalleryAdmin() {
 
   const checkClipStatus = async (clipId) => {
     try {
-      const { data, error } = await supabase.functions.invoke('video-gallery-upload', {
+      const { data, error } = await supabase.functions.invoke('gallery-video-upload', {
         body: { action: 'status', clip_id: clipId }
       })
       
