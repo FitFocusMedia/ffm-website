@@ -277,6 +277,13 @@ serve(async (req) => {
           .from('galleries')
           .remove([clip.original_path])
       }
+      
+      // Also try to delete the uploaded clip file if stored
+      if (clip?.file_path) {
+        await supabase.storage
+          .from('galleries')
+          .remove([clip.file_path])
+      }
 
       // Delete DB record
       await supabase

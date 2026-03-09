@@ -163,9 +163,9 @@ export default function VideoGalleryAdmin() {
       
       try {
         // Step 1: Upload to Supabase Storage
-        const filePath = `${galleryId}/${Date.now()}-${file.name}`
+        const filePath = `clips/${galleryId}/${Date.now()}-${file.name}`
         const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('video-clips')
+          .from('galleries')
           .upload(filePath, file, {
             cacheControl: '3600',
             upsert: false
@@ -175,7 +175,7 @@ export default function VideoGalleryAdmin() {
 
         // Step 2: Get public URL
         const { data: urlData } = supabase.storage
-          .from('video-clips')
+          .from('galleries')
           .getPublicUrl(filePath)
 
         // Step 3: Call Edge Function to process with Bunny
