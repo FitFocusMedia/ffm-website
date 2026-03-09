@@ -1875,7 +1875,7 @@ function GalleryEditor({ gallery, organization, onBack }) {
                       <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center">
                         <Loader2 className="w-8 h-8 text-blue-400 animate-spin mb-2" />
                         <span className="text-white text-xs font-medium">Processing...</span>
-                        <span className="text-gray-400 text-xs mt-1">MUX is adding watermark</span>
+                        <span className="text-gray-400 text-xs mt-1">Processing video</span>
                       </div>
                     )}
                     {clip.processing_status === 'failed' && (
