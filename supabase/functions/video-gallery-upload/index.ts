@@ -1,5 +1,5 @@
-// FFM Gallery Video Upload - Bunny Stream Version
-// Replaces MUX with Bunny Stream for video hosting
+// FFM Gallery Video Upload - Hybrid MUX + Bunny Stream Version
+// Existing MUX videos keep working, new uploads go to Bunny
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -8,9 +8,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Bunny Stream config (new uploads)
 const BUNNY_API_KEY = Deno.env.get('BUNNY_API_KEY') || 'f1c59999-9148-4c31-ac37db440e51-c5b7-4019'
 const BUNNY_LIBRARY_ID = Deno.env.get('BUNNY_LIBRARY_ID') || '612039'
 const BUNNY_CDN_HOSTNAME = 'vz-7668c0c5-24e.b-cdn.net'
+
+// MUX config (legacy videos)
+const MUX_TOKEN_ID = Deno.env.get('MUX_TOKEN_ID')!
+const MUX_TOKEN_SECRET = Deno.env.get('MUX_TOKEN_SECRET')!
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -20,11 +25,12 @@ serve(async (req) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!
   const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const supabase = createClient(supabaseUrl, supabaseKey)
+  const muxAuth = btoa(`${MUX_TOKEN_ID}:${MUX_TOKEN_SECRET}`)
 
   try {
     const { action, gallery_id, video_url, filename, file_size, category, clip_id, bunny_video_id } = await req.json()
 
-    // ========== CREATE: Upload video to Bunny Stream ========== 
+    // ========== CREATE: Upload video to Bunny Stream (NEW) ========== 
     if (action === 'create') {
       if (!gallery_id || !video_url || !filename) {
         throw new Error('Missing required fields: gallery_id, video_url, filename')
@@ -47,8 +53,7 @@ serve(async (req) => {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            title: filename,
-            collectionId: gallery_id // Use gallery_id as collection for organization
+            title: filename
           })
         }
       )
@@ -120,65 +125,7 @@ serve(async (req) => {
       })
     }
 
-    // ========== LINK: Link existing Bunny video to clip ========== 
-    if (action === 'link') {
-      if (!gallery_id || !bunny_video_id || !filename) {
-        throw new Error('Missing required fields: gallery_id, bunny_video_id, filename')
-      }
-
-      // Verify video exists in Bunny
-      const bunnyRes = await fetch(
-        `https://video.bunnycdn.com/library/${BUNNY_LIBRARY_ID}/videos/${bunny_video_id}`,
-        {
-          headers: {
-            'AccessKey': BUNNY_API_KEY,
-            'Accept': 'application/json'
-          }
-        }
-      )
-
-      if (!bunnyRes.ok) {
-        throw new Error('Bunny video not found')
-      }
-
-      const bunnyVideo = await bunnyRes.json()
-
-      // Get gallery info for pricing
-      const { data: gallery } = await supabase
-        .from('galleries')
-        .select('price_per_video')
-        .eq('id', gallery_id)
-        .single()
-
-      // Insert into gallery_clips table
-      const { data: clip, error: dbError } = await supabase
-        .from('gallery_clips')
-        .insert({
-          gallery_id,
-          filename,
-          bunny_video_id: bunny_video_id,
-          bunny_library_id: BUNNY_LIBRARY_ID,
-          video_source: 'bunny',
-          processing_status: bunnyVideo.status === 4 ? 'completed' : 'processing',
-          duration_seconds: bunnyVideo.length || null,
-          thumbnail_url: `https://${BUNNY_CDN_HOSTNAME}/${bunny_video_id}/thumbnail.jpg`,
-          price: gallery?.price_per_video || 1500
-        })
-        .select()
-        .single()
-
-      if (dbError) throw dbError
-
-      return new Response(JSON.stringify({
-        success: true,
-        clip,
-        playback_url: `https://${BUNNY_CDN_HOSTNAME}/${bunny_video_id}/playlist.m3u8`
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
-
-    // ========== STATUS: Check Bunny encoding status ========== 
+    // ========== STATUS: Check encoding status (handles both MUX and Bunny) ========== 
     if (action === 'status' && clip_id) {
       const { data: clip } = await supabase
         .from('gallery_clips')
@@ -186,79 +133,140 @@ serve(async (req) => {
         .eq('id', clip_id)
         .single()
 
-      if (!clip?.bunny_video_id) {
-        throw new Error('Clip not found or no Bunny video')
+      if (!clip) {
+        throw new Error('Clip not found')
       }
 
-      const bunnyRes = await fetch(
-        `https://video.bunnycdn.com/library/${clip.bunny_library_id || BUNNY_LIBRARY_ID}/videos/${clip.bunny_video_id}`,
-        {
-          headers: { 'AccessKey': BUNNY_API_KEY }
+      // Check if it's a Bunny video
+      if (clip.video_source === 'bunny' && clip.bunny_video_id) {
+        const bunnyRes = await fetch(
+          `https://video.bunnycdn.com/library/${clip.bunny_library_id || BUNNY_LIBRARY_ID}/videos/${clip.bunny_video_id}`,
+          {
+            headers: { 'AccessKey': BUNNY_API_KEY }
+          }
+        )
+
+        if (!bunnyRes.ok) {
+          throw new Error('Failed to fetch Bunny video status')
         }
-      )
 
-      if (!bunnyRes.ok) {
-        throw new Error('Failed to fetch Bunny video status')
+        const video = await bunnyRes.json()
+
+        const statusMap: Record<number, string> = {
+          0: 'created',
+          1: 'uploaded',
+          2: 'processing',
+          3: 'transcoding',
+          4: 'completed',
+          5: 'failed'
+        }
+
+        const newStatus = statusMap[video.status] || 'processing'
+
+        if (video.status === 4 && clip.processing_status !== 'completed') {
+          await supabase
+            .from('gallery_clips')
+            .update({
+              processing_status: 'completed',
+              duration_seconds: video.length,
+              thumbnail_url: `https://${BUNNY_CDN_HOSTNAME}/${video.guid}/thumbnail.jpg`
+            })
+            .eq('id', clip_id)
+        } else if (video.status === 5 && clip.processing_status !== 'failed') {
+          await supabase
+            .from('gallery_clips')
+            .update({ processing_status: 'failed' })
+            .eq('id', clip_id)
+        }
+
+        return new Response(JSON.stringify({
+          source: 'bunny',
+          status: newStatus,
+          encodeProgress: video.encodeProgress || 0,
+          isReady: video.status === 4,
+          duration: video.length,
+          playback_url: video.status === 4 ? `https://${BUNNY_CDN_HOSTNAME}/${video.guid}/playlist.m3u8` : null,
+          thumbnail_url: video.status === 4 ? `https://${BUNNY_CDN_HOSTNAME}/${video.guid}/thumbnail.jpg` : null
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
       }
 
-      const video = await bunnyRes.json()
+      // Legacy MUX video
+      if (clip.mux_asset_id) {
+        const muxResponse = await fetch(
+          `https://api.mux.com/video/v1/assets/${clip.mux_asset_id}`,
+          {
+            headers: { 'Authorization': `Basic ${muxAuth}` }
+          }
+        )
 
-      // Bunny status codes: 0=created, 1=uploaded, 2=processing, 3=transcoding, 4=finished, 5=error
-      const statusMap: Record<number, string> = {
-        0: 'created',
-        1: 'uploaded',
-        2: 'processing',
-        3: 'transcoding',
-        4: 'completed',
-        5: 'failed'
+        if (!muxResponse.ok) {
+          throw new Error('Failed to fetch MUX asset status')
+        }
+
+        const muxData = await muxResponse.json()
+        const asset = muxData.data
+
+        if (asset.status === 'ready' && clip.processing_status !== 'completed') {
+          await supabase
+            .from('gallery_clips')
+            .update({
+              processing_status: 'completed',
+              mux_playback_id: asset.playback_ids?.[0]?.id,
+              duration_seconds: asset.duration,
+              thumbnail_url: `https://image.mux.com/${asset.playback_ids?.[0]?.id}/thumbnail.jpg`
+            })
+            .eq('id', clip_id)
+        } else if (asset.status === 'errored') {
+          await supabase
+            .from('gallery_clips')
+            .update({ processing_status: 'failed' })
+            .eq('id', clip_id)
+        }
+
+        return new Response(JSON.stringify({
+          source: 'mux',
+          status: asset.status,
+          playback_id: asset.playback_ids?.[0]?.id,
+          duration: asset.duration,
+          thumbnail_url: asset.playback_ids?.[0]?.id 
+            ? `https://image.mux.com/${asset.playback_ids[0].id}/thumbnail.jpg` 
+            : null
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
       }
 
-      const newStatus = statusMap[video.status] || 'processing'
-
-      // Update clip if status changed
-      if (video.status === 4 && clip.processing_status !== 'completed') {
-        await supabase
-          .from('gallery_clips')
-          .update({
-            processing_status: 'completed',
-            duration_seconds: video.length,
-            thumbnail_url: `https://${BUNNY_CDN_HOSTNAME}/${video.guid}/thumbnail.jpg`
-          })
-          .eq('id', clip_id)
-      } else if (video.status === 5 && clip.processing_status !== 'failed') {
-        await supabase
-          .from('gallery_clips')
-          .update({ processing_status: 'failed' })
-          .eq('id', clip_id)
-      }
-
-      return new Response(JSON.stringify({
-        status: newStatus,
-        encodeProgress: video.encodeProgress || 0,
-        isReady: video.status === 4,
-        duration: video.length,
-        playback_url: video.status === 4 ? `https://${BUNNY_CDN_HOSTNAME}/${video.guid}/playlist.m3u8` : null,
-        thumbnail_url: video.status === 4 ? `https://${BUNNY_CDN_HOSTNAME}/${video.guid}/thumbnail.jpg` : null
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
+      throw new Error('Clip has no video source')
     }
 
-    // ========== DELETE: Remove from Bunny and DB ========== 
+    // ========== DELETE: Remove from Bunny/MUX and DB ========== 
     if (action === 'delete' && clip_id) {
       const { data: clip } = await supabase
         .from('gallery_clips')
-        .select('bunny_video_id, bunny_library_id, original_path')
+        .select('bunny_video_id, bunny_library_id, mux_asset_id, original_path, video_source')
         .eq('id', clip_id)
         .single()
 
-      // Delete from Bunny
+      // Delete from Bunny if applicable
       if (clip?.bunny_video_id) {
         await fetch(
           `https://video.bunnycdn.com/library/${clip.bunny_library_id || BUNNY_LIBRARY_ID}/videos/${clip.bunny_video_id}`,
           {
             method: 'DELETE',
             headers: { 'AccessKey': BUNNY_API_KEY }
+          }
+        )
+      }
+
+      // Delete from MUX if applicable
+      if (clip?.mux_asset_id) {
+        await fetch(
+          `https://api.mux.com/video/v1/assets/${clip.mux_asset_id}`,
+          {
+            method: 'DELETE',
+            headers: { 'Authorization': `Basic ${muxAuth}` }
           }
         )
       }
@@ -281,7 +289,7 @@ serve(async (req) => {
       })
     }
 
-    // ========== LIST: Get clips for a gallery ========== 
+    // ========== LIST: Get clips for a gallery (handles both sources) ========== 
     if (action === 'list' && gallery_id) {
       const { data: clips, error } = await supabase
         .from('gallery_clips')
@@ -291,13 +299,22 @@ serve(async (req) => {
 
       if (error) throw error
 
-      // Enrich with Bunny playback URLs
+      // Enrich with playback URLs based on source
       const enrichedClips = (clips || []).map(clip => {
+        // Bunny videos
         if (clip.video_source === 'bunny' && clip.bunny_video_id) {
           return {
             ...clip,
             playback_url: `https://${BUNNY_CDN_HOSTNAME}/${clip.bunny_video_id}/playlist.m3u8`,
             thumbnail_url: clip.thumbnail_url || `https://${BUNNY_CDN_HOSTNAME}/${clip.bunny_video_id}/thumbnail.jpg`
+          }
+        }
+        // MUX videos (legacy)
+        if (clip.mux_playback_id) {
+          return {
+            ...clip,
+            playback_url: `https://stream.mux.com/${clip.mux_playback_id}.m3u8`,
+            thumbnail_url: clip.thumbnail_url || `https://image.mux.com/${clip.mux_playback_id}/thumbnail.jpg`
           }
         }
         return clip
@@ -310,11 +327,8 @@ serve(async (req) => {
 
     // ========== BUNNY-VIDEOS: List all videos in Bunny library ========== 
     if (action === 'bunny-videos') {
-      const page = 1
-      const perPage = 100
-
       const response = await fetch(
-        `https://video.bunnycdn.com/library/${BUNNY_LIBRARY_ID}/videos?page=${page}&itemsPerPage=${perPage}`,
+        `https://video.bunnycdn.com/library/${BUNNY_LIBRARY_ID}/videos?page=1&itemsPerPage=100`,
         {
           headers: {
             'AccessKey': BUNNY_API_KEY,
