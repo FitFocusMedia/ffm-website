@@ -272,14 +272,29 @@ export default function GalleryPage() {
         }
         
         if (allClips.length > 0) {
-          // Add MUX thumbnail URLs and prices
-          const processedClips = allClips.map(c => ({
-            ...c,
-            price: c.price || galleryData.price_per_video || 1500,
-            thumbnail_url: c.mux_playback_id 
-              ? `https://image.mux.com/${c.mux_playback_id}/thumbnail.jpg`
-              : c.thumbnail_url
-          }))
+          // Add thumbnail URLs and playback URLs (handles both MUX and Bunny)
+          const processedClips = allClips.map(c => {
+            let thumbnail_url = c.thumbnail_url
+            let playback_url = null
+            
+            // Bunny Stream videos
+            if (c.video_source === 'bunny' && c.bunny_video_id) {
+              thumbnail_url = thumbnail_url || `https://vz-7668c0c5-24e.b-cdn.net/${c.bunny_video_id}/thumbnail.jpg`
+              playback_url = `https://vz-7668c0c5-24e.b-cdn.net/${c.bunny_video_id}/playlist.m3u8`
+            }
+            // MUX videos (legacy)
+            else if (c.mux_playback_id) {
+              thumbnail_url = thumbnail_url || `https://image.mux.com/${c.mux_playback_id}/thumbnail.jpg`
+              playback_url = `https://stream.mux.com/${c.mux_playback_id}.m3u8`
+            }
+            
+            return {
+              ...c,
+              price: c.price || galleryData.price_per_video || 1500,
+              thumbnail_url,
+              playback_url
+            }
+          })
           setClips(processedClips)
         }
       } catch (clipErr) {
@@ -911,8 +926,8 @@ export default function GalleryPage() {
           />
         )}
         
-        {/* Video Lightbox (MUX Player) with Navigation */}
-        {lightboxClip && lightboxClip.mux_playback_id && (() => {
+        {/* Video Lightbox (MUX or Bunny) with Navigation + Watermark */}
+        {lightboxClip && (lightboxClip.mux_playback_id || lightboxClip.bunny_video_id || lightboxClip.playback_url) && (() => {
           // Get filtered clips for navigation (same filter as grid)
           const filteredClips = clips.filter(c => filterCategory === 'all' || c.category_id === filterCategory)
           const currentIndex = filteredClips.findIndex(c => c.id === lightboxClip.id)
@@ -996,14 +1011,35 @@ export default function GalleryPage() {
                       <Loader2 className="w-12 h-12 text-red-500 animate-spin" />
                     </div>
                   }>
-                    <MuxPlayer
-                      key={lightboxClip.id}
-                      playbackId={lightboxClip.mux_playback_id}
-                      streamType="on-demand"
-                      autoPlay
-                      style={{ width: '100%', height: '100%', borderRadius: '0.5rem 0.5rem 0 0' }}
-                    />
+                    {lightboxClip.mux_playback_id ? (
+                      <MuxPlayer
+                        key={lightboxClip.id}
+                        playbackId={lightboxClip.mux_playback_id}
+                        streamType="on-demand"
+                        autoPlay
+                        style={{ width: '100%', height: '100%', borderRadius: '0.5rem 0.5rem 0 0' }}
+                      />
+                    ) : lightboxClip.playback_url ? (
+                      <video
+                        key={lightboxClip.id}
+                        src={lightboxClip.playback_url}
+                        controls
+                        autoPlay
+                        playsInline
+                        className="w-full h-full object-contain rounded-t-lg bg-black"
+                      />
+                    ) : null}
                   </Suspense>
+                  
+                  {/* Watermark Overlay */}
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <img
+                      src="https://gonalgubgldgpkcekaxe.supabase.co/storage/v1/object/public/assets/ffm-watermark.png"
+                      alt=""
+                      className="w-1/2 max-w-[300px] opacity-30 select-none"
+                      draggable="false"
+                    />
+                  </div>
                 </div>
                 
                 {/* Video info bar - BELOW the video player */}
