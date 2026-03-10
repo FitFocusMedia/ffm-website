@@ -86,6 +86,7 @@ const PricingCalculator = lazy(() => import('./pages/portal/PricingCalculator'))
 const CrewManagement = lazy(() => import('./pages/portal/CrewManagement'))
 const LivestreamAdmin = lazy(() => import('./pages/portal/LivestreamAdmin'))
 const LivestreamAnalytics = lazy(() => import('./pages/portal/LivestreamAnalytics'))
+const EventComparison = lazy(() => import('./pages/portal/EventComparison'))
 const ProposalAdmin = lazy(() => import('./pages/portal/ProposalAdmin'))
 const GalleryAdmin = lazy(() => import('./pages/portal/GalleryAdmin'))
 const GalleryOrders = lazy(() => import('./pages/portal/GalleryOrders'))
@@ -249,6 +250,7 @@ function App() {
         {/* Portal - Livestream */}
         <Route path="/portal/livestream" element={<ProtectedRoute><PortalLayout><LazyRoute><LivestreamAdmin /></LazyRoute></PortalLayout></ProtectedRoute>} />
         <Route path="/portal/livestream/analytics" element={<ProtectedRoute><PortalLayout><LazyRoute><LivestreamAnalytics /></LazyRoute></PortalLayout></ProtectedRoute>} />
+        <Route path="/portal/livestream/compare" element={<ProtectedRoute><PortalLayout><LazyRoute><EventComparison /></LazyRoute></PortalLayout></ProtectedRoute>} />
 
         {/* Portal - Proposals */}
         <Route path="/portal/proposals" element={<ProtectedRoute><PortalLayout><LazyRoute><ProposalAdmin /></LazyRoute></PortalLayout></ProtectedRoute>} />

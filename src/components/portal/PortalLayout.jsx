@@ -31,6 +31,7 @@ export default function PortalLayout({ children }) {
     { name: '🎬 Videos', path: '/portal/video-galleries' },
     { name: 'Livestream', path: '/portal/livestream' },
     { name: 'Analytics', path: '/portal/livestream/analytics' },
+    { name: 'Compare Events', path: '/portal/livestream/compare' },
     { name: 'Crews', path: '/portal/crews' },
     { name: 'Pricing', path: '/portal/pricing' }
   ]
