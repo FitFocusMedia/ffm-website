@@ -905,35 +905,44 @@ export default function LivestreamAdmin() {
               // Convert local time in selected timezone to UTC for database storage
               const convertToUTC = (localDatetime, timezone = data.timezone || 'Australia/Brisbane') => {
                 if (!localDatetime) return null
-                // Parse the datetime-local value and interpret it in the selected timezone
-                // Format: "2026-03-07T18:00"
+                
+                // Use a reliable method: get the UTC offset for this timezone at this date
+                // by formatting a known UTC time and comparing
+                
+                // Parse the entered datetime: "2026-03-21T09:30"
                 const [datePart, timePart] = localDatetime.split('T')
                 const [year, month, day] = datePart.split('-').map(Number)
-                const [hour, minute] = timePart.split(':').map(Number)
+                const [hour, minute] = (timePart || '00:00').split(':').map(Number)
                 
-                // Create a date string with timezone and parse it
-                const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`
+                // Create a reference date at noon UTC on this day (avoids DST edge cases)
+                const refDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0))
                 
-                // Use Intl to get the UTC offset for the selected timezone at this date
+                // Format this UTC time in the target timezone to find the offset
                 const formatter = new Intl.DateTimeFormat('en-US', {
                   timeZone: timezone,
                   year: 'numeric', month: '2-digit', day: '2-digit',
-                  hour: '2-digit', minute: '2-digit', second: '2-digit',
-                  hour12: false
+                  hour: '2-digit', minute: '2-digit', hour12: false
                 })
+                const parts = formatter.formatToParts(refDate)
+                const obj = {}
+                parts.forEach(p => obj[p.type] = p.value)
                 
-                // Get offset by comparing local interpretation to a known date
-                const testDate = new Date(dateStr)
-                const utcTime = testDate.getTime()
-                const tzParts = formatter.formatToParts(testDate)
-                const tzObj = {}
-                tzParts.forEach(p => tzObj[p.type] = p.value)
-                const tzDate = new Date(`${tzObj.year}-${tzObj.month}-${tzObj.day}T${tzObj.hour}:${tzObj.minute}:${tzObj.second}Z`)
-                const offset = utcTime - tzDate.getTime()
+                // Calculate offset: if UTC 12:00 shows as 22:00 in timezone, offset is +10
+                const refHour = 12
+                const tzHour = parseInt(obj.hour)
+                const tzDay = parseInt(obj.day)
                 
-                // Apply offset to get correct UTC
-                const utcDate = new Date(utcTime - offset)
-                return utcDate.toISOString()
+                let offsetHours = tzHour - refHour
+                if (tzDay > day) offsetHours += 24
+                else if (tzDay < day) offsetHours -= 24
+                
+                // Now convert: entered time in timezone to UTC
+                // UTC = local_time - offset
+                // e.g., 09:30 Brisbane (UTC+10) = 09:30 - 10:00 = -00:30 = 23:30 previous day
+                const localMs = Date.UTC(year, month - 1, day, hour, minute, 0)
+                const utcMs = localMs - (offsetHours * 60 * 60 * 1000)
+                
+                return new Date(utcMs).toISOString()
               }
               
               // Convert timestamps from Brisbane to UTC
