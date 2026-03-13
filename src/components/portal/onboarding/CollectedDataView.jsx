@@ -63,30 +63,63 @@ const checklistConfig = [
   },
 ]
 
+// Convert Google Drive view URL to embeddable thumbnail URL
+const getDriveThumbnailUrl = (url) => {
+  if (!url) return null
+  
+  // Match Google Drive file URLs
+  // Format: https://drive.google.com/file/d/{fileId}/view
+  const driveMatch = url.match(/drive\.google\.com\/file\/d\/([^\/]+)/)
+  if (driveMatch) {
+    const fileId = driveMatch[1]
+    // Use the direct export URL for images
+    return `https://drive.google.com/uc?export=view&id=${fileId}`
+  }
+  
+  // Match Google Drive open URLs
+  // Format: https://drive.google.com/open?id={fileId}
+  const openMatch = url.match(/drive\.google\.com\/open\?id=([^&]+)/)
+  if (openMatch) {
+    const fileId = openMatch[1]
+    return `https://drive.google.com/uc?export=view&id=${fileId}`
+  }
+  
+  return null
+}
+
 // Get file icon and type
-const getFileInfo = (url) => {
+const getFileInfo = (url, fileName = '') => {
   if (!url) return { icon: File, type: 'file', isImage: false }
   
   const lower = url.toLowerCase()
+  const lowerName = fileName.toLowerCase()
   
-  // Images
-  if (lower.match(/\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?|$)/i)) {
+  // Check if it's a Google Drive URL - check filename for extension
+  const isDriveUrl = lower.includes('drive.google.com')
+  
+  // Images - check URL extension OR filename extension for Drive URLs
+  if (lower.match(/\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?|$)/i) ||
+      (isDriveUrl && lowerName.match(/\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i))) {
     return { icon: Image, type: 'image', isImage: true }
   }
   // Videos
-  if (lower.match(/\.(mp4|mov|avi|webm|mkv)(\?|$)/i)) {
+  if (lower.match(/\.(mp4|mov|avi|webm|mkv)(\?|$)/i) ||
+      (isDriveUrl && lowerName.match(/\.(mp4|mov|avi|webm|mkv)$/i))) {
     return { icon: Play, type: 'video', isImage: false }
   }
   // Audio
-  if (lower.match(/\.(mp3|wav|aac|ogg|m4a)(\?|$)/i)) {
+  if (lower.match(/\.(mp3|wav|aac|ogg|m4a)(\?|$)/i) ||
+      (isDriveUrl && lowerName.match(/\.(mp3|wav|aac|ogg|m4a)$/i))) {
     return { icon: Music, type: 'audio', isImage: false }
   }
   // Documents
-  if (lower.match(/\.(pdf|doc|docx|xls|xlsx|ppt|pptx|txt|csv)(\?|$)/i)) {
+  if (lower.match(/\.(pdf|doc|docx|xls|xlsx|ppt|pptx|txt|csv)(\?|$)/i) ||
+      (isDriveUrl && lowerName.match(/\.(pdf|doc|docx|xls|xlsx|ppt|pptx|txt|csv)$/i))) {
     return { icon: FileText, type: 'document', isImage: false }
   }
   // Archives
-  if (lower.match(/\.(zip|rar|7z|tar|gz)(\?|$)/i)) {
+  if (lower.match(/\.(zip|rar|7z|tar|gz)(\?|$)/i) ||
+      (isDriveUrl && lowerName.match(/\.(zip|rar|7z|tar|gz)$/i))) {
     return { icon: Archive, type: 'archive', isImage: false }
   }
   
@@ -109,9 +142,12 @@ const getFileName = (url) => {
 }
 
 // File preview component
-function FilePreview({ url, label }) {
-  const { icon: Icon, type, isImage } = getFileInfo(url)
-  const fileName = getFileName(url)
+function FilePreview({ url, label, fileName: providedFileName }) {
+  const fileName = providedFileName || getFileName(url)
+  const { icon: Icon, type, isImage } = getFileInfo(url, fileName)
+  
+  // Get the right image URL for display (convert Drive URLs to thumbnails)
+  const displayUrl = isImage ? (getDriveThumbnailUrl(url) || url) : url
   
   return (
     <a
@@ -125,7 +161,7 @@ function FilePreview({ url, label }) {
         <div className="bg-gray-900 aspect-video flex items-center justify-center relative overflow-hidden">
           {isImage ? (
             <img 
-              src={url} 
+              src={displayUrl} 
               alt={label}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform"
               onError={(e) => {
@@ -411,6 +447,7 @@ export default function CollectedDataView({ data, files = [], checklistConfig: c
                           key={file.id || idx}
                           url={file.url}
                           label={file.label || file.fileName || 'Uploaded file'}
+                          fileName={file.fileName}
                         />
                       ))}
                     </div>
