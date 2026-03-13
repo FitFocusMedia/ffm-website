@@ -10,38 +10,38 @@ export default function AddToCalendar({ event, className = '' }) {
 
   if (!event) return null
 
-  // Parse as local time (strip Z/timezone suffix since DB stores AEST as naive)
-  const parseAsLocalTime = (dateStr) => {
-    if (!dateStr) return new Date()
-    const stripped = dateStr.replace(/[Z+].*$/, '').replace(/\.000$/, '')
-    return new Date(stripped)
-  }
-  
-  const startDate = parseAsLocalTime(event.start_time)
-  const endDate = event.end_time ? parseAsLocalTime(event.end_time) : new Date(startDate.getTime() + 3 * 60 * 60 * 1000) // Default 3 hours
+  // Parse UTC dates
+  const startDateUTC = new Date(event.start_time)
+  const endDateUTC = event.end_time ? new Date(event.end_time) : new Date(startDateUTC.getTime() + 3 * 60 * 60 * 1000) // Default 3 hours
 
-  // Format for Google Calendar (YYYYMMDDTHHMMSS in local time)
+  // Get Brisbane time components for a UTC date
+  const getBrisbaneComponents = (date) => {
+    const formatter = new Intl.DateTimeFormat('en-AU', {
+      timeZone: 'Australia/Brisbane',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    })
+    const parts = formatter.formatToParts(date)
+    const obj = {}
+    parts.forEach(p => obj[p.type] = p.value)
+    return obj
+  }
+
+  // Format for Google Calendar (YYYYMMDDTHHMMSS in Brisbane time)
   const formatGoogleDate = (date) => {
-    const pad = (n) => String(n).padStart(2, '0')
-    const y = date.getFullYear()
-    const m = pad(date.getMonth() + 1)
-    const d = pad(date.getDate())
-    const h = pad(date.getHours())
-    const min = pad(date.getMinutes())
-    const s = pad(date.getSeconds())
-    return `${y}${m}${d}T${h}${min}${s}`
+    const p = getBrisbaneComponents(date)
+    return `${p.year}${p.month}${p.day}T${p.hour}${p.minute}${p.second}`
   }
 
-  // Format for ICS file (local time, no Z suffix = floating time)
+  // Format for ICS file (Brisbane time)
   const formatICSDate = (date) => {
-    const pad = (n) => String(n).padStart(2, '0')
-    const y = date.getFullYear()
-    const m = pad(date.getMonth() + 1)
-    const d = pad(date.getDate())
-    const h = pad(date.getHours())
-    const min = pad(date.getMinutes())
-    const s = pad(date.getSeconds())
-    return `${y}${m}${d}T${h}${min}${s}`
+    const p = getBrisbaneComponents(date)
+    return `${p.year}${p.month}${p.day}T${p.hour}${p.minute}${p.second}`
   }
 
   const title = encodeURIComponent(event.title)
@@ -50,21 +50,15 @@ export default function AddToCalendar({ event, className = '' }) {
   )
   const location = encodeURIComponent(event.venue || 'Online')
 
-  const googleUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${formatGoogleDate(startDate)}/${formatGoogleDate(endDate)}&details=${description}&location=${location}`
+  const googleUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${formatGoogleDate(startDateUTC)}/${formatGoogleDate(endDateUTC)}&details=${description}&location=${location}`
 
-  // Format for Outlook (ISO 8601 local time without Z)
+  // Format for Outlook (ISO 8601 in Brisbane time)
   const formatOutlookDate = (date) => {
-    const pad = (n) => String(n).padStart(2, '0')
-    const y = date.getFullYear()
-    const m = pad(date.getMonth() + 1)
-    const d = pad(date.getDate())
-    const h = pad(date.getHours())
-    const min = pad(date.getMinutes())
-    const s = pad(date.getSeconds())
-    return `${y}-${m}-${d}T${h}:${min}:${s}`
+    const p = getBrisbaneComponents(date)
+    return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}:${p.second}`
   }
   
-  const outlookUrl = `https://outlook.live.com/calendar/0/deeplink/compose?subject=${title}&startdt=${encodeURIComponent(formatOutlookDate(startDate))}&enddt=${encodeURIComponent(formatOutlookDate(endDate))}&body=${description}&location=${location}`
+  const outlookUrl = `https://outlook.live.com/calendar/0/deeplink/compose?subject=${title}&startdt=${encodeURIComponent(formatOutlookDate(startDateUTC))}&enddt=${encodeURIComponent(formatOutlookDate(endDateUTC))}&body=${description}&location=${location}`
 
   // Generate ICS file content
   const generateICS = () => {
@@ -74,8 +68,8 @@ PRODID:-//Fit Focus Media//Livestream//EN
 BEGIN:VEVENT
 UID:${event.id}@fitfocusmedia.com.au
 DTSTAMP:${formatICSDate(new Date())}
-DTSTART:${formatICSDate(startDate)}
-DTEND:${formatICSDate(endDate)}
+DTSTART:${formatICSDate(startDateUTC)}
+DTEND:${formatICSDate(endDateUTC)}
 SUMMARY:${event.title}
 DESCRIPTION:${event.org_display_name || event.organization}\\n\\nWatch live at: https://fitfocusmedia.com.au/#/live/${event.id}
 LOCATION:${event.venue || 'Online'}

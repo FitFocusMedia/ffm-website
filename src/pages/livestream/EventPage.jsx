@@ -431,15 +431,9 @@ export default function EventPage() {
     )
   }
 
-  // Parse datetime
-  const parseAsLocalTime = (dateStr) => {
-    if (!dateStr) return new Date()
-    const stripped = dateStr.replace(/[Z+].*$/, '').replace(/\.000$/, '')
-    return new Date(stripped)
-  }
-  
-  const eventDate = parseAsLocalTime(event.start_time)
-  const eventEnd = event.end_time ? parseAsLocalTime(event.end_time) : null
+  // Parse datetime - keep UTC, display in Brisbane timezone
+  const eventDate = new Date(event.start_time)
+  const eventEnd = event.end_time ? new Date(event.end_time) : null
   const fallbackEnd = new Date(eventDate.getTime() + 8 * 60 * 60 * 1000) // 8 hours after start
   const isPast = event.status === 'ended' || (eventEnd ? eventEnd < new Date() : fallbackEnd < new Date())
   // Don't show as live if event has ended
@@ -455,7 +449,7 @@ export default function EventPage() {
     <>
       <MetaTags 
         title={`${event.title} - ${event.org_display_name || event.organization}`}
-        description={`Watch ${event.title} live! ${eventDate.toLocaleDateString('en-AU')} at ${event.venue}. Stream access $${event.price} AUD.`}
+        description={`Watch ${event.title} live! ${eventDate.toLocaleDateString('en-AU', { timeZone: 'Australia/Brisbane' })} at ${event.venue}. Stream access $${event.price} AUD.`}
         image={getDirectImageUrl(event.thumbnail_url)}
         type="video.other"
       />
@@ -520,7 +514,7 @@ export default function EventPage() {
                   <AddToCalendar event={event} />
                   <SocialShare 
                     title={`Watch ${event.title} Live!`}
-                    description={`${event.org_display_name || event.organization} - ${eventDate.toLocaleDateString('en-AU')}`}
+                    description={`${event.org_display_name || event.organization} - ${eventDate.toLocaleDateString('en-AU', { timeZone: 'Australia/Brisbane' })}`}
                   />
                 </div>
               </div>
@@ -547,7 +541,8 @@ export default function EventPage() {
                       {eventDate.toLocaleDateString('en-AU', {
                         weekday: 'short',
                         day: 'numeric',
-                        month: 'short'
+                        month: 'short',
+                        timeZone: 'Australia/Brisbane'
                       })}
                     </p>
                   </div>
@@ -562,7 +557,8 @@ export default function EventPage() {
                     <p className="text-white font-medium">
                       {eventDate.toLocaleTimeString('en-AU', {
                         hour: '2-digit',
-                        minute: '2-digit'
+                        minute: '2-digit',
+                        timeZone: 'Australia/Brisbane'
                       })} AEST
                     </p>
                   </div>

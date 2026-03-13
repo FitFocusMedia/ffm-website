@@ -589,14 +589,8 @@ export default function WatchPage() {
     )
   }
 
-  // Parse datetime as local time
-  const parseAsLocalTime = (dateStr) => {
-    if (!dateStr) return new Date()
-    const stripped = dateStr.replace(/[Z+].*$/, '').replace(/\.000$/, '')
-    return new Date(stripped)
-  }
-
-  const eventDate = parseAsLocalTime(event.start_time)
+  // Parse datetime - keep UTC for proper timezone handling
+  const eventDate = new Date(event.start_time)
   const doorsOpen = event.doors_open === true
   const previewMode = searchParams.get('preview') === 'player'
   const eventTimeHasPassed = new Date() >= eventDate
