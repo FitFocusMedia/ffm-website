@@ -1114,7 +1114,8 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
             organizationId: evt.organization_id,
             // Use venue from existing livestream event if available, otherwise fall back to content location
             venue: existingLivestream?.venue || evt.location || '',
-            geo_venue_address: existingLivestream?.geo_venue_address || '',
+            // geo_venue_address: prefer existing livestream, then content location as fallback
+            geo_venue_address: existingLivestream?.geo_venue_address || evt.location || '',
             date: evt.date,
             status: evt.status
           }
