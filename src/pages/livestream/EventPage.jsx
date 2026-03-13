@@ -434,6 +434,37 @@ export default function EventPage() {
   // Parse datetime - keep UTC, display in Brisbane timezone
   const eventDate = new Date(event.start_time)
   const eventEnd = event.end_time ? new Date(event.end_time) : null
+  
+  // Get user's local timezone
+  const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const isBrisbaneTimezone = userTimezone === 'Australia/Brisbane' || userTimezone === 'Australia/Queensland'
+  
+  // Format local time for user (only if different from Brisbane)
+  const getLocalTimeString = () => {
+    if (isBrisbaneTimezone) return null
+    const localTime = eventDate.toLocaleTimeString('en-AU', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    })
+    const localDate = eventDate.toLocaleDateString('en-AU', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short'
+    })
+    // Check if local date is different from Brisbane date
+    const brisbaneDate = eventDate.toLocaleDateString('en-AU', {
+      weekday: 'short',
+      day: 'numeric', 
+      month: 'short',
+      timeZone: 'Australia/Brisbane'
+    })
+    if (localDate !== brisbaneDate) {
+      return `${localTime} ${localDate} your time`
+    }
+    return `${localTime} your time`
+  }
+  const localTimeString = getLocalTimeString()
   const fallbackEnd = new Date(eventDate.getTime() + 8 * 60 * 60 * 1000) // 8 hours after start
   const isPast = event.status === 'ended' || (eventEnd ? eventEnd < new Date() : fallbackEnd < new Date())
   // Don't show as live if event has ended
@@ -561,6 +592,11 @@ export default function EventPage() {
                         timeZone: 'Australia/Brisbane'
                       })} AEST
                     </p>
+                    {localTimeString && (
+                      <p className="text-sm text-gray-400 mt-0.5">
+                        ({localTimeString})
+                      </p>
+                    )}
                   </div>
                 </div>
                 
