@@ -21,7 +21,7 @@ export default function VideoGalleryAdmin() {
     try {
       const { data, error } = await supabase
         .from('video_galleries')
-        .select('*, video_clips(count), livestream_events(id, title)')
+        .select('*, video_clips(count), events(id, name)')
         .order('created_at', { ascending: false })
 
       if (error) throw error
@@ -93,9 +93,9 @@ export default function VideoGalleryAdmin() {
                 <Film className="w-12 h-12 text-gray-600" />
               </div>
               <div className="p-4">
-                <h3 className="font-semibold text-white mb-1">{gallery.title}</h3>
+                <h3 className="font-semibold text-white mb-1">{gallery.name}</h3>
                 <p className="text-sm text-gray-400 mb-2">
-                  {gallery.livestream_events?.title || 'No event linked'}
+                  {gallery.events?.name || 'No event linked'}
                 </p>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-500">
@@ -142,7 +142,7 @@ function CreateVideoGalleryModal({ onClose, onCreated }) {
 
   const loadEvents = async () => {
     const { data } = await supabase
-      .from('livestream_events')
+      .from('events')
       .select('id, title')
       .order('event_date', { ascending: false })
       .limit(50)
@@ -201,7 +201,7 @@ function CreateVideoGalleryModal({ onClose, onCreated }) {
             >
               <option value="">No event</option>
               {events.map(event => (
-                <option key={event.id} value={event.id}>{event.title}</option>
+                <option key={event.id} value={event.id}>{event.name}</option>
               ))}
             </select>
           </div>
@@ -258,7 +258,7 @@ function VideoGalleryEditor({ galleryId, onBack }) {
     try {
       const { data: galleryData, error: galleryError } = await supabase
         .from('video_galleries')
-        .select('*, livestream_events(id, title)')
+        .select('*, events(id, name)')
         .eq('id', galleryId)
         .single()
 
@@ -503,9 +503,9 @@ function VideoGalleryEditor({ galleryId, onBack }) {
           <ArrowLeft className="w-5 h-5 text-gray-400" />
         </button>
         <div className="flex-grow">
-          <h1 className="text-2xl font-bold text-white">{gallery?.title}</h1>
+          <h1 className="text-2xl font-bold text-white">{gallery?.name}</h1>
           <p className="text-gray-400 text-sm">
-            {gallery?.livestream_events?.title || 'No event linked'} • 
+            {gallery?.events?.name || 'No event linked'} • 
             ${(gallery?.price_per_clip / 100).toFixed(2)} per clip
           </p>
         </div>

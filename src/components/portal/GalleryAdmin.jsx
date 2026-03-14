@@ -82,7 +82,7 @@ export default function GalleryAdmin() {
         .select(`
           *,
           gallery_photos(count),
-          livestream_events(title)
+          events(name)
         `)
         .order('created_at', { ascending: false })
 
@@ -177,10 +177,10 @@ function GalleryCard({ gallery, onClick }) {
           </span>
           <span className="text-gray-400 text-sm">{photoCount} photos</span>
         </div>
-        <h3 className="text-white font-semibold">{gallery.title}</h3>
-        {gallery.livestream_events && (
+        <h3 className="text-white font-semibold">{gallery.name}</h3>
+        {gallery.events && (
           <p className="text-gray-400 text-sm mt-1">
-            {gallery.livestream_events.title}
+            {gallery.events.name}
           </p>
         )}
         <p className="text-gray-500 text-sm mt-2">
@@ -207,7 +207,7 @@ function CreateGalleryModal({ onClose, onCreate }) {
 
     try {
       // Generate slug from title
-      const slug = formData.title
+      const slug = formData.name
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/(^-|-$)/g, '')
@@ -215,7 +215,7 @@ function CreateGalleryModal({ onClose, onCreate }) {
       const { data, error } = await supabase
         .from('galleries')
         .insert({
-          title: formData.title,
+          title: formData.name,
           description: formData.description,
           slug,
           price_per_photo: Math.round(formData.price_per_photo * 100),
@@ -245,7 +245,7 @@ function CreateGalleryModal({ onClose, onCreate }) {
             <label className="block text-gray-400 mb-1">Title *</label>
             <input
               type="text"
-              value={formData.title}
+              value={formData.name}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
               className="w-full bg-dark-700 text-white rounded-lg px-4 py-3 border border-dark-600 focus:border-red-500 focus:outline-none"
               required
@@ -304,7 +304,7 @@ function CreateGalleryModal({ onClose, onCreate }) {
             </button>
             <button
               type="submit"
-              disabled={creating || !formData.title}
+              disabled={creating || !formData.name}
               className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white py-3 rounded-lg flex items-center justify-center gap-2"
             >
               {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
@@ -337,7 +337,7 @@ function GalleryEditor({ galleryId, onBack }) {
       // Get gallery
       const { data: galleryData, error: galleryError } = await supabase
         .from('galleries')
-        .select('*, livestream_events(id, title)')
+        .select('*, events(id, name)')
         .eq('id', galleryId)
         .single()
 
@@ -545,7 +545,7 @@ function GalleryEditor({ galleryId, onBack }) {
           <button onClick={onBack} className="text-gray-400 hover:text-white">
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h1 className="text-2xl font-bold text-white">{gallery.title}</h1>
+          <h1 className="text-2xl font-bold text-white">{gallery.name}</h1>
           <span className={`px-2 py-1 rounded text-sm ${
             gallery.status === 'published' ? 'bg-green-600' : 'bg-yellow-600'
           } text-white`}>
