@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FFM Livestream SOP - Adelaide Solo Show</title>
+  <title>FFM Livestream SOP</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -15,9 +15,41 @@
     .emergency { animation: pulse 2s infinite; }
     @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
     .copy-btn:active { transform: scale(0.95); }
+    #auth-gate { display: flex; }
+    #main-content { display: none; }
+    .authenticated #auth-gate { display: none; }
+    .authenticated #main-content { display: block; }
   </style>
 </head>
 <body class="bg-gray-900 text-white min-h-screen">
+
+  <!-- Password Gate -->
+  <div id="auth-gate" class="min-h-screen flex items-center justify-center p-4">
+    <div class="bg-gray-800 rounded-2xl p-8 max-w-md w-full text-center border border-gray-700">
+      <div class="text-4xl mb-4">🔒</div>
+      <h1 class="text-2xl font-bold mb-2">FFM Crew Access</h1>
+      <p class="text-gray-400 mb-6">Enter the crew password to access this document.</p>
+      <form id="auth-form" class="space-y-4">
+        <input 
+          type="password" 
+          id="password-input" 
+          placeholder="Enter password"
+          class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-red-500"
+          autocomplete="off"
+        >
+        <button 
+          type="submit"
+          class="w-full px-4 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-lg transition-colors"
+        >
+          Access SOP
+        </button>
+      </form>
+      <p id="auth-error" class="text-red-400 mt-4 hidden">Incorrect password. Try again.</p>
+    </div>
+  </div>
+
+  <!-- Main Content (hidden until authenticated) -->
+  <div id="main-content">
   <div class="max-w-4xl mx-auto p-4 sm:p-6">
     
     <!-- Header -->
@@ -492,6 +524,7 @@
     </footer>
 
   </div>
+  </div><!-- end main-content -->
 
   <script>
     // Copy to clipboard function
@@ -525,6 +558,38 @@
         localStorage.setItem(`sop-checkbox-${index}`, 'false');
       });
     };
+
+    // Password authentication
+    const PASS_HASH = '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a963'; // SHA-256 of 'ffmcrew'
+    
+    async function hashPassword(password) {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(password.toLowerCase().trim());
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    // Check if already authenticated
+    if (localStorage.getItem('sop_auth') === PASS_HASH) {
+      document.body.classList.add('authenticated');
+    }
+
+    // Handle form submission
+    document.getElementById('auth-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const password = document.getElementById('password-input').value;
+      const hash = await hashPassword(password);
+      
+      if (hash === PASS_HASH) {
+        localStorage.setItem('sop_auth', PASS_HASH);
+        document.body.classList.add('authenticated');
+        document.getElementById('auth-error').classList.add('hidden');
+      } else {
+        document.getElementById('auth-error').classList.remove('hidden');
+        document.getElementById('password-input').value = '';
+      }
+    });
   </script>
 </body>
 </html>
