@@ -485,6 +485,29 @@ export default function EventPage() {
         type="video.other"
       />
       
+      {/* Weather Alert Banner - QBJJC Caloundra Open March 22, 2026 */}
+      {(event.title?.toLowerCase().includes('qbjjc') || event.title?.toLowerCase().includes('caloundra')) && (
+        <div className="bg-gradient-to-r from-amber-900/95 via-amber-800/95 to-amber-900/95 border-y-4 border-amber-500">
+          <div className="max-w-6xl mx-auto px-4 py-6">
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0 w-12 h-12 rounded-full bg-amber-500/30 flex items-center justify-center">
+                <AlertTriangle className="w-7 h-7 text-amber-300" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+                  ⚠️ NETWORK UPDATE
+                </h3>
+                <p className="text-amber-100 text-base leading-relaxed">
+                  We are experiencing some network drops and outages due to weather conditions, however feeds have been 
+                  consistently improving throughout the morning. Full match recordings will be made available 
+                  following today's event.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <div className="py-12 md:py-16 px-4">
         <div className="max-w-6xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-12">
