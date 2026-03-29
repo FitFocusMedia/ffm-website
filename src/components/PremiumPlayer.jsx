@@ -28,7 +28,7 @@ export default function PremiumPlayer({
   const [showControls, setShowControls] = useState(true)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [showReactions, setShowReactions] = useState(false)
-  const [bunnyProcessing, setBunnyProcessing] = useState(false)
+  const [bunnyProcessing, setBunnyProcessing] = useState(null) // null = checking, true = processing, false = ready
   const [reactions, setReactions] = useState([])
   const [isPlaying, setIsPlaying] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
@@ -244,8 +244,8 @@ export default function PremiumPlayer({
 
   // For Bunny: use their iframe embed player which has proper controls
   if (isBunnySource) {
-    // Show processing message if video is still encoding
-    if (bunnyProcessing) {
+    // Show processing message if video is still encoding (or still checking)
+    if (bunnyProcessing === null || bunnyProcessing === true) {
       return (
         <div className={`relative bg-black ${className}`}>
           <div className="w-full aspect-video bg-dark-900 flex items-center justify-center">
