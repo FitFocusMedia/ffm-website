@@ -781,8 +781,9 @@ export default function WatchPage() {
   
   // Bunny video ID (takes priority for VOD if set)
   // Check stream first (multi-stream), then event (single-stream)
-  const activeBunnyVideoId = isVodMode 
-    ? (selectedStream?.bunny_video_id || event.bunny_video_id || null)
+  // Always pass bunny ID if available and VOD is enabled - let player handle processing state
+  const activeBunnyVideoId = (isVodMode || event?.vod_enabled)
+    ? (selectedStream?.bunny_video_id || event?.bunny_video_id || null)
     : null
 
   // MUX playback ID (fallback for VOD, or primary for live)
