@@ -282,20 +282,27 @@ export default function PremiumPlayer({
   }
 
   // No valid source - placeholder
+  // For non-live (VOD), show processing message instead of generic fallback
   return (
     <div className={`relative bg-black ${className}`}>
-      <div className="w-full aspect-video bg-dark-900 flex items-center justify-center">
-        <div className="text-center p-8">
-          <div className="text-6xl mb-4">🎬</div>
-          <h3 className="text-xl font-bold text-white mb-2">
-            {isLive ? 'Stream Starting Soon' : 'Replay Processing'}
+      <div className="w-full aspect-video bg-dark-900 flex items-center justify-center px-4">
+        <div className="text-center p-4 md:p-8 max-w-sm">
+          <div className="text-4xl md:text-6xl mb-3 md:mb-4">{isLive ? '🎬' : '⏳'}</div>
+          <h3 className="text-base md:text-xl font-bold text-white mb-2">
+            {isLive ? 'Stream Starting Soon' : 'Stream Recording Processing'}
           </h3>
-          <p className="text-gray-400">
+          <p className="text-sm md:text-base text-gray-400 mb-3 md:mb-4">
             {isLive 
               ? 'The live stream will begin shortly. Please wait...'
-              : 'This replay is being prepared. Please check back soon.'
+              : 'Replays will be available shortly once processing is completed.'
             }
           </p>
+          {!isLive && (
+            <div className="flex items-center justify-center gap-2 text-xs md:text-sm text-gray-500">
+              <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
+              <span>This page will update automatically</span>
+            </div>
+          )}
         </div>
       </div>
     </div>
