@@ -995,6 +995,17 @@ export default function WatchPage() {
           )}
           
           <div className="relative">
+            {/* Show loading state if VOD with bunny but IDs not ready yet */}
+            {isVodMode && event?.bunny_video_id && !activeBunnyVideoId ? (
+              <div className="w-full aspect-video bg-dark-900 flex items-center justify-center px-4">
+                <div className="text-center p-4 md:p-8 max-w-sm">
+                  <div className="text-4xl md:text-6xl mb-3 md:mb-4">⏳</div>
+                  <h3 className="text-base md:text-xl font-bold text-white mb-2">
+                    Loading Replay...
+                  </h3>
+                </div>
+              </div>
+            ) : (
             <PremiumPlayer
               playbackId={activePlaybackId}
               bunnyVideoId={activeBunnyVideoId}
@@ -1013,6 +1024,7 @@ export default function WatchPage() {
                 }
               }}
             />
+            )}
             
             {/* Desktop stream selector overlay - positioned at top to avoid blocking video controls */}
             {isMultiStream && (
