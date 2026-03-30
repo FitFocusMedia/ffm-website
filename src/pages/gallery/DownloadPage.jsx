@@ -162,8 +162,8 @@ export default function GalleryDownloadPage() {
   const allPhotosDownloaded = photoItems.every(item => downloadedPhotos.has(item.photo_id))
   const allVideosDownloaded = videoItems.every(item => downloadedClips.has(item.clip_id))
   
-  const expiresAt = new Date(order.token_expires_at)
-  const daysLeft = Math.ceil((expiresAt - new Date()) / (1000 * 60 * 60 * 24))
+  const expiresAt = order.token_expires_at ? new Date(order.token_expires_at) : null
+  const daysLeft = expiresAt ? Math.ceil((expiresAt - new Date()) / (1000 * 60 * 60 * 24)) : null
 
   // Determine header text
   let headerText = 'Your Content Is Ready!'
@@ -189,17 +189,24 @@ export default function GalleryDownloadPage() {
           </p>
         </div>
 
-        {/* Expiry Warning */}
-        <div className="mb-6 p-4 bg-dark-800 rounded-lg flex items-center gap-3">
-          <Clock className="w-5 h-5 text-yellow-500" />
-          <div>
-            <span className="text-gray-300">Downloads available for </span>
-            <span className="text-white font-semibold">{daysLeft} more days</span>
-            <span className="text-gray-500 text-sm ml-2">
-              (expires {expiresAt.toLocaleDateString()})
-            </span>
+        {/* Expiry Notice - only show if there's an expiry date */}
+        {expiresAt ? (
+          <div className="mb-6 p-4 bg-dark-800 rounded-lg flex items-center gap-3">
+            <Clock className="w-5 h-5 text-yellow-500" />
+            <div>
+              <span className="text-gray-300">Downloads available for </span>
+              <span className="text-white font-semibold">{daysLeft} more days</span>
+              <span className="text-gray-500 text-sm ml-2">
+                (expires {expiresAt.toLocaleDateString()})
+              </span>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="mb-6 p-4 bg-dark-800 rounded-lg flex items-center gap-3">
+            <Check className="w-5 h-5 text-green-500" />
+            <span className="text-gray-300">Downloads available</span>
+          </div>
+        )}
 
         {/* Photos Section */}
         {hasPhotos && (
