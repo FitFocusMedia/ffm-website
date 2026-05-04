@@ -983,14 +983,16 @@ export default function LivestreamAdmin() {
                   })
                   if (muxErr) {
                     console.error('MUX stream creation failed:', muxErr)
-                  } else if (muxData?.stream_key) {
+                  } else if (muxData?.stream_key || muxData?.mux_stream_key) {
                     // Copy stream key to clipboard
-                    const obsConfig = `Server: ${muxData.rtmp_url}\nStream Key: ${muxData.stream_key}`
-                    navigator.clipboard.writeText(muxData.stream_key).then(() => {
-                      alert(`MUX Stream Created! ✅\n\nStream Key copied to clipboard!\n\nFor OBS:\n• Server: ${muxData.rtmp_url}\n• Stream Key: (already copied)\n\nJust paste (Cmd+V) in OBS Stream Key field.`)
+                    const streamKey = muxData.mux_stream_key || muxData.stream_key
+                    const srtUrl = muxData.srt_url || ''
+                    navigator.clipboard.writeText(streamKey).then(() => {
+                      const srtMsg = srtUrl ? `\n\n📡 SRT URL (YOLO Box):\n${srtUrl}` : ''
+                      alert(`MUX Stream Created! ✅\n\nStream Key copied to clipboard!\n\nFor OBS:\n• Server: ${muxData.rtmp_url}\n• Stream Key: (already copied)${srtMsg}`)
                     }).catch(() => {
                       // Fallback: use prompt so they can copy
-                      prompt('MUX Stream Created! Copy this Stream Key:', muxData.stream_key)
+                      prompt('MUX Stream Created! Copy this Stream Key:', streamKey)
                     })
                   }
                 } catch (muxErr) {
@@ -1062,6 +1064,8 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
     status: initialEvent?.status || 'draft',
     mux_playback_id: initialEvent?.mux_playback_id || '',
     mux_stream_key: initialEvent?.mux_stream_key || '',
+    mux_srt_passphrase: initialEvent?.mux_srt_passphrase || '',
+    mux_srt_url: initialEvent?.mux_srt_url || '',
     geo_blocking_enabled: initialEvent?.geo_blocking_enabled || false,
     geo_lat: initialEvent?.geo_lat || null,
     geo_lng: initialEvent?.geo_lng || null,
@@ -1090,7 +1094,9 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
         setFormData(prev => ({
           ...prev,
           mux_playback_id: data.mux_playback_id || '',
-          mux_stream_key: data.mux_stream_key || ''
+          mux_stream_key: data.mux_stream_key || '',
+          mux_srt_passphrase: data.mux_srt_passphrase || '',
+          mux_srt_url: data.mux_srt_url || ''
         }))
       }
     } catch (err) {
@@ -1582,11 +1588,13 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
                         if (muxData?.stream_key) {
                           setFormData(prev => ({
                             ...prev,
-                            mux_stream_key: muxData.stream_key,
-                            mux_playback_id: muxData.playback_id
+                            mux_stream_key: muxData.mux_stream_key || muxData.stream_key,
+                            mux_playback_id: muxData.mux_playback_id || muxData.playback_id,
+                            mux_srt_passphrase: muxData.mux_srt_passphrase || '',
+                            mux_srt_url: muxData.srt_url || ''
                           }))
-                          navigator.clipboard.writeText(muxData.stream_key)
-                          alert('MUX Stream created! Stream Key copied to clipboard.')
+                          navigator.clipboard.writeText(muxData.stream_key || muxData.mux_stream_key)
+                          alert('MUX Stream created! Stream Key & SRT URL saved to event.')
                         }
                       } catch (err) {
                         alert('Failed to create stream: ' + err.message)
@@ -1599,6 +1607,29 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
                 )}
               </div>
               <p className="text-sm text-amber-400 mt-1 font-medium">📡 RTMP Server: rtmps://global-live.mux.com:443/app</p>
+              {formData.mux_srt_url && (
+                <div className="mt-2 p-2 bg-dark-900 border border-green-700 rounded-lg">
+                  <label className="block text-sm font-medium text-green-400 mb-1">📡 SRT URL (for YOLO Box / OBS)</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={formData.mux_srt_url}
+                      readOnly
+                      className="flex-1 px-2 py-1 bg-dark-800 border border-dark-700 rounded text-green-300 font-mono text-xs break-all"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(formData.mux_srt_url)
+                        alert('SRT URL copied! Paste directly into YOLO Box or OBS (leave Stream Key field empty in OBS).')
+                      }}
+                      className="px-2 py-1 bg-green-600 hover:bg-green-500 text-white rounded text-sm whitespace-nowrap"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -2046,16 +2077,22 @@ function MultiStreamManager({ eventId, event, onEventUpdate }) {
       
       if (muxData?.stream_key) {
         // Update stream with MUX credentials (edge function updates DB directly, but update local state)
+        const streamKey = muxData.mux_stream_key || muxData.stream_key
+        const srtUrl = muxData.srt_url || ''
+        
         await updateEventStream(stream.id, {
-          mux_stream_key: muxData.stream_key,
-          mux_playback_id: muxData.playback_id,
-          mux_stream_id: muxData.stream_id,
+          mux_stream_key: streamKey,
+          mux_playback_id: muxData.mux_playback_id || muxData.playback_id,
+          mux_stream_id: muxData.mux_stream_id || muxData.stream_id,
+          mux_srt_passphrase: muxData.mux_srt_passphrase || '',
+          mux_srt_url: srtUrl,
           status: 'idle'
         })
         
         // Copy to clipboard
-        navigator.clipboard.writeText(muxData.stream_key)
-        alert(`✅ Stream Key for ${stream.name} created and copied!\n\nServer: rtmps://global-live.mux.com:443/app\nStream Key: ${muxData.stream_key}`)
+        navigator.clipboard.writeText(streamKey)
+        const srtMsg = srtUrl ? `\n\n📡 SRT URL (YOLO Box):\n${srtUrl}` : ''
+        alert(`✅ Stream Key for ${stream.name} created and copied!\n\nRTMP Server: rtmps://global-live.mux.com:443/app\nStream Key: ${streamKey}${srtMsg}`)
         
         await loadStreams()
       }
@@ -2497,6 +2534,29 @@ function MultiStreamManager({ eventId, event, onEventUpdate }) {
                       <p className="text-xs text-amber-400 font-medium">
                         📡 RTMP Server: rtmps://global-live.mux.com:443/app
                       </p>
+                      {stream.mux_srt_url && (
+                        <div className="mt-2 p-2 bg-dark-900 border border-green-700 rounded-lg">
+                          <label className="block text-xs font-medium text-green-400 mb-1">📡 SRT URL (for YOLO Box / OBS)</label>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              readOnly
+                              value={stream.mux_srt_url}
+                              className="flex-1 px-2 py-1 bg-dark-800 border border-dark-700 rounded text-green-300 font-mono text-xs break-all"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(stream.mux_srt_url)
+                                alert('SRT URL copied! Paste directly into YOLO Box or OBS (leave Stream Key field empty in OBS).')
+                              }}
+                              className="px-2 py-1 bg-green-600 hover:bg-green-500 text-white rounded text-sm whitespace-nowrap"
+                            >
+                              Copy
+                            </button>
+                          </div>
+                        </div>
+                      )}
                       
                       {/* VOD Info Section */}
                       {stream.vod_playback_id && (

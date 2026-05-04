@@ -6,6 +6,13 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Helper: Build SRT URL from stream_key and srt_passphrase
+function buildSrtUrl(streamKey, srtPassphrase) {
+  if (!streamKey) return ''
+  const base = `srt://global-live.mux.com:6001?streamid=${streamKey}&latency=2000000`
+  return srtPassphrase ? `${base}&passphrase=${srtPassphrase}` : base
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -13,7 +20,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json()
-    const { action, event_id, stream_id, stream_name } = body
+    const { action, event_id, stream_id, stream_name, mux_stream_id } = body
     
     const tokenId = Deno.env.get('MUX_TOKEN_ID')
     const tokenSecret = Deno.env.get('MUX_TOKEN_SECRET')
@@ -23,6 +30,58 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_URL'),
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     )
+
+    // ========================================
+    // STREAM-STATUS: Get status by MUX stream ID directly
+    // ========================================
+    if (action === 'stream-status') {
+      if (!mux_stream_id) {
+        return new Response(JSON.stringify({ error: 'mux_stream_id required' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+
+      try {
+        const muxRes = await fetch('https://api.mux.com/video/v1/live-streams/' + mux_stream_id, {
+          headers: { 'Authorization': 'Basic ' + auth }
+        })
+        
+        if (!muxRes.ok) {
+          return new Response(JSON.stringify({ 
+            status: 'unknown', 
+            isLive: false,
+            error: 'Failed to fetch from MUX'
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+        }
+
+        const muxData = await muxRes.json()
+        const stream = muxData.data
+        const isLive = stream.status === 'active'
+        const srtUrl = buildSrtUrl(stream.stream_key, stream.srt_passphrase)
+
+        return new Response(JSON.stringify({
+          status: stream.status,
+          isLive: isLive,
+          playback_id: stream.playback_ids ? stream.playback_ids[0].id : null,
+          stream_key: stream.stream_key,
+          srt_passphrase: stream.srt_passphrase || '',
+          srt_url: srtUrl
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      } catch (err) {
+        console.error('MUX status check failed:', err)
+        return new Response(JSON.stringify({ 
+          status: 'unknown', 
+          isLive: false 
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+    }
 
     // ========================================
     // CREATE: Create a new MUX live stream
@@ -63,12 +122,18 @@ serve(async (req) => {
           })
           if (checkRes.ok) {
             const existing = await checkRes.json()
+            const srtUrl = buildSrtUrl(existing.data.stream_key, existing.data.srt_passphrase)
             return new Response(JSON.stringify({
               stream_id: existing.data.id,
               stream_key: existing.data.stream_key,
+              mux_stream_key: existing.data.stream_key,
               playback_id: existing.data.playback_ids ? existing.data.playback_ids[0].id : null,
+              mux_playback_id: existing.data.playback_ids ? existing.data.playback_ids[0].id : null,
               rtmp_url: 'rtmps://global-live.mux.com:443/app',
               status: existing.data.status,
+              srt_passphrase: existing.data.srt_passphrase || '',
+              mux_srt_passphrase: existing.data.srt_passphrase || '',
+              srt_url: srtUrl,
               existing: true
             }), {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -108,11 +173,14 @@ serve(async (req) => {
 
         const muxData = await muxRes.json()
         const stream = muxData.data
+        const srtUrl = buildSrtUrl(stream.stream_key, stream.srt_passphrase)
 
         await supabase.from('livestream_streams').update({
           mux_stream_id: stream.id,
           mux_stream_key: stream.stream_key,
           mux_playback_id: stream.playback_ids[0].id,
+          mux_srt_passphrase: stream.srt_passphrase || '',
+          mux_srt_url: srtUrl,
           status: stream.status
         }).eq('id', stream_id)
 
@@ -122,10 +190,17 @@ serve(async (req) => {
 
         return new Response(JSON.stringify({
           stream_id: stream.id,
+          mux_stream_id: stream.id,
           stream_key: stream.stream_key,
+          mux_stream_key: stream.stream_key,
           playback_id: stream.playback_ids[0].id,
+          mux_playback_id: stream.playback_ids[0].id,
           rtmp_url: 'rtmps://global-live.mux.com:443/app',
+          rtmp_full: `rtmps://global-live.mux.com:443/app/${stream.stream_key}`,
           status: stream.status,
+          srt_passphrase: stream.srt_passphrase || '',
+          mux_srt_passphrase: stream.srt_passphrase || '',
+          srt_url: srtUrl,
           stream_name: stream_name
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -139,12 +214,20 @@ serve(async (req) => {
         })
         if (checkRes.ok) {
           const existing = await checkRes.json()
+          const srtUrl = buildSrtUrl(existing.data.stream_key, existing.data.srt_passphrase)
           return new Response(JSON.stringify({
             stream_id: existing.data.id,
+            mux_stream_id: existing.data.id,
             stream_key: existing.data.stream_key,
+            mux_stream_key: existing.data.stream_key,
             playback_id: existing.data.playback_ids ? existing.data.playback_ids[0].id : null,
+            mux_playback_id: existing.data.playback_ids ? existing.data.playback_ids[0].id : null,
             rtmp_url: 'rtmps://global-live.mux.com:443/app',
+            rtmp_full: `rtmps://global-live.mux.com:443/app/${existing.data.stream_key}`,
             status: existing.data.status,
+            srt_passphrase: existing.data.srt_passphrase || '',
+            mux_srt_passphrase: existing.data.srt_passphrase || '',
+            srt_url: srtUrl,
             existing: true
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -183,27 +266,37 @@ serve(async (req) => {
 
       const muxData = await muxRes.json()
       const stream = muxData.data
+      const srtUrl = buildSrtUrl(stream.stream_key, stream.srt_passphrase)
 
       await supabase.from('livestream_events').update({
         mux_stream_id: stream.id,
         mux_stream_key: stream.stream_key,
         mux_playback_id: stream.playback_ids[0].id,
+        mux_srt_passphrase: stream.srt_passphrase || '',
+        mux_srt_url: srtUrl,
         stream_status: stream.status
       }).eq('id', event_id)
 
       return new Response(JSON.stringify({
         stream_id: stream.id,
+        mux_stream_id: stream.id,
         stream_key: stream.stream_key,
+        mux_stream_key: stream.stream_key,
         playback_id: stream.playback_ids[0].id,
+        mux_playback_id: stream.playback_ids[0].id,
         rtmp_url: 'rtmps://global-live.mux.com:443/app',
-        status: stream.status
+        rtmp_full: `rtmps://global-live.mux.com:443/app/${stream.stream_key}`,
+        status: stream.status,
+        srt_passphrase: stream.srt_passphrase || '',
+        mux_srt_passphrase: stream.srt_passphrase || '',
+        srt_url: srtUrl
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
     // ========================================
-    // STATUS: Get stream status from MUX
+    // STATUS: Get stream status from MUX (by event_id)
     // ========================================
     if (action === 'status' && event_id) {
       const { data: event } = await supabase
@@ -225,6 +318,7 @@ serve(async (req) => {
       const muxData = await muxRes.json()
       const stream = muxData.data
       const isLive = stream.status === 'active'
+      const srtUrl = buildSrtUrl(stream.stream_key, stream.srt_passphrase)
 
       await supabase.from('livestream_events').update({
         stream_status: stream.status,
@@ -234,7 +328,10 @@ serve(async (req) => {
       return new Response(JSON.stringify({
         status: stream.status,
         is_live: isLive,
-        playback_id: stream.playback_ids ? stream.playback_ids[0].id : null
+        playback_id: stream.playback_ids ? stream.playback_ids[0].id : null,
+        stream_key: stream.stream_key,
+        srt_passphrase: stream.srt_passphrase || '',
+        srt_url: srtUrl
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
@@ -287,6 +384,8 @@ serve(async (req) => {
           mux_stream_id: null,
           mux_stream_key: null,
           mux_playback_id: null,
+          mux_srt_passphrase: null,
+          mux_srt_url: null,
           stream_status: null,
           is_live: false
         }).eq('id', event_id)
@@ -323,7 +422,7 @@ serve(async (req) => {
       // Get event with existing stream data
       const { data: event, error: eventError } = await supabase
         .from('livestream_events')
-        .select('id, title, organization, mux_stream_id, mux_stream_key, mux_playback_id')
+        .select('id, title, organization, mux_stream_id, mux_stream_key, mux_playback_id, mux_srt_passphrase, mux_srt_url')
         .eq('id', event_id)
         .single()
 
@@ -351,6 +450,8 @@ serve(async (req) => {
           mux_stream_id: event.mux_stream_id,
           mux_stream_key: event.mux_stream_key,
           mux_playback_id: event.mux_playback_id,
+          mux_srt_passphrase: event.mux_srt_passphrase,
+          mux_srt_url: event.mux_srt_url,
           status: 'active',
           is_default: true
         })
@@ -372,6 +473,8 @@ serve(async (req) => {
           mux_stream_id: null,
           mux_stream_key: null,
           mux_playback_id: null,
+          mux_srt_passphrase: null,
+          mux_srt_url: null,
           is_multi_stream: true
         })
         .eq('id', event_id)
@@ -412,124 +515,6 @@ serve(async (req) => {
         stream_id: newStream.id,
         stream_name: stream_name,
         message: 'Successfully converted to multi-stream'
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
-
-    // ========================================
-    // SYNC-VOD: Sync VOD assets from MUX to streams
-    // ========================================
-    if (action === 'sync-vod') {
-      if (!event_id) {
-        return new Response(JSON.stringify({ error: 'event_id required' }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        })
-      }
-
-      // Fetch all MUX assets
-      const assetsResponse = await fetch('https://api.mux.com/video/v1/assets?limit=100', {
-        headers: { 'Authorization': 'Basic ' + auth }
-      })
-      const assetsData = await assetsResponse.json()
-      
-      // Filter to ready assets for this event
-      const eventAssets = (assetsData.data || []).filter((asset: any) => {
-        if (asset.status !== 'ready') return false
-        try {
-          const passthrough = JSON.parse(asset.passthrough || '{}')
-          return passthrough.event_id === event_id
-        } catch {
-          return false
-        }
-      })
-
-      if (eventAssets.length === 0) {
-        return new Response(JSON.stringify({ 
-          success: true, 
-          message: 'No VOD assets found for this event',
-          linked: 0 
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        })
-      }
-
-      // Get streams for this event
-      const { data: streams, error: streamsError } = await supabase
-        .from('livestream_streams')
-        .select('id, name, mux_stream_id')
-        .eq('event_id', event_id)
-
-      if (streamsError) {
-        return new Response(JSON.stringify({ error: 'Failed to fetch streams', details: streamsError.message }), {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        })
-      }
-
-      // Group assets by stream (using stream_id or stream_name from passthrough)
-      // Pick the longest duration asset per stream (main recording, not short reconnects)
-      const streamAssets: Record<string, any> = {}
-      
-      for (const asset of eventAssets) {
-        const passthrough = JSON.parse(asset.passthrough || '{}')
-        const streamId = passthrough.stream_id
-        const streamName = passthrough.stream_name
-        
-        // Find matching stream
-        let matchedStream = streams?.find(s => s.id === streamId)
-        if (!matchedStream && streamName) {
-          matchedStream = streams?.find(s => 
-            s.name.toLowerCase().includes(streamName.toLowerCase().replace(/\.$/, '')) ||
-            streamName.toLowerCase().includes(s.name.toLowerCase())
-          )
-        }
-        
-        if (matchedStream) {
-          const existingAsset = streamAssets[matchedStream.id]
-          // Keep the longest recording
-          if (!existingAsset || (asset.duration || 0) > (existingAsset.duration || 0)) {
-            streamAssets[matchedStream.id] = {
-              ...asset,
-              matched_stream_id: matchedStream.id
-            }
-          }
-        }
-      }
-
-      // Update streams with VOD info
-      const updates = []
-      for (const [streamId, asset] of Object.entries(streamAssets)) {
-        const playbackId = asset.playback_ids?.[0]?.id
-        if (playbackId) {
-          const { error: updateError } = await supabase
-            .from('livestream_streams')
-            .update({
-              vod_asset_id: asset.id,
-              vod_playback_id: playbackId,
-              vod_duration_seconds: Math.round(asset.duration || 0),
-              vod_enabled: true
-            })
-            .eq('id', streamId)
-          
-          if (!updateError) {
-            updates.push({
-              stream_id: streamId,
-              asset_id: asset.id,
-              playback_id: playbackId,
-              duration_seconds: Math.round(asset.duration || 0)
-            })
-          }
-        }
-      }
-
-      return new Response(JSON.stringify({
-        success: true,
-        message: `Linked ${updates.length} VOD assets to streams`,
-        linked: updates.length,
-        total_assets: eventAssets.length,
-        updates
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
