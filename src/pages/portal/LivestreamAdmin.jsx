@@ -1563,16 +1563,55 @@ function EventModal({ event: initialEvent, onClose, onSave }) {
                   placeholder={formData.mux_stream_key ? '' : 'Click Generate to create'}
                 />
                 {formData.mux_stream_key ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(formData.mux_stream_key)
-                      alert('Stream Key copied!')
-                    }}
-                    className="px-3 py-2 bg-dark-700 hover:bg-dark-600 text-white rounded-lg transition-colors"
-                  >
-                    Copy
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(formData.mux_stream_key)
+                        alert('Stream Key copied!')
+                      }}
+                      className="px-3 py-2 bg-dark-700 hover:bg-dark-600 text-white rounded-lg transition-colors"
+                    >
+                      Copy
+                    </button>
+                    {!formData.mux_srt_url && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            const { data: muxData, error } = await supabase.functions.invoke('mux-stream', {
+                              body: { action: 'stream-status', mux_stream_id: event?.mux_stream_id }
+                            })
+                            if (error) {
+                              alert('Failed to fetch SRT URL: ' + error.message)
+                              return
+                            }
+                            if (muxData?.srt_url) {
+                              setFormData(prev => ({
+                                ...prev,
+                                mux_srt_passphrase: muxData.mux_srt_passphrase || muxData.srt_passphrase || '',
+                                mux_srt_url: muxData.srt_url || ''
+                              }))
+                              // Also save to database
+                              if (event?.id) {
+                                await supabase.from('livestream_events').update({
+                                  mux_srt_passphrase: muxData.mux_srt_passphrase || muxData.srt_passphrase || '',
+                                  mux_srt_url: muxData.srt_url || ''
+                                }).eq('id', event.id)
+                              }
+                            } else {
+                              alert('No SRT URL available for this stream.')
+                            }
+                          } catch (err) {
+                            alert('Failed to fetch SRT URL: ' + err.message)
+                          }
+                        }}
+                        className="px-3 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors whitespace-nowrap"
+                      >
+                        Get SRT URL
+                      </button>
+                    )}
+                  </>
                 ) : event?.id && (
                   <button
                     type="button"
@@ -2520,6 +2559,35 @@ function MultiStreamManager({ eventId, event, onEventUpdate }) {
                           >
                             <Copy className="w-4 h-4" />
                           </button>
+                          {!stream.mux_srt_url && stream.mux_stream_id && (
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  const res = await fetch('https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/mux-stream', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ action: 'stream-status', mux_stream_id: stream.mux_stream_id })
+                                  })
+                                  const muxData = await res.json()
+                                  if (muxData?.srt_url) {
+                                    await updateEventStream(stream.id, {
+                                      mux_srt_passphrase: muxData.mux_srt_passphrase || muxData.srt_passphrase || '',
+                                      mux_srt_url: muxData.srt_url || ''
+                                    })
+                                    await loadStreams()
+                                  } else {
+                                    alert('No SRT URL available for this stream.')
+                                  }
+                                } catch (err) {
+                                  alert('Failed to fetch SRT URL: ' + err.message)
+                                }
+                              }}
+                              className="px-2 py-1 bg-green-600 hover:bg-green-500 text-white rounded text-xs whitespace-nowrap"
+                            >
+                              Get SRT
+                            </button>
+                          )}
                         </div>
                       </div>
                       <div>
