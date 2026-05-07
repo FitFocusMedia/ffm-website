@@ -69,11 +69,28 @@ export default function LivestreamAnalytics() {
     const totalRevenue = orders.reduce((sum, o) => sum + parseFloat(o.amount || 0), 0)
     const totalPurchases = orders.length
     
+    // Track Live vs VOD purchases
+    let liveOrders = 0
+    let vodOrders = 0
+    
     // Group orders by event
     const eventStats = events.map(event => {
       const eventOrders = orders.filter(o => o.event_id === event.id)
       const revenue = eventOrders.reduce((sum, o) => sum + parseFloat(o.amount || 0), 0)
       const purchases = eventOrders.length
+      
+      // Calculate live vs VOD (purchases within 48h of event are "live", rest are "VOD")
+      const eventDate = new Date(event.start_time)
+      const eventEnd = new Date(eventDate.getTime() + 48 * 60 * 60 * 1000) // 48h window
+      
+      eventOrders.forEach(order => {
+        const orderDate = new Date(order.created_at)
+        if (orderDate <= eventEnd) {
+          liveOrders++
+        } else {
+          vodOrders++
+        }
+      })
       
       return {
         ...event,
@@ -102,6 +119,9 @@ export default function LivestreamAnalytics() {
       totalPurchases,
       totalEvents: events.length,
       avgOrderValue: totalPurchases > 0 ? totalRevenue / totalPurchases : 0,
+      liveOrders,
+      vodOrders,
+      livePercent: totalPurchases > 0 ? (liveOrders / totalPurchases) * 100 : 0,
       eventStats,
       dailyRevenue
     }
@@ -227,7 +247,7 @@ export default function LivestreamAnalytics() {
         )}
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
           <div className="bg-gradient-to-br from-red-500/20 to-red-600/10 backdrop-blur-md rounded-xl p-6 border border-red-500/20">
             <div className="flex items-center justify-between mb-2">
               <DollarSign className="w-8 h-8 text-red-400" />
@@ -270,6 +290,20 @@ export default function LivestreamAnalytics() {
               ${analytics?.avgOrderValue.toFixed(2)}
             </div>
             <div className="text-sm text-gray-400">Avg Order Value</div>
+          </div>
+
+          <div className="bg-gradient-to-br from-orange-500/20 to-orange-600/10 backdrop-blur-md rounded-xl p-6 border border-orange-500/20">
+            <div className="flex items-center justify-between mb-2">
+              <Users className="w-8 h-8 text-orange-400" />
+              <span className="text-2xl">🎬</span>
+            </div>
+            <div className="text-3xl font-bold text-white mb-1">
+              {analytics?.livePercent.toFixed(0)}%
+            </div>
+            <div className="text-sm text-gray-400">Live Purchases</div>
+            <div className="text-xs text-gray-500 mt-1">
+              {analytics?.liveOrders} live • {analytics?.vodOrders} VOD
+            </div>
           </div>
         </div>
 
@@ -339,7 +373,7 @@ export default function LivestreamAnalytics() {
         </div>
 
         {/* Daily Revenue Chart */}
-        <div className="bg-gray-800/30 backdrop-blur-md rounded-xl border border-gray-700 p-6">
+        <div className="bg-gray-800/30 backdrop-blur-md rounded-xl border border-gray-700 p-6 mb-8">
           <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-red-500" />
             Revenue Trend (Last 30 Days)
@@ -377,6 +411,90 @@ export default function LivestreamAnalytics() {
               No revenue data available
             </div>
           )}
+        </div>
+
+        {/* Key Insights */}
+        <div className="bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 backdrop-blur-md rounded-xl border border-yellow-500/20 p-6">
+          <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+            <span className="text-2xl">💡</span>
+            Key Insights & Recommendations
+          </h2>
+          <div className="space-y-4">
+            {analytics?.eventStats[0] && (
+              <div className="flex gap-3">
+                <div className="text-yellow-400 mt-1">→</div>
+                <div>
+                  <div className="text-gray-300">
+                    <strong className="text-white">Top Event:</strong> {analytics.eventStats[0].title} generated{' '}
+                    ${analytics.eventStats[0].revenue.toFixed(2)} from {analytics.eventStats[0].purchases} orders
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {analytics?.livePercent >= 0 && (
+              <div className="flex gap-3">
+                <div className="text-yellow-400 mt-1">→</div>
+                <div>
+                  <div className="text-gray-300">
+                    <strong className="text-white">Purchase Timing:</strong>{' '}
+                    {analytics.livePercent.toFixed(0)}% of purchases happen during or shortly after the live event.{' '}
+                    {analytics.vodOrders > 0 && (
+                      <span className="text-blue-300">
+                        {analytics.vodOrders} customers bought replays later — consider time-based VOD pricing 
+                        (Week 1: $25, Week 2-4: $15, Month 2+: $10) to create urgency.
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {analytics?.avgOrderValue > 0 && (
+              <div className="flex gap-3">
+                <div className="text-yellow-400 mt-1">→</div>
+                <div>
+                  <div className="text-gray-300">
+                    <strong className="text-white">Pricing Opportunity:</strong> Current average order value is{' '}
+                    ${analytics.avgOrderValue.toFixed(2)}. Consider three-tier pricing:
+                    <ul className="ml-4 mt-2 space-y-1 text-sm text-gray-400">
+                      <li>• <strong className="text-gray-300">Basic ($20):</strong> Live stream only</li>
+                      <li>• <strong className="text-gray-300">Plus ($35):</strong> Live + 30-day replay access</li>
+                      <li>• <strong className="text-gray-300">Premium ($50):</strong> Live + lifetime VOD + behind-the-scenes</li>
+                    </ul>
+                    <div className="mt-2 text-blue-300">
+                      Multi-tier pricing captures different buyer segments and increases average order value by 20-40%.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {analytics?.totalPurchases >= 50 && analytics?.vodOrders >= 10 && (
+              <div className="flex gap-3">
+                <div className="text-yellow-400 mt-1">→</div>
+                <div>
+                  <div className="text-gray-300">
+                    <strong className="text-white">Membership Opportunity:</strong> With {analytics.vodOrders} VOD purchases,
+                    launch a "Fight Pass" membership ($15-20/month) for unlimited replay access + PPV discounts.
+                    <div className="mt-2 text-blue-300">
+                      40 members at $15/mo = $7,200/year recurring revenue (equivalent to one event, but repeating monthly).
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-3 mt-6 pt-4 border-t border-yellow-500/20">
+              <div className="text-yellow-400 mt-1">📚</div>
+              <div>
+                <div className="text-sm text-gray-400">
+                  These insights are based on 2026 livestream monetization research showing hybrid models (PPV + subscriptions + VOD) 
+                  achieve 278% higher growth vs single-tier pricing. Full research: <span className="text-blue-300">second-brain/data/documents/research-2026-03-09.md</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
