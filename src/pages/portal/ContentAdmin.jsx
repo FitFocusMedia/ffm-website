@@ -76,7 +76,7 @@ export default function ContentAdmin() {
       supabase.from('packages').select('*').eq('organization_id', orgId).order('sort_order'),
       supabase.from('content_orders').select('*, events(name), packages(name)').eq('organization_id', orgId).order('created_at', { ascending: false }).limit(50),
       supabase.from('galleries').select('*, events(name), gallery_photos(count)').eq('organization_id', orgId).order('created_at', { ascending: false }),
-      supabase.from('gallery_purchases').select('*, galleries(title, slug, events(name))').eq('organization_id', orgId).order('created_at', { ascending: false }).limit(100)
+      supabase.from('gallery_orders').select('*, galleries!inner(id, title, slug, organization_id, events(name))').eq('galleries.organization_id', orgId).order('created_at', { ascending: false }).limit(100)
     ])
     
     setOrgEvents(eventsRes.data || [])
@@ -900,7 +900,7 @@ export default function ContentAdmin() {
             <h2 className="text-lg font-semibold">Gallery Photo Orders</h2>
             <div className="text-sm text-gray-400">
               Total Revenue: <span className="text-green-400 font-semibold">
-                ${galleryOrders.reduce((sum, o) => sum + (o.amount || 0), 0).toFixed(2)}
+                ${(galleryOrders.reduce((sum, o) => sum + (o.total_amount || 0), 0) / 100).toFixed(2)}
               </span>
             </div>
           </div>
@@ -918,7 +918,6 @@ export default function ContentAdmin() {
                     <th className="text-left p-3">Customer</th>
                     <th className="text-left p-3">Gallery</th>
                     <th className="text-left p-3">Event</th>
-                    <th className="text-center p-3">Photos</th>
                     <th className="text-right p-3">Amount</th>
                     <th className="text-center p-3">Status</th>
                     <th className="text-right p-3">Actions</th>
@@ -935,12 +934,11 @@ export default function ContentAdmin() {
                       </td>
                       <td className="p-3">
                         <div className="font-medium">{order.customer_name || 'N/A'}</div>
-                        <div className="text-xs text-gray-500">{order.customer_email}</div>
+                        <div className="text-xs text-gray-500">{order.email}</div>
                       </td>
                       <td className="p-3 text-gray-400">{order.galleries?.title || 'N/A'}</td>
                       <td className="p-3 text-gray-400">{order.galleries?.events?.name || '—'}</td>
-                      <td className="p-3 text-center">{order.photo_count || 1}</td>
-                      <td className="p-3 text-right font-semibold text-green-400">${(order.amount || 0).toFixed(2)}</td>
+                      <td className="p-3 text-right font-semibold text-green-400">${((order.total_amount || 0) / 100).toFixed(2)}</td>
                       <td className="p-3 text-center">
                         <span className={`px-2 py-1 rounded text-xs ${
                           order.status === 'completed' || order.status === 'paid' ? 'bg-green-600' :
@@ -949,14 +947,23 @@ export default function ContentAdmin() {
                           {order.status || 'pending'}
                         </span>
                       </td>
-                      <td className="p-3 text-right">
+                      <td className="p-3 text-right space-x-3">
+                        {order.download_token && (
+                          <a 
+                            href={`/#/gallery/download/${order.download_token}`} 
+                            target="_blank"
+                            className="text-green-400 hover:text-green-300 text-sm"
+                          >
+                            View Order
+                          </a>
+                        )}
                         {order.galleries?.slug && (
                           <a 
                             href={`/#/gallery/${order.galleries.slug}`} 
                             target="_blank"
                             className="text-blue-400 hover:text-blue-300 text-sm"
                           >
-                            View Gallery
+                            Gallery
                           </a>
                         )}
                       </td>

@@ -18,6 +18,7 @@ export default function PremiumPurchaseCard({
   isPast = false,
   isVod = false,
   vodExpired = false,
+  vodEnabled = true,  // Whether replay is available for this event
   className = ''
 }) {
   const [focused, setFocused] = useState(false)
@@ -28,7 +29,7 @@ export default function PremiumPurchaseCard({
   
   const liveBenefits = [
     { icon: Zap, text: isFree ? 'Instant access' : 'Instant access after payment', highlight: true },
-    { icon: Play, text: 'Watch live + replay for 7 days', highlight: true },
+    { icon: Play, text: vodEnabled ? 'Watch live + replay for 7 days' : 'Watch the live event', highlight: true },
     { icon: Star, text: 'HD quality streaming', highlight: true },
     ...(!isFree ? [{ icon: Shield, text: 'Secure payment via Stripe', highlight: true }] : [])
   ]

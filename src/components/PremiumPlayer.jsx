@@ -28,6 +28,7 @@ export default function PremiumPlayer({
   const [showControls, setShowControls] = useState(true)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [showReactions, setShowReactions] = useState(false)
+  const [bunnyProcessing, setBunnyProcessing] = useState(null) // null = checking, true = processing, false = ready
   const [reactions, setReactions] = useState([])
   const [isPlaying, setIsPlaying] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
@@ -41,6 +42,31 @@ export default function PremiumPlayer({
   const bunnyHlsUrl = bunnyVideoId 
     ? `${BUNNY_CDN_URL}/${bunnyVideoId}/playlist.m3u8`
     : null
+
+  // Check if Bunny video is still processing
+  useEffect(() => {
+    if (!isBunnySource || !bunnyVideoId) return
+    
+    const checkProcessing = async () => {
+      try {
+        const response = await fetch(bunnyHlsUrl, { method: 'HEAD' })
+        // 403 = video exists but still processing, 200 = ready
+        if (response.status === 403) {
+          setBunnyProcessing(true)
+        } else {
+          setBunnyProcessing(false)
+        }
+      } catch (err) {
+        // Network error likely means still processing
+        setBunnyProcessing(true)
+      }
+    }
+    
+    checkProcessing()
+    // Re-check every 30 seconds while processing
+    const interval = setInterval(checkProcessing, 30000)
+    return () => clearInterval(interval)
+  }, [isBunnySource, bunnyVideoId, bunnyHlsUrl])
 
   // Initialize HLS.js for Bunny Stream
   useEffect(() => {
@@ -218,6 +244,29 @@ export default function PremiumPlayer({
 
   // For Bunny: use their iframe embed player which has proper controls
   if (isBunnySource) {
+    // Show processing message if video is still encoding (or still checking)
+    if (bunnyProcessing === null || bunnyProcessing === true) {
+      return (
+        <div className={`relative bg-black ${className}`}>
+          <div className="w-full aspect-video bg-dark-900 flex items-center justify-center px-4">
+            <div className="text-center p-4 md:p-8 max-w-sm">
+              <div className="text-4xl md:text-6xl mb-3 md:mb-4">⏳</div>
+              <h3 className="text-base md:text-xl font-bold text-white mb-2">
+                Stream Recording Processing
+              </h3>
+              <p className="text-sm md:text-base text-gray-400 mb-3 md:mb-4">
+                Replays will be available shortly once processing is completed.
+              </p>
+              <div className="flex items-center justify-center gap-2 text-xs md:text-sm text-gray-500">
+                <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
+                <span>This page will update automatically</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+    }
+    
     const embedUrl = `https://iframe.mediadelivery.net/embed/${bunnyLibraryId || '612038'}/${bunnyVideoId}?autoplay=true&preload=true&responsive=true`
     return (
       <div className={`relative bg-black ${className}`}>
@@ -233,20 +282,27 @@ export default function PremiumPlayer({
   }
 
   // No valid source - placeholder
+  // For non-live (VOD), show processing message instead of generic fallback
   return (
     <div className={`relative bg-black ${className}`}>
-      <div className="w-full aspect-video bg-dark-900 flex items-center justify-center">
-        <div className="text-center p-8">
-          <div className="text-6xl mb-4">🎬</div>
-          <h3 className="text-xl font-bold text-white mb-2">
-            {isLive ? 'Stream Starting Soon' : 'Replay Processing'}
+      <div className="w-full aspect-video bg-dark-900 flex items-center justify-center px-4">
+        <div className="text-center p-4 md:p-8 max-w-sm">
+          <div className="text-4xl md:text-6xl mb-3 md:mb-4">{isLive ? '🎬' : '⏳'}</div>
+          <h3 className="text-base md:text-xl font-bold text-white mb-2">
+            {isLive ? 'Stream Starting Soon' : 'Stream Recording Processing'}
           </h3>
-          <p className="text-gray-400">
+          <p className="text-sm md:text-base text-gray-400 mb-3 md:mb-4">
             {isLive 
               ? 'The live stream will begin shortly. Please wait...'
-              : 'This replay is being prepared. Please check back soon.'
+              : 'Replays will be available shortly once processing is completed.'
             }
           </p>
+          {!isLive && (
+            <div className="flex items-center justify-center gap-2 text-xs md:text-sm text-gray-500">
+              <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
+              <span>This page will update automatically</span>
+            </div>
+          )}
         </div>
       </div>
     </div>

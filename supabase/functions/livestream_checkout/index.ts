@@ -288,7 +288,7 @@ serve(async (req) => {
 
 // Send confirmation email via Postmark
 async function sendConfirmationEmail(email: string, event: any, orderId: string) {
-  const postmarkToken = Deno.env.get('POSTMARK_API_TOKEN')
+  const postmarkToken = Deno.env.get('POSTMARK_SERVER_TOKEN')
   if (!postmarkToken) {
     console.log('[Email] Postmark not configured, skipping email')
     return
