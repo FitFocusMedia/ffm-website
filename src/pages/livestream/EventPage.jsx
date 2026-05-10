@@ -186,10 +186,17 @@ export default function EventPage() {
     try {
       // FRONTEND CHECK: See if user already has access (bypasses broken Edge Function .single() bug)
       const existingOrder = await getLivestreamOrderByEmail(eventId, cleanEmail)
-      if (existingOrder && existingOrder.status === 'completed') {
-        // User already has access - redirect directly to watch page
-        window.location.href = `/#/watch/${eventId}?email=${encodeURIComponent(cleanEmail)}`
-        return
+      if (existingOrder) {
+        if (existingOrder.status === 'completed') {
+          // User already has access - redirect directly to watch page
+          window.location.href = `/#/watch/${eventId}?email=${encodeURIComponent(cleanEmail)}`
+          return
+        } else if (existingOrder.status === 'pending') {
+          // Payment in progress - don't allow another purchase
+          setError('You have a purchase in progress. Please check your email or try again in a few minutes.')
+          setPurchasing(false)
+          return
+        }
       }
 
       // Use Supabase edge function (JWT verification disabled)
@@ -224,6 +231,9 @@ export default function EventPage() {
       if (data.already_purchased && data.redirect) {
         // User already has access - redirect to watch page
         window.location.href = data.redirect
+      } else if (data.pending) {
+        // User has a pending order - payment in progress
+        setError(data.error || 'You have a purchase in progress. Please check your email or try again in a few minutes.')
       } else if (data.demo && data.redirect) {
         // Demo mode - edge function created order, redirect to watch
         window.location.href = data.redirect

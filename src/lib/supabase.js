@@ -786,8 +786,8 @@ export async function getLivestreamOrderByEmail(eventId, email) {
     .from('livestream_orders')
     .select('*')
     .eq('event_id', eventId)
-    .eq('email', email.toLowerCase())
-    .eq('status', 'completed')
+    .ilike('email', email.toLowerCase())
+    .in('status', ['completed', 'pending'])
     .order('created_at', { ascending: false })
     .limit(1)
   
@@ -1020,7 +1020,7 @@ export async function getOrCreateUserProfile(email) {
   const { data: existing, error: fetchError } = await supabase
     .from('user_profiles')
     .select('*')
-    .eq('email', email.toLowerCase())
+    .ilike('email', email.toLowerCase())
     .single()
   
   if (existing) return existing
@@ -1136,8 +1136,8 @@ export async function getUserPurchaseHistory(email) {
   const { data, error } = await supabase
     .from('livestream_orders')
     .select('*, event:livestream_events(*)')
-    .eq('email', email.toLowerCase())
-    .eq('status', 'completed')
+    .ilike('email', email.toLowerCase())
+    .in('status', ['completed', 'pending'])
     .order('created_at', { ascending: false })
   
   if (error) throw error
@@ -1170,8 +1170,8 @@ export async function getGalleryPurchaseHistory(email) {
         )
       )
     `)
-    .eq('email', email.toLowerCase())
-    .eq('status', 'completed')
+    .ilike('email', email.toLowerCase())
+    .in('status', ['completed', 'pending'])
     .order('created_at', { ascending: false })
   
   if (error) throw error
@@ -1189,8 +1189,8 @@ export async function getAllUserPurchases(email) {
     supabase
       .from('livestream_orders')
       .select('*, event:livestream_events(*)')
-      .eq('email', lowerEmail)
-      .eq('status', 'completed')
+      .ilike('email', lowerEmail)
+      .in('status', ['completed', 'pending'])
       .order('created_at', { ascending: false }),
     supabase
       .from('gallery_orders')
@@ -1214,8 +1214,8 @@ export async function getAllUserPurchases(email) {
           )
         )
       `)
-      .eq('email', lowerEmail)
-      .eq('status', 'completed')
+      .ilike('email', lowerEmail)
+      .in('status', ['completed', 'pending'])
       .order('created_at', { ascending: false })
   ])
   

@@ -65,36 +65,56 @@ serve(async (req) => {
 
       const normalizedEmail = email.toLowerCase()
 
-      // Check if user already has a completed order for this event (use limit(1) instead of single() to handle multiple orders)
+      // Check if user already has a completed or pending order for this event
+      // Use ilike for case-insensitive email matching (orders may be stored with different casing)
       const { data: existingOrders } = await supabase
         .from('livestream_orders')
         .select('id, email, status, vod_access_granted')
         .eq('event_id', event_id)
-        .eq('email', normalizedEmail)
-        .eq('status', 'completed')
+        .ilike('email', normalizedEmail)
+        .in('status', ['completed', 'pending'])
         .limit(1)
 
       if (existingOrders && existingOrders.length > 0) {
-        console.log(`[Checkout] User already has access: ${normalizedEmail}`)
-        const baseUrl = 'https://fitfocusmedia.com.au'
-        return new Response(
-          JSON.stringify({ 
-            already_purchased: true,
-            redirect: success_url || `${baseUrl}/#/watch/${event_id}?email=${encodeURIComponent(email)}`
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
+        const existingOrder = existingOrders[0]
+        if (existingOrder.status === 'completed') {
+          // User already has access - redirect to watch page
+          console.log(`[Checkout] User already has access: ${normalizedEmail}`)
+          const baseUrl = 'https://fitfocusmedia.com.au'
+          return new Response(
+            JSON.stringify({ 
+              already_purchased: true,
+              redirect: success_url || `${baseUrl}/#/watch/${event_id}?email=${encodeURIComponent(email)}`
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        } else {
+          // User has a pending order - payment is in progress, don't create another
+          console.log(`[Checkout] User has pending order: ${normalizedEmail}, session: ${existingOrder.id}`)
+          return new Response(
+            JSON.stringify({ 
+              error: 'You have a purchase in progress. Please check your email for a confirmation or try again in a few minutes.',
+              pending: true
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
       }
 
-      // Get or create user profile
+      // Get or create user profile (case-insensitive email lookup)
       let userId: string | null = null
       const { data: profile } = await supabase
         .from('user_profiles')
         .select('id')
-        .eq('email', normalizedEmail)
+        .ilike('email', normalizedEmail)
+        .limit(1)
         .single()
+        .then(result => {
+          // .single() throws if no rows, so use .then to handle
+          return result.data ? result : { data: null }
+        })
       
-      if (profile) {
+      if (profile && profile.id) {
         userId = profile.id
       } else {
         const { data: newProfile } = await supabase
@@ -236,7 +256,7 @@ serve(async (req) => {
         const session = event.data.object as Stripe.Checkout.Session
         console.log('[Webhook] Payment completed for session:', session.id)
 
-        // Get the order to get event details
+        // Get the order to get event details (case-insensitive email lookup)
         const { data: order } = await supabase
           .from('livestream_orders')
           .select('*, livestream_events(*)')

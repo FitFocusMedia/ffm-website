@@ -2478,6 +2478,7 @@ function ContentDelivery({ gallery, organization }) {
   const [importResult, setImportResult] = useState(null)
   const [emailResult, setEmailResult] = useState(null)
   const [eventName, setEventName] = useState('')
+  const [dryRun, setDryRun] = useState(true)
 
   useEffect(() => {
     loadEvents()
@@ -2553,7 +2554,8 @@ function ContentDelivery({ gallery, organization }) {
           event_id: selectedEventId,
           email_type: type,
           content_type: contentType,
-          event_name: eventName || gallery.title
+          event_name: eventName || gallery.title,
+          dry_run: dryRun
         })
       })
       
@@ -2616,6 +2618,27 @@ function ContentDelivery({ gallery, organization }) {
           {loading && !emailResult ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
           Import Paid Athletes
         </button>
+
+        {/* Dry Run Toggle */}
+        <div className="flex items-center gap-3 mb-4 p-3 bg-yellow-900/20 border border-yellow-700/30 rounded-lg">
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={dryRun}
+              onChange={(e) => setDryRun(e.target.checked)}
+              className="sr-only peer"
+            />
+            <div className="w-9 h-5 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-yellow-500"></div>
+          </label>
+          <div>
+            <span className="text-yellow-400 text-sm font-medium">
+              {dryRun ? '🧪 Dry Run Mode' : '📧 Live Mode'}
+            </span>
+            <p className="text-gray-500 text-xs">
+              {dryRun ? 'Preview who would receive emails without actually sending' : 'Emails will be sent for real!'}
+            </p>
+          </div>
+        </div>
 
         {/* Import Result */}
         {importResult && (
@@ -2687,8 +2710,8 @@ function ContentDelivery({ gallery, organization }) {
               <p className="text-red-400 text-sm">Error: {emailResult.error}</p>
             ) : (
               <div className="text-sm">
-                <p className="text-green-400 font-medium mb-2">
-                  ✅ {emailResult.email_type === 'delivery' ? 'Delivery' : 'Promo'} emails processed
+                <p className={`font-medium mb-2 ${emailResult.dry_run ? 'text-yellow-400' : 'text-green-400'}`}>
+                  {emailResult.dry_run ? '🧪 Dry Run — no emails sent' : '✅'} {emailResult.email_type === 'delivery' ? 'Delivery' : 'Promo'} emails {emailResult.dry_run ? 'would be sent' : 'processed'}
                 </p>
                 <div className="grid grid-cols-2 gap-3 text-center">
                   <div>

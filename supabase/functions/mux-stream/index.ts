@@ -68,7 +68,8 @@ serve(async (req) => {
           playback_id: stream.playback_ids ? stream.playback_ids[0].id : null,
           stream_key: stream.stream_key,
           srt_passphrase: stream.srt_passphrase || '',
-          srt_url: srtUrl
+          srt_url: srtUrl,
+          asset_id: stream.asset_id || null
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })
@@ -335,6 +336,94 @@ serve(async (req) => {
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
+    }
+
+    // ========================================
+    // GET-VOD-ASSET: Get VOD asset ID for a live stream
+    // ========================================
+    if (action === 'get-vod-asset') {
+      const streamId = mux_stream_id || body.mux_stream_id
+      if (!streamId) {
+        return new Response(JSON.stringify({ error: 'mux_stream_id required' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+
+      try {
+        // Query MUX for the live stream to get its asset_id
+        const muxRes = await fetch('https://api.mux.com/video/v1/live-streams/' + streamId, {
+          headers: { 'Authorization': 'Basic ' + auth }
+        })
+        
+        if (!muxRes.ok) {
+          return new Response(JSON.stringify({ error: 'Failed to fetch from MUX', status: muxRes.status }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+        }
+
+        const muxData = await muxRes.json()
+        const stream = muxData.data
+        const assetId = stream.asset_id
+
+        if (!assetId) {
+          // No asset yet — stream may still be processing
+          return new Response(JSON.stringify({
+            asset_id: null,
+            playback_id: null,
+            status: stream.status,
+            message: 'No VOD asset created yet. Stream may still be processing.'
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+        }
+
+        // Query MUX for the asset to get playback_id
+        const assetRes = await fetch('https://api.mux.com/video/v1/assets/' + assetId, {
+          headers: { 'Authorization': 'Basic ' + auth }
+        })
+        
+        let playbackId = null
+        let duration = null
+        
+        if (assetRes.ok) {
+          const assetData = await assetRes.json()
+          playbackId = assetData.data?.playback_ids?.[0]?.id || null
+          duration = assetData.data?.duration || null
+        }
+
+        // Auto-update the livestream_events table
+        if (event_id && playbackId) {
+          await supabase
+            .from('livestream_events')
+            .update({
+              vod_asset_id: assetId,
+              vod_playback_id: playbackId,
+              status: 'ended',
+              is_live: false,
+              vod_duration_seconds: duration ? Math.round(duration) : null,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', event_id)
+        }
+
+        return new Response(JSON.stringify({
+          asset_id: assetId,
+          playback_id: playbackId,
+          duration: duration,
+          status: stream.status,
+          updated_db: !!event_id && !!playbackId
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      } catch (err) {
+        console.error('[mux-stream] get-vod-asset error:', err)
+        return new Response(JSON.stringify({ error: err.message }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
     }
 
     // ========================================
