@@ -2495,10 +2495,20 @@ function ContentDelivery({ gallery, organization }) {
       return
     }
     try {
+      // Detect delimiter: tab, comma, or semicolon
+      const firstLine = csvText.trim().split('\n')[0]
+      const tabCount = (firstLine.match(/\t/g) || []).length
+      const commaCount = (firstLine.match(/,/g) || []).length
+      const semiCount = (firstLine.match(/;/g) || []).length
+      const delimiter = tabCount > commaCount && tabCount > semiCount ? '\t' : semiCount > commaCount ? ';' : ','
+
       const lines = csvText.trim().split('\n').map(l => l.trim()).filter(l => l)
       if (lines.length < 2) { setCsvEvents([]); setParsedRows([]); return }
 
       const parseCsvLine = (line) => {
+        if (delimiter === '\t') return line.split('\t').map(p => p.trim().replace(/^"|"$/g, ''))
+        if (delimiter === ';') return line.split(';').map(p => p.trim().replace(/^"|"$/g, ''))
+        // Standard CSV with quote handling
         const parts = []
         let current = ''
         let inQuotes = false
@@ -2511,13 +2521,13 @@ function ContentDelivery({ gallery, organization }) {
         return parts
       }
 
-      const headers = parseCsvLine(lines[0]).map(h => h.toLowerCase().trim())
-      const emailIdx = headers.findIndex(h => h === 'email' || h === 'e-mail')
-      const firstNameIdx = headers.findIndex(h => h === 'first name' || h === 'first_name' || h === 'firstname')
-      const lastNameIdx = headers.findIndex(h => h === 'last name' || h === 'last_name' || h === 'lastname')
-      const athleteNumberIdx = headers.findIndex(h => h.includes('athlete number') || h === 'number')
-      const videographyIdx = headers.findIndex(h => h.includes('videography') || h.includes('service'))
-      const eventIdx = headers.findIndex(h => h === 'event')
+      const headers = parseCsvLine(lines[0]).map(h => h.toLowerCase().trim().replace(/^"|"$/g, ''))
+      const emailIdx = headers.findIndex(h => h === 'email' || h === 'e-mail' || h === 'email address')
+      const firstNameIdx = headers.findIndex(h => h === 'first name' || h === 'first_name' || h === 'firstname' || h === 'first' || h === 'given name')
+      const lastNameIdx = headers.findIndex(h => h === 'last name' || h === 'last_name' || h === 'lastname' || h === 'surname')
+      const athleteNumberIdx = headers.findIndex(h => h.includes('athlete number') || h.includes('competitor') || h === 'number' || h === 'id')
+      const videographyIdx = headers.findIndex(h => h.includes('videography') || h.includes('service') || h.includes('package') || h.includes('product'))
+      const eventIdx = headers.findIndex(h => h === 'event' || h === 'show' || h === 'competition' || h === 'division')
 
       if (emailIdx === -1) { setCsvEvents([]); setParsedRows([]); return }
 
@@ -2525,17 +2535,17 @@ function ContentDelivery({ gallery, organization }) {
       const eventSet = new Set()
       for (let i = 1; i < lines.length; i++) {
         const parts = parseCsvLine(lines[i])
-        const email = (parts[emailIdx] || '').toLowerCase().trim()
+        const email = (parts[emailIdx] || '').toLowerCase().trim().replace(/^"|"$/g, '')
         if (!email || !email.includes('@')) continue
 
-        const evt = eventIdx >= 0 ? (parts[eventIdx] || '').trim() : ''
-        const service = videographyIdx >= 0 ? (parts[videographyIdx] || '').trim() : ''
+        const evt = eventIdx >= 0 ? (parts[eventIdx] || '').trim().replace(/^"|"$/g, '') : ''
+        const service = videographyIdx >= 0 ? (parts[videographyIdx] || '').trim().replace(/^"|"$/g, '') : ''
 
         rows.push({
           email,
-          first_name: firstNameIdx >= 0 ? (parts[firstNameIdx] || '').trim() : '',
-          last_name: lastNameIdx >= 0 ? (parts[lastNameIdx] || '').trim() : '',
-          athlete_number: athleteNumberIdx >= 0 ? (parts[athleteNumberIdx] || '').trim() : '',
+          first_name: firstNameIdx >= 0 ? (parts[firstNameIdx] || '').trim().replace(/^"|"$/g, '') : '',
+          last_name: lastNameIdx >= 0 ? (parts[lastNameIdx] || '').trim().replace(/^"|"$/g, '') : '',
+          athlete_number: athleteNumberIdx >= 0 ? (parts[athleteNumberIdx] || '').trim().replace(/^"|"$/g, '') : '',
           videography_service: service,
           event: evt
         })
@@ -2736,16 +2746,39 @@ function ContentDelivery({ gallery, organization }) {
             className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-lg flex items-center justify-center gap-2 font-medium"
           >
             📄 Import from CSV
-            <span className="text-xs opacity-70">(paste spreadsheet)</span>
+            <span className="text-xs opacity-70">(upload or paste)</span>
           </button>
         </div>
 
         {/* CSV Import Area */}
         {showCsvImport && (
           <div className="mb-4 p-4 bg-dark-800 rounded-lg border border-emerald-700/30">
-            <p className="text-gray-400 text-xs mb-2">
-              Paste your full order sheet. Auto-detects events and lets you filter by show.
+            <p className="text-gray-400 text-xs mb-3">
+              Upload a CSV/Excel file or paste spreadsheet data. Auto-detects columns and events.
             </p>
+            <div className="flex gap-3 mb-3">
+              <label className="flex-1 cursor-pointer">
+                <input
+                  type="file"
+                  accept=".csv,.tsv,.txt,.xls,.xlsx"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (!file) return
+                    const reader = new FileReader()
+                    reader.onload = (ev) => {
+                      const text = ev.target?.result
+                      if (typeof text === 'string') setCsvText(text)
+                    }
+                    reader.readAsText(file)
+                  }}
+                />
+                <div className="bg-dark-900 hover:bg-dark-800 text-white px-4 py-2 rounded-lg border border-dark-600 hover:border-emerald-500 text-center transition-colors text-sm">
+                  📁 Upload CSV File
+                </div>
+              </label>
+              <div className="flex items-center text-gray-500 text-xs">or paste below</div>
+            </div>
             <textarea
               value={csvText}
               onChange={(e) => setCsvText(e.target.value)}
