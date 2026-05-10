@@ -80,7 +80,7 @@ serve(async (req) => {
       gallery_order_video_items: videoOrderItems || []
     }
 
-    // For free_access orders, fetch the gallery's video clips
+    // For free_access orders, fetch the gallery's video clips and match by athlete name + service type
     let galleryClips = []
     if (order.delivery_type === 'free_access' && order.galleries?.id) {
       const { data: clips } = await supabase
@@ -91,6 +91,34 @@ serve(async (req) => {
         .order('created_at', { ascending: true })
       
       galleryClips = clips || []
+      
+      // Match clips to athlete based on name and service type from notes
+      // Notes format: "Service: I-Walk | Event: Show Name" or "I-Walk Routine"
+      // Filename format: "{number} - {Name} - {Service Type} - {Show} - {Date} - Fit Focus Media"
+      if (order.notes && galleryClips.length > 0) {
+        const athleteName = `${order.athlete_first_name || ''} ${order.athlete_last_name || ''}`.trim().toLowerCase()
+        const notesLower = (order.notes || '').toLowerCase()
+        
+        // Extract service type from notes
+        let serviceType = ''
+        if (notesLower.includes('i-walk')) serviceType = 'i-walk'
+        else if (notesLower.includes('posing')) serviceType = 'posing'
+        
+        // Filter clips to only include ones matching the athlete's name (and service type if available)
+        galleryClips = galleryClips.filter((clip: any) => {
+          const filenameLower = (clip.filename || '').toLowerCase()
+          
+          // Must match athlete name
+          const nameMatches = !athleteName || filenameLower.includes(athleteName)
+          
+          // If service type is known, also match that
+          if (serviceType) {
+            return nameMatches && filenameLower.includes(serviceType)
+          }
+          
+          return nameMatches
+        })
+      }
     }
 
     // Check token expiry

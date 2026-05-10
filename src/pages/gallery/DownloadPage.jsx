@@ -170,7 +170,7 @@ export default function GalleryDownloadPage() {
   // Determine header text
   let headerText = 'Your Content Is Ready!'
   if (isFreeAccess) {
-    headerText = galleryClips.length > 0 ? 'Your Video Is Ready!' : 'Your Content Is Ready!'
+    headerText = galleryClips.length === 1 ? 'Your Video Is Ready!' : galleryClips.length > 0 ? `Your Videos Are Ready! (${galleryClips.length})` : 'Your Content Is Ready!'
   } else if (hasPhotos && hasVideos) {
     headerText = 'Your Photos & Videos Are Ready!'
   } else if (hasVideos) {
