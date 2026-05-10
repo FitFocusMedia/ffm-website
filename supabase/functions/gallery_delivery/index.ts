@@ -23,18 +23,93 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Route: POST /gallery-delivery/import — Bulk create free-access orders from content orders
+    // Route: POST /gallery_delivery/import — Bulk create free-access orders from content orders OR CSV
     if (req.method === 'POST' && path === 'import') {
-      const { gallery_id, event_id, content_type } = await req.json()
+      const { gallery_id, event_id, content_type, csv_rows } = await req.json()
 
-      if (!gallery_id || !event_id) {
+      if (!gallery_id) {
         return new Response(
-          JSON.stringify({ error: 'Missing gallery_id or event_id' }),
+          JSON.stringify({ error: 'Missing gallery_id' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
 
       const contentType = content_type || 'I-Walk / Posing Routine'
+
+      // CSV import mode: create gallery_orders directly from pasted data
+      if (csv_rows && csv_rows.length > 0) {
+        const { data: gallery } = await supabase
+          .from('galleries')
+          .select('id, title, slug, organizations(id, name)')
+          .eq('id', gallery_id)
+          .single()
+
+        const results = { created: 0, skipped: 0, errors: 0, details: [] as any[] }
+
+        for (const row of csv_rows) {
+          if (!row.email || !row.email.includes('@')) {
+            results.errors++
+            results.details.push({ email: row.email || '', name: `${row.first_name || ''} ${row.last_name || ''}`.trim(), status: 'error', error: 'Invalid email' })
+            continue
+          }
+
+          const { data: existingOrder } = await supabase
+            .from('gallery_orders')
+            .select('id, status')
+            .eq('gallery_id', gallery_id)
+            .ilike('email', row.email.toLowerCase())
+            .limit(1)
+
+          if (existingOrder && existingOrder.length > 0) {
+            results.skipped++
+            results.details.push({ email: row.email, name: `${row.first_name || ''} ${row.last_name || ''}`.trim(), status: 'already_exists', existing_status: existingOrder[0].status })
+            continue
+          }
+
+          const downloadToken = crypto.randomUUID()
+          const { data: galleryOrder, error: createError } = await supabase
+            .from('gallery_orders')
+            .insert({
+              gallery_id: gallery_id,
+              email: row.email.toLowerCase(),
+              customer_name: `${row.first_name || ''} ${row.last_name || ''}`.trim(),
+              total_amount: 0,
+              status: 'completed',
+              delivery_type: 'free_access',
+              athlete_first_name: row.first_name || null,
+              athlete_last_name: row.last_name || null,
+              athlete_number: row.athlete_number || null,
+              download_token: downloadToken,
+              completed_at: new Date().toISOString(),
+              delivery_email_sent: false
+            })
+            .select()
+            .single()
+
+          if (createError) {
+            console.error('[GalleryDelivery] CSV import error:', createError)
+            results.errors++
+            results.details.push({ email: row.email, name: `${row.first_name || ''} ${row.last_name || ''}`.trim(), status: 'error', error: createError.message })
+            continue
+          }
+
+          results.created++
+          results.details.push({ email: row.email, name: `${row.first_name || ''} ${row.last_name || ''}`.trim(), status: 'created', order_id: galleryOrder?.id, download_token: downloadToken })
+        }
+
+        return new Response(
+          JSON.stringify({ success: true, gallery_id, import_type: 'csv', total_rows: csv_rows.length, results }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      // Content orders import mode (requires event_id)
+      if (!event_id) {
+        return new Response(
+          JSON.stringify({ error: 'Missing event_id (required for content order import). Use csv_rows for direct CSV import.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
 
       // Get all paid content orders for this event
       const { data: contentOrders, error: ordersError } = await supabase

@@ -2479,6 +2479,9 @@ function ContentDelivery({ gallery, organization }) {
   const [emailResult, setEmailResult] = useState(null)
   const [eventName, setEventName] = useState('')
   const [dryRun, setDryRun] = useState(true)
+  const [showCsvImport, setShowCsvImport] = useState(false)
+  const [csvText, setCsvText] = useState('')
+  const [csvResult, setCsvResult] = useState(null)
 
   useEffect(() => {
     loadEvents()
@@ -2490,6 +2493,61 @@ function ContentDelivery({ gallery, organization }) {
       setEventName(ev?.name || '')
     }
   }, [selectedEventId, events])
+
+  const importFromCsv = async () => {
+    if (!csvText.trim() || !gallery?.id) return
+    setLoading(true)
+    setCsvResult(null)
+
+    try {
+      // Parse CSV: email, first_name, last_name, athlete_number (header row optional)
+      const lines = csvText.trim().split('\n').map(l => l.trim()).filter(l => l)
+      const rows = []
+      for (const line of lines) {
+        const parts = line.split(',').map(p => p.trim().replace(/^"|"$/g, ''))
+        // Skip header row
+        if (parts[0]?.toLowerCase() === 'email') continue
+        rows.push({
+          email: (parts[0] || '').toLowerCase(),
+          first_name: parts[1] || '',
+          last_name: parts[2] || '',
+          athlete_number: parts[3] || ''
+        })
+      }
+
+      // Filter out rows without email
+      const validRows = rows.filter(r => r.email && r.email.includes('@'))
+      if (validRows.length === 0) {
+        setCsvResult({ error: 'No valid rows found. Format: email, first_name, last_name, athlete_number' })
+        setLoading(false)
+        return
+      }
+
+      const { data: { session } } = await supabase.auth.getSession()
+      const response = await fetch(`https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/gallery_delivery/import`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token || ''}`
+        },
+        body: JSON.stringify({
+          gallery_id: gallery.id,
+          event_id: selectedEventId || null,
+          content_type: contentType,
+          csv_rows: validRows
+        })
+      })
+
+      const result = await response.json()
+      setCsvResult(result)
+      // Refresh import result if successful
+      if (result.success) loadEvents()
+    } catch (err) {
+      setCsvResult({ error: err.message })
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const loadEvents = async () => {
     if (!organization?.id) return
@@ -2609,15 +2667,97 @@ function ContentDelivery({ gallery, organization }) {
           </div>
         </div>
 
-        {/* Import Button */}
-        <button
-          onClick={importAthletes}
-          disabled={loading || !selectedEventId}
-          className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-4 py-3 rounded-lg flex items-center justify-center gap-2 font-medium mb-4"
-        >
-          {loading && !emailResult ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-          Import Paid Athletes
-        </button>
+        {/* Import Buttons */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+          <button
+            onClick={importAthletes}
+            disabled={loading || !selectedEventId}
+            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-4 py-3 rounded-lg flex items-center justify-center gap-2 font-medium"
+          >
+            {loading && !emailResult ? <Loader2 className="w-4 h-4 animate-spin" /> : '📋'}
+            Import from Content Orders
+            <span className="text-xs opacity-70">(paid athletes)</span>
+          </button>
+          <button
+            onClick={() => setShowCsvImport(!showCsvImport)}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-lg flex items-center justify-center gap-2 font-medium"
+          >
+            📄 Import from CSV
+            <span className="text-xs opacity-70">(paste spreadsheet)</span>
+          </button>
+        </div>
+
+        {/* CSV Import Area */}
+        {showCsvImport && (
+          <div className="mb-4 p-4 bg-dark-800 rounded-lg border border-emerald-700/30">
+            <p className="text-gray-400 text-xs mb-2">
+              Paste your data below. Format: <code className="text-emerald-400">email, first_name, last_name, athlete_number</code>
+            </p>
+            <p className="text-gray-500 text-xs mb-3">
+              Header row is optional. One athlete per line. Email is required.
+            </p>
+            <textarea
+              value={csvText}
+              onChange={(e) => setCsvText(e.target.value)}
+              placeholder={`email, first_name, last_name, athlete_number
+athlete1@example.com, John, Smith, 42
+athlete2@example.com, Sarah, Jones, 15`}
+              className="w-full h-32 bg-dark-900 text-white rounded-lg px-3 py-2 border border-dark-600 focus:border-emerald-500 focus:outline-none font-mono text-sm resize-y"
+            />
+            <div className="flex items-center gap-3 mt-3">
+              <button
+                onClick={importFromCsv}
+                disabled={loading || !csvText.trim()}
+                className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg flex items-center gap-2 font-medium text-sm"
+              >
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : '➕'}
+                Create Gallery Orders
+              </button>
+              <span className="text-gray-500 text-xs">
+                {csvText.trim() ? `${csvText.trim().split('\n').filter(l => l.trim() && !l.toLowerCase().startsWith('email')).length} athletes` : '0 athletes'}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* CSV Import Result */}
+        {csvResult && (
+          <div className={`rounded-lg p-4 mb-4 ${csvResult.error ? 'bg-red-900/30 border border-red-700' : 'bg-green-900/30 border border-green-700'}`}>
+            {csvResult.error ? (
+              <p className="text-red-400 text-sm">Error: {csvResult.error}</p>
+            ) : (
+              <div className="text-sm">
+                <p className="text-green-400 font-medium mb-2">✅ CSV Import complete</p>
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div>
+                    <div className="text-2xl font-bold text-green-400">{csvResult.results?.created || 0}</div>
+                    <div className="text-gray-400">Created</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-yellow-400">{csvResult.results?.skipped || 0}</div>
+                    <div className="text-gray-400">Skipped</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-red-400">{csvResult.results?.errors || 0}</div>
+                    <div className="text-gray-400">Errors</div>
+                  </div>
+                </div>
+                {csvResult.results?.details?.length > 0 && (
+                  <details className="mt-3">
+                    <summary className="text-gray-400 cursor-pointer hover:text-white">View details</summary>
+                    <div className="mt-2 max-h-40 overflow-y-auto">
+                      {csvResult.results.details.map((d, i) => (
+                        <div key={i} className={`py-1 ${d.status === 'error' ? 'text-red-400' : d.status === 'already_exists' ? 'text-yellow-400' : 'text-green-400'}`}>
+                          {d.name || d.email} — {d.status}
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Dry Run Toggle */}
         <div className="flex items-center gap-3 mb-4 p-3 bg-yellow-900/20 border border-yellow-700/30 rounded-lg">
