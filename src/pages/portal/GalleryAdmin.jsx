@@ -2031,6 +2031,9 @@ function GalleryEditor({ gallery, organization, onBack }) {
             setCurrentGallery({ ...currentGallery, ...updates })
           }} 
         />
+
+        {/* Content Delivery — I-Walk / Posing Routine */}
+        <ContentDelivery gallery={currentGallery} organization={organization} />
       </div>
     </div>
   )
@@ -2462,6 +2465,258 @@ function VideoPricingTiersEditor({ gallery, onUpdate }) {
           {edited ? 'Save Video Pricing' : 'Saved ✓'}
         </button>
       )}
+    </div>
+  )
+}
+
+// Content Delivery — I-Walk / Posing Routine bulk import & email delivery
+function ContentDelivery({ gallery, organization }) {
+  const [events, setEvents] = useState([])
+  const [selectedEventId, setSelectedEventId] = useState(gallery.event_id || '')
+  const [contentType, setContentType] = useState('I-Walk / Posing Routine')
+  const [loading, setLoading] = useState(false)
+  const [importResult, setImportResult] = useState(null)
+  const [emailResult, setEmailResult] = useState(null)
+  const [eventName, setEventName] = useState('')
+
+  useEffect(() => {
+    loadEvents()
+  }, [organization?.id])
+
+  useEffect(() => {
+    if (selectedEventId) {
+      const ev = events.find(e => e.id === selectedEventId)
+      setEventName(ev?.name || '')
+    }
+  }, [selectedEventId, events])
+
+  const loadEvents = async () => {
+    if (!organization?.id) return
+    try {
+      const { data, error } = await supabase
+        .from('events')
+        .select('id, name, date')
+        .eq('organization_id', organization.id)
+        .order('date', { ascending: false })
+      
+      if (error) throw error
+      setEvents(data || [])
+    } catch (err) {
+      console.error('Load events error:', err)
+    }
+  }
+
+  const importAthletes = async () => {
+    if (!selectedEventId || !gallery.id) return
+    setLoading(true)
+    setImportResult(null)
+    
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const response = await fetch(`https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/gallery-delivery/import`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token || ''}`
+        },
+        body: JSON.stringify({
+          gallery_id: gallery.id,
+          event_id: selectedEventId,
+          content_type: contentType
+        })
+      })
+      
+      const result = await response.json()
+      setImportResult(result)
+    } catch (err) {
+      setImportResult({ error: err.message })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const sendDeliveryEmails = async (type) => {
+    if (!gallery.id) return
+    setLoading(true)
+    setEmailResult(null)
+    
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const response = await fetch(`https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/gallery-delivery/send-emails`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token || ''}`
+        },
+        body: JSON.stringify({
+          gallery_id: gallery.id,
+          event_id: selectedEventId,
+          email_type: type,
+          content_type: contentType,
+          event_name: eventName || gallery.title
+        })
+      })
+      
+      const result = await response.json()
+      setEmailResult(result)
+    } catch (err) {
+      setEmailResult({ error: err.message })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="border-t border-dark-600 pt-6 mt-6">
+      <h3 className="text-md font-semibold text-white flex items-center gap-2 mb-4">
+        🎬 Content Delivery
+        <span className="text-xs text-gray-500 font-normal">(I-Walk / Posing Routine)</span>
+      </h3>
+      
+      <div className="bg-dark-700 rounded-lg p-4 mb-4">
+        <p className="text-gray-400 text-sm mb-4">
+          Import athletes who paid for content orders and grant them free gallery access, 
+          then send delivery or promo emails.
+        </p>
+
+        {/* Event Selection */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div>
+            <label className="block text-gray-400 text-sm mb-1">Linked Event</label>
+            <select
+              value={selectedEventId}
+              onChange={(e) => setSelectedEventId(e.target.value)}
+              className="w-full bg-dark-900 text-white rounded-lg px-3 py-2 border border-dark-600 focus:border-red-500 focus:outline-none"
+            >
+              <option value="">Select event...</option>
+              {events.map(ev => (
+                <option key={ev.id} value={ev.id}>
+                  {ev.name} ({new Date(ev.date).toLocaleDateString()})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-gray-400 text-sm mb-1">Content Type</label>
+            <input
+              type="text"
+              value={contentType}
+              onChange={(e) => setContentType(e.target.value)}
+              className="w-full bg-dark-900 text-white rounded-lg px-3 py-2 border border-dark-600 focus:border-red-500 focus:outline-none"
+            />
+          </div>
+        </div>
+
+        {/* Import Button */}
+        <button
+          onClick={importAthletes}
+          disabled={loading || !selectedEventId}
+          className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-4 py-3 rounded-lg flex items-center justify-center gap-2 font-medium mb-4"
+        >
+          {loading && !emailResult ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+          Import Paid Athletes
+        </button>
+
+        {/* Import Result */}
+        {importResult && (
+          <div className={`rounded-lg p-4 mb-4 ${importResult.error ? 'bg-red-900/30 border border-red-700' : 'bg-green-900/30 border border-green-700'}`}>
+            {importResult.error ? (
+              <p className="text-red-400 text-sm">Error: {importResult.error}</p>
+            ) : (
+              <div className="text-sm">
+                <p className="text-green-400 font-medium mb-2">
+                  ✅ Import complete
+                </p>
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div>
+                    <div className="text-2xl font-bold text-green-400">{importResult.results?.created || 0}</div>
+                    <div className="text-gray-400">Created</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-yellow-400">{importResult.results?.skipped || 0}</div>
+                    <div className="text-gray-400">Skipped</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-red-400">{importResult.results?.errors || 0}</div>
+                    <div className="text-gray-400">Errors</div>
+                  </div>
+                </div>
+                {importResult.results?.details?.length > 0 && (
+                  <details className="mt-3">
+                    <summary className="text-gray-400 cursor-pointer hover:text-white">View details</summary>
+                    <div className="mt-2 max-h-40 overflow-y-auto">
+                      {importResult.results.details.map((d, i) => (
+                        <div key={i} className={`py-1 ${d.status === 'error' ? 'text-red-400' : d.status === 'already_exists' ? 'text-yellow-400' : 'text-green-400'}`}>
+                          {d.name || d.email} — {d.status}
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Email Buttons */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <button
+            onClick={() => sendDeliveryEmails('delivery')}
+            disabled={loading || !selectedEventId}
+            className="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-4 py-3 rounded-lg flex items-center justify-center gap-2 font-medium"
+          >
+            {loading && !importResult ? <Loader2 className="w-4 h-4 animate-spin" /> : '📧'}
+            Send Delivery Emails
+            <span className="text-xs opacity-70">(paid athletes)</span>
+          </button>
+          <button
+            onClick={() => sendDeliveryEmails('promo')}
+            disabled={loading || !selectedEventId}
+            className="bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-4 py-3 rounded-lg flex items-center justify-center gap-2 font-medium"
+          >
+            {loading && !importResult ? <Loader2 className="w-4 h-4 animate-spin" /> : '📣'}
+            Send Promo Emails
+            <span className="text-xs opacity-70">(non-buyers)</span>
+          </button>
+        </div>
+
+        {/* Email Result */}
+        {emailResult && (
+          <div className={`rounded-lg p-4 mt-4 ${emailResult.error ? 'bg-red-900/30 border border-red-700' : 'bg-green-900/30 border border-green-700'}`}>
+            {emailResult.error ? (
+              <p className="text-red-400 text-sm">Error: {emailResult.error}</p>
+            ) : (
+              <div className="text-sm">
+                <p className="text-green-400 font-medium mb-2">
+                  ✅ {emailResult.email_type === 'delivery' ? 'Delivery' : 'Promo'} emails processed
+                </p>
+                <div className="grid grid-cols-2 gap-3 text-center">
+                  <div>
+                    <div className="text-2xl font-bold text-green-400">{emailResult.results?.sent || 0}</div>
+                    <div className="text-gray-400">Sent</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-red-400">{emailResult.results?.failed || 0}</div>
+                    <div className="text-gray-400">Failed</div>
+                  </div>
+                </div>
+                {emailResult.results?.details?.length > 0 && (
+                  <details className="mt-3">
+                    <summary className="text-gray-400 cursor-pointer hover:text-white">View details</summary>
+                    <div className="mt-2 max-h-40 overflow-y-auto">
+                      {emailResult.results.details.map((d, i) => (
+                        <div key={i} className={`py-1 ${d.status === 'failed' || d.status === 'error' ? 'text-red-400' : 'text-green-400'}`}>
+                          {d.name || d.email} — {d.status}
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
