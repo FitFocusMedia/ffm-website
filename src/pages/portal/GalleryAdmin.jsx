@@ -2594,12 +2594,23 @@ function ContentDelivery({ gallery, organization }) {
 
     try {
       // Filter rows by selected event (or use all if no event selected)
-      const rowsToImport = selectedCsvEvent
+      let rowsToImport = selectedCsvEvent
         ? parsedRows.filter(r => r.event === selectedCsvEvent)
         : parsedRows
 
+      // Only import athletes who ordered I-Walk or Posing Routine content
+      // (Skip athletes who ordered other services like Highlight Reel only, or nothing)
+      const serviceKeywords = ['i-walk', 'i walk', 'posing', 'routine']
+      rowsToImport = rowsToImport.filter(r => {
+        const service = (r.videography_service || '').toLowerCase()
+        // Include if their service mentions I-Walk, Posing, or Routine
+        // Exclude if they only ordered Highlight Reel or nothing
+        if (!service) return false // No service ordered
+        return serviceKeywords.some(kw => service.includes(kw))
+      })
+
       if (rowsToImport.length === 0) {
-        setCsvResult({ error: 'No athletes match the selected event.' })
+        setCsvResult({ error: 'No athletes with I-Walk or Posing Routine orders found in the selected data.' })
         setLoading(false)
         return
       }
@@ -2754,7 +2765,8 @@ function ContentDelivery({ gallery, organization }) {
         {showCsvImport && (
           <div className="mb-4 p-4 bg-dark-800 rounded-lg border border-emerald-700/30">
             <p className="text-gray-400 text-xs mb-3">
-              Upload a CSV/Excel file or paste spreadsheet data. Auto-detects columns and events.
+              Upload a CSV/Excel file or paste spreadsheet data. Auto-detects columns and events.<br/>
+              <span className="text-emerald-400">Only athletes with I-Walk or Posing Routine orders will be imported.</span>
             </p>
             <div className="flex gap-3 mb-3">
               <label className="flex-1 cursor-pointer">
@@ -2820,8 +2832,14 @@ function ContentDelivery({ gallery, organization }) {
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : '➕'}
                 Create Gallery Orders
                 {selectedCsvEvent
-                  ? ` (${parsedRows.filter(r => r.event === selectedCsvEvent).length} athletes)`
-                  : parsedRows.length > 0 ? ` (${parsedRows.length} athletes)` : ''
+                  ? ` (${parsedRows.filter(r => {
+                      const s = (r.videography_service || '').toLowerCase()
+                      return r.event === selectedCsvEvent && s && ['i-walk','i walk','posing','routine'].some(kw => s.includes(kw))
+                    }).length} eligible)`
+                  : parsedRows.length > 0 ? ` (${parsedRows.filter(r => {
+                      const s = (r.videography_service || '').toLowerCase()
+                      return s && ['i-walk','i walk','posing','routine'].some(kw => s.includes(kw))
+                    }).length} eligible of ${parsedRows.length} total)` : ''
                 }
               </button>
             </div>
