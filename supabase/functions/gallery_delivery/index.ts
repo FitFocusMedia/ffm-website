@@ -341,11 +341,9 @@ serve(async (req) => {
                   <p style="margin: 10px 0 0; font-size: 20px; font-weight: bold; color: #e53e3e;">Your ${contentType} Is Ready!</p>
                 </div>
                 
-                <p>Your ${contentType} is now available to view and download. Below you'll find your access link, along with a video tutorial on how to correctly download and save your files in the highest possible quality.</p>
+                <p>Your ${contentType} is now available to view and download. Below you'll find your access link.</p>
                 
                 ${buttonHtml}
-                
-                <p style="margin: 20px 0;"><a href="https://vimeo.com/754948167/cca7492a10?share=copy" style="color: #e53e3e; font-weight: bold;">📹 Watch: How to Download & Save Your Videos</a></p>
                 
                 <p style="color: #666; font-size: 14px;"><strong>How to access:</strong> Your access is linked to this email address — <strong>${order.email}</strong></p>
                 
@@ -375,9 +373,6 @@ Your ${contentType} from ${gallery.title} is now ready to view and download.
 
 Download here:
 ${downloadUrl}
-
-How to download tutorial:
-https://vimeo.com/754948167/cca7492a10?share=copy
 
 Your access is linked to: ${order.email}
 
