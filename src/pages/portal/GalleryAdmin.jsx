@@ -2604,6 +2604,67 @@ function ContentDelivery({ gallery, organization }) {
     }
   }
 
+  const importAthletes = async () => {
+    if (!gallery?.id || !selectedEventId) return
+    setLoading(true)
+    setImportResult(null)
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const response = await fetch(`https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/gallery_delivery/import`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token || ''}`
+        },
+        body: JSON.stringify({
+          gallery_id: gallery.id,
+          event_id: selectedEventId,
+          content_type: contentType
+        })
+      })
+
+      const result = await response.json()
+      setImportResult(result)
+    } catch (err) {
+      setImportResult({ error: err.message })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const sendDeliveryEmails = async (type) => {
+    if (!gallery?.id) return
+    setLoading(true)
+    setEmailResult(null)
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const response = await fetch(`https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/gallery_delivery/send-emails`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token || ''}`
+        },
+        body: JSON.stringify({
+          gallery_id: gallery.id,
+          event_id: selectedEventId,
+          email_type: type,
+          content_type: contentType,
+          event_name: eventName || gallery.title,
+          dry_run: dryRun
+        })
+      })
+
+      const result = await response.json()
+      setEmailResult(result)
+    } catch (err) {
+      setEmailResult({ error: err.message })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="border-t border-dark-600 pt-6 mt-6">
       <h3 className="text-md font-semibold text-white flex items-center gap-2 mb-4">
