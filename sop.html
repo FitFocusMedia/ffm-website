@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FFM Livestream SOP</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    .checklist-item:has(input:checked) { opacity: 0.6; text-decoration: line-through; }
+    details[open] summary { border-bottom: 1px solid #374151; margin-bottom: 1rem; padding-bottom: 0.5rem; }
+    summary { cursor: pointer; }
+    summary::-webkit-details-marker { display: none; }
+    .emergency { animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+    .copy-btn:active { transform: scale(0.95); }
+    #auth-gate { display: flex; }
+    #main-content { display: none; }
+    .authenticated #auth-gate { display: none; }
+    .authenticated #main-content { display: block; }
+  </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+
+  <!-- Password Gate -->
+  <div id="auth-gate" class="min-h-screen flex items-center justify-center p-4">
+    <div class="bg-gray-800 rounded-2xl p-8 max-w-md w-full text-center border border-gray-700">
+      <div class="text-4xl mb-4">🔒</div>
+      <h1 class="text-2xl font-bold mb-2">FFM Crew Access</h1>
+      <p class="text-gray-400 mb-6">Enter the crew password to access this document.</p>
+      <form id="auth-form" class="space-y-4">
+        <input 
+          type="password" 
+          id="password-input" 
+          placeholder="Enter password"
+          class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-red-500"
+          autocomplete="off"
+        >
+        <button 
+          type="submit"
+          class="w-full px-4 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-lg transition-colors"
+        >
+          Access SOP
+        </button>
+      </form>
+      <p id="auth-error" class="text-red-400 mt-4 hidden">Incorrect password. Try again.</p>
+    </div>
+  </div>
+
+  <!-- Main Content (hidden until authenticated) -->
+  <div id="main-content">
+  <div class="max-w-4xl mx-auto p-4 sm:p-6">
+    
+    <!-- Header -->
+    <header class="text-center mb-8 pt-4">
+      <h1 class="text-3xl sm:text-4xl font-bold text-red-500 mb-2">🎬 FFM Livestream SOP</h1>
+      <p class="text-gray-400 text-lg">Solo Show Guide for Tristan</p>
+      <p class="text-gray-500 text-sm mt-2">Adelaide Show - March 21, 2026</p>
+    </header>
+
+    <!-- Emergency Contact -->
+    <div class="bg-red-500/20 border border-red-500/50 rounded-xl p-4 mb-6 emergency">
+      <h2 class="font-bold text-red-400 flex items-center gap-2">
+        🚨 Emergency Contact
+      </h2>
+      <p class="text-white mt-2">
+        <strong>Brandon:</strong> <a href="tel:0411934935" class="text-red-400 underline">0411 934 935</a><br>
+        <strong>Scarlet (AI):</strong> Message via Telegram if Brandon is unavailable
+      </p>
+    </div>
+
+    <!-- Quick Links -->
+    <div class="bg-gray-800 rounded-xl p-4 mb-6">
+      <h2 class="font-bold text-white mb-3">🔗 Quick Links (Production)</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <a href="https://fitfocusmedia.com.au/#/portal/livestream" target="_blank" 
+           class="bg-gray-700 hover:bg-gray-600 rounded-lg p-3 flex items-center gap-2 transition-colors">
+          <span class="text-2xl">🎛️</span>
+          <div>
+            <div class="font-medium">Livestream Portal</div>
+            <div class="text-xs text-gray-400">Manage events & go live</div>
+          </div>
+        </a>
+        <a href="https://fitfocusmedia.com.au/#/portal/livestream-analytics" target="_blank"
+           class="bg-gray-700 hover:bg-gray-600 rounded-lg p-3 flex items-center gap-2 transition-colors">
+          <span class="text-2xl">📊</span>
+          <div>
+            <div class="font-medium">Analytics</div>
+            <div class="text-xs text-gray-400">Monitor viewer stats</div>
+          </div>
+        </a>
+      </div>
+    </div>
+
+    <!-- Section 1: Pre-Show Setup -->
+    <details open class="bg-gray-800 rounded-xl mb-4 overflow-hidden">
+      <summary class="p-4 font-bold text-xl flex items-center gap-2 hover:bg-gray-700">
+        <span class="text-2xl">1️⃣</span> Pre-Show Setup (Day Before / Morning Of)
+      </summary>
+      <div class="px-4 pb-4 space-y-4">
+        
+        <div class="bg-gray-700/50 rounded-lg p-4">
+          <h3 class="font-semibold text-yellow-400 mb-3">📋 Equipment Checklist</h3>
+          <div class="space-y-2">
+            <label class="checklist-item flex items-center gap-3 p-2 hover:bg-gray-600/30 rounded cursor-pointer">
+              <input type="checkbox" class="w-5 h-5 rounded">
+              <span>Camera(s) powered on and working</span>
+            </label>
+            <label class="checklist-item flex items-center gap-3 p-2 hover:bg-gray-600/30 rounded cursor-pointer">
+              <input type="checkbox" class="w-5 h-5 rounded">
+              <span>Capture card connected to laptop</span>
+            </label>
+            <label class="checklist-item flex items-center gap-3 p-2 hover:bg-gray-600/30 rounded cursor-pointer">
+              <input type="checkbox" class="w-5 h-5 rounded">
+              <span>OBS installed and configured</span>
+            </label>
+            <label class="checklist-item flex items-center gap-3 p-2 hover:bg-gray-600/30 rounded cursor-pointer">
+              <input type="checkbox" class="w-5 h-5 rounded">
+              <span>Internet connection tested (5G router or venue WiFi)</span>
+            </label>
+            <label class="checklist-item flex items-center gap-3 p-2 hover:bg-gray-600/30 rounded cursor-pointer">
+              <input type="checkbox" class="w-5 h-5 rounded">
+              <span>Backup internet ready (phone hotspot)</span>
+            </label>
+            <label class="checklist-item flex items-center gap-3 p-2 hover:bg-gray-600/30 rounded cursor-pointer">
+              <input type="checkbox" class="w-5 h-5 rounded">
+              <span>Audio mixer/mic levels tested</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="bg-gray-700/50 rounded-lg p-4">
+          <h3 class="font-semibold text-yellow-400 mb-3">🌐 Internet Speed Requirements</h3>
+          <ul class="space-y-2 text-gray-300">
+            <li>• <strong>Minimum upload:</strong> 10 Mbps (stable)</li>
+            <li>• <strong>Recommended:</strong> 15+ Mbps upload</li>
+            <li>• <strong>Test at:</strong> <a href="https://speedtest.net" target="_blank" class="text-blue-400 underline">speedtest.net</a></li>
+          </ul>
+        </div>
+      </div>
+    </details>
+
+    <!-- Section 2: OBS Configuration -->
+    <details class="bg-gray-800 rounded-xl mb-4 overflow-hidden">
+      <summary class="p-4 font-bold text-xl flex items-center gap-2 hover:bg-gray-700">
+        <span class="text-2xl">2️⃣</span> OBS Configuration
+      </summary>
+      <div class="px-4 pb-4 space-y-4">
+        
+        <div class="bg-blue-500/20 border border-blue-500/50 rounded-lg p-4">
+          <h3 class="font-semibold text-blue-400 mb-2">🎯 Stream Settings</h3>
+          <p class="text-gray-300 text-sm mb-3">Go to OBS → Settings → Stream</p>
+          
+          <div class="space-y-3">
+            <div class="bg-gray-800 rounded-lg p-3">
+              <div class="text-xs text-gray-400 mb-1">Service</div>
+              <div class="font-mono text-green-400">Custom...</div>
+            </div>
+            
+            <div class="bg-gray-800 rounded-lg p-3">
+              <div class="text-xs text-gray-400 mb-1">Server (RTMP URL)</div>
+              <div class="flex items-center gap-2">
+                <code class="font-mono text-green-400 text-sm flex-1 break-all">rtmps://global-live.mux.com:443/app</code>
+                <button onclick="copyToClipboard('rtmps://global-live.mux.com:443/app', this)" 
+                        class="copy-btn bg-gray-600 hover:bg-gray-500 px-3 py-1 rounded text-xs">
+                  Copy
+                </button>
+              </div>
+            </div>
+            
+            <div class="bg-gray-800 rounded-lg p-3">
+              <div class="text-xs text-gray-400 mb-1">Stream Key</div>
+              <div class="text-yellow-400 text-sm">
+                ⚠️ Get this from the Portal → Edit Event → Stream Settings
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-gray-700/50 rounded-lg p-4">
+          <h3 class="font-semibold text-yellow-400 mb-3">⚙️ Output Settings</h3>
+          <p class="text-gray-400 text-sm mb-3">OBS → Settings → Output → Output Mode: Advanced</p>
+          <div class="grid grid-cols-2 gap-3 text-sm">
+            <div class="bg-gray-800 p-2 rounded">
+              <div class="text-gray-400">Encoder</div>
+              <div class="text-white">x264 or Hardware (NVENC)</div>
+            </div>
+            <div class="bg-gray-800 p-2 rounded">
+              <div class="text-gray-400">Rate Control</div>
+              <div class="text-white">CBR</div>
+            </div>
+            <div class="bg-gray-800 p-2 rounded">
+              <div class="text-gray-400">Bitrate</div>
+              <div class="text-white">4500-6000 Kbps</div>
+            </div>
+            <div class="bg-gray-800 p-2 rounded">
+              <div class="text-gray-400">Keyframe Interval</div>
+              <div class="text-white">2 seconds</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-gray-700/50 rounded-lg p-4">
+          <h3 class="font-semibold text-yellow-400 mb-3">🖥️ Video Settings</h3>
+          <p class="text-gray-400 text-sm mb-3">OBS → Settings → Video</p>
+          <div class="grid grid-cols-2 gap-3 text-sm">
+            <div class="bg-gray-800 p-2 rounded">
+              <div class="text-gray-400">Base Resolution</div>
+              <div class="text-white">1920x1080</div>
+            </div>
+            <div class="bg-gray-800 p-2 rounded">
+              <div class="text-gray-400">Output Resolution</div>
+              <div class="text-white">1920x1080</div>
+            </div>
+            <div class="bg-gray-800 p-2 rounded">
+              <div class="text-gray-400">FPS</div>
+              <div class="text-white">30</div>
+            </div>
+            <div class="bg-gray-800 p-2 rounded">
+              <div class="text-gray-400">Downscale Filter</div>
+              <div class="text-white">Lanczos</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <!-- Section 3: Portal Walkthrough -->
+    <details class="bg-gray-800 rounded-xl mb-4 overflow-hidden">
+      <summary class="p-4 font-bold text-xl flex items-center gap-2 hover:bg-gray-700">
+        <span class="text-2xl">3️⃣</span> Portal Walkthrough
+      </summary>
+      <div class="px-4 pb-4 space-y-4">
+        
+        <div class="bg-green-500/20 border border-green-500/50 rounded-lg p-4">
+          <h3 class="font-semibold text-green-400 mb-2">🔐 Accessing the Portal</h3>
+          <ol class="list-decimal list-inside space-y-2 text-gray-300">
+            <li>Go to <a href="https://fitfocusmedia.com.au/#/portal/livestream" target="_blank" class="text-blue-400 underline">fitfocusmedia.com.au/#/portal/livestream</a></li>
+            <li>You should see the Livestream Events dashboard</li>
+            <li>The Adelaide event should already be created</li>
+          </ol>
+        </div>
+
+        <div class="bg-gray-700/50 rounded-lg p-4">
+          <h3 class="font-semibold text-yellow-400 mb-3">📝 Event Details to Verify</h3>
+          <p class="text-gray-400 text-sm mb-3">Click "Edit" on your event and check:</p>
+          <div class="space-y-2">
+            <label class="checklist-item flex items-center gap-3 p-2 hover:bg-gray-600/30 rounded cursor-pointer">
+              <input type="checkbox" class="w-5 h-5 rounded">
+              <span>Event title is correct</span>
+            </label>
+            <label class="checklist-item flex items-center gap-3 p-2 hover:bg-gray-600/30 rounded cursor-pointer">
+              <input type="checkbox" class="w-5 h-5 rounded">
+              <span>Start time is correct (check timezone!)</span>
+            </label>
+            <label class="checklist-item flex items-center gap-3 p-2 hover:bg-gray-600/30 rounded cursor-pointer">
+              <input type="checkbox" class="w-5 h-5 rounded">
+              <span>Price is set correctly</span>
+            </label>
+            <label class="checklist-item flex items-center gap-3 p-2 hover:bg-gray-600/30 rounded cursor-pointer">
+              <input type="checkbox" class="w-5 h-5 rounded">
+              <span>Status is "Published" (not Draft)</span>
+            </label>
+            <label class="checklist-item flex items-center gap-3 p-2 hover:bg-gray-600/30 rounded cursor-pointer">
+              <input type="checkbox" class="w-5 h-5 rounded">
+              <span>MUX Stream Key is present (copy to OBS)</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="bg-gray-700/50 rounded-lg p-4">
+          <h3 class="font-semibold text-yellow-400 mb-3">🎬 Getting the Stream Key</h3>
+          <ol class="list-decimal list-inside space-y-2 text-gray-300">
+            <li>In the Portal, click <strong>Edit</strong> on your event</li>
+            <li>Scroll down to <strong>Stream Settings</strong> section</li>
+            <li>Find the <strong>Stream Key</strong> field</li>
+            <li>Click the copy button next to it</li>
+            <li>Paste this into OBS → Settings → Stream → Stream Key</li>
+          </ol>
+        </div>
+      </div>
+    </details>
+
+    <!-- Section 4: Going Live -->
+    <details class="bg-gray-800 rounded-xl mb-4 overflow-hidden">
+      <summary class="p-4 font-bold text-xl flex items-center gap-2 hover:bg-gray-700">
+        <span class="text-2xl">4️⃣</span> Going Live (Step by Step)
+      </summary>
+      <div class="px-4 pb-4 space-y-4">
+        
+        <div class="bg-red-500/20 border border-red-500/50 rounded-lg p-4">
+          <h3 class="font-semibold text-red-400 mb-2">⏰ Timeline</h3>
+          <ul class="space-y-2 text-gray-300">
+            <li><strong>30 min before:</strong> Test stream privately</li>
+            <li><strong>15 min before:</strong> Open doors in portal</li>
+            <li><strong>5 min before:</strong> Start streaming in OBS</li>
+            <li><strong>Event time:</strong> Toggle "Go Live" in portal</li>
+          </ul>
+        </div>
+
+        <div class="bg-gray-700/50 rounded-lg p-4">
+          <h3 class="font-semibold text-green-400 mb-3">🚀 Go Live Checklist</h3>
+          <div class="space-y-3">
+            
+            <div class="bg-gray-800 rounded-lg p-3 border-l-4 border-blue-500">
+              <div class="font-medium text-blue-400">Step 1: Start OBS Stream</div>
+              <p class="text-sm text-gray-400 mt-1">Click "Start Streaming" in OBS. Wait for the green status indicator.</p>
+            </div>
+            
+            <div class="bg-gray-800 rounded-lg p-3 border-l-4 border-yellow-500">
+              <div class="font-medium text-yellow-400">Step 2: Open Doors</div>
+              <p class="text-sm text-gray-400 mt-1">In Portal, click the <strong>Door icon (🚪)</strong> on your event to allow viewers to enter. Door should turn green.</p>
+            </div>
+            
+            <div class="bg-gray-800 rounded-lg p-3 border-l-4 border-red-500">
+              <div class="font-medium text-red-400">Step 3: Toggle "Go Live"</div>
+              <p class="text-sm text-gray-400 mt-1">Click the <strong>Radio icon (📻)</strong> on your event. It turns red when live. This shows the live indicator to viewers.</p>
+            </div>
+            
+            <div class="bg-gray-800 rounded-lg p-3 border-l-4 border-green-500">
+              <div class="font-medium text-green-400">Step 4: Verify</div>
+              <p class="text-sm text-gray-400 mt-1">Open the event page in an incognito window to confirm viewers can see the stream.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-purple-500/20 border border-purple-500/50 rounded-lg p-4">
+          <h3 class="font-semibold text-purple-400 mb-2">🔍 Portal Icons Explained</h3>
+          <div class="space-y-2 text-sm">
+            <div class="flex items-center gap-3">
+              <span class="text-2xl">🚪</span>
+              <span><strong>Door (Open/Close):</strong> Controls if viewers can enter the stream</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="text-2xl">📻</span>
+              <span><strong>Radio (Go Live):</strong> Shows "LIVE" indicator to viewers</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="text-2xl">⏹️</span>
+              <span><strong>Stop (End Stream):</strong> Ends the event and archives it</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="text-2xl">📋</span>
+              <span><strong>Copy:</strong> Copies the event link to share</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="text-2xl">👁️</span>
+              <span><strong>Eye (View):</strong> Opens the public event page</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <!-- Section 5: During the Show -->
+    <details class="bg-gray-800 rounded-xl mb-4 overflow-hidden">
+      <summary class="p-4 font-bold text-xl flex items-center gap-2 hover:bg-gray-700">
+        <span class="text-2xl">5️⃣</span> During the Show
+      </summary>
+      <div class="px-4 pb-4 space-y-4">
+        
+        <div class="bg-gray-700/50 rounded-lg p-4">
+          <h3 class="font-semibold text-yellow-400 mb-3">👀 What to Monitor</h3>
+          <ul class="space-y-3">
+            <li class="flex items-start gap-3">
+              <span class="text-xl">📊</span>
+              <div>
+                <strong>OBS Stats:</strong> Watch for dropped frames (bottom bar). Should stay at 0%.
+              </div>
+            </li>
+            <li class="flex items-start gap-3">
+              <span class="text-xl">🌐</span>
+              <div>
+                <strong>Internet:</strong> If connection drops, OBS will show red/yellow status. Be ready to switch to backup.
+              </div>
+            </li>
+            <li class="flex items-start gap-3">
+              <span class="text-xl">💰</span>
+              <div>
+                <strong>Orders Tab:</strong> Check the Portal's Orders tab periodically to see purchases.
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <div class="bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-4">
+          <h3 class="font-semibold text-yellow-400 mb-2">⚠️ If Stream Drops</h3>
+          <ol class="list-decimal list-inside space-y-2 text-gray-300">
+            <li>Don't panic - viewers will see a loading state</li>
+            <li>Check OBS status indicator (bottom right)</li>
+            <li>If internet issue: Switch to backup (phone hotspot)</li>
+            <li>Click "Start Streaming" again in OBS</li>
+            <li>Stream will auto-reconnect in MUX - no portal changes needed</li>
+          </ol>
+        </div>
+      </div>
+    </details>
+
+    <!-- Section 6: Ending the Show -->
+    <details class="bg-gray-800 rounded-xl mb-4 overflow-hidden">
+      <summary class="p-4 font-bold text-xl flex items-center gap-2 hover:bg-gray-700">
+        <span class="text-2xl">6️⃣</span> Ending the Show
+      </summary>
+      <div class="px-4 pb-4 space-y-4">
+        
+        <div class="bg-gray-700/50 rounded-lg p-4">
+          <h3 class="font-semibold text-green-400 mb-3">✅ Shutdown Checklist</h3>
+          <div class="space-y-3">
+            
+            <div class="bg-gray-800 rounded-lg p-3 border-l-4 border-yellow-500">
+              <div class="font-medium text-yellow-400">Step 1: Stop OBS Streaming</div>
+              <p class="text-sm text-gray-400 mt-1">Click "Stop Streaming" in OBS first.</p>
+            </div>
+            
+            <div class="bg-gray-800 rounded-lg p-3 border-l-4 border-orange-500">
+              <div class="font-medium text-orange-400">Step 2: End Stream in Portal</div>
+              <p class="text-sm text-gray-400 mt-1">Click the <strong>Stop icon (⏹️)</strong> on your event. This archives the event and finalizes the recording.</p>
+            </div>
+            
+            <div class="bg-gray-800 rounded-lg p-3 border-l-4 border-green-500">
+              <div class="font-medium text-green-400">Step 3: Confirm Status</div>
+              <p class="text-sm text-gray-400 mt-1">Event should now show "Ended" status in the portal.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-blue-500/20 border border-blue-500/50 rounded-lg p-4">
+          <h3 class="font-semibold text-blue-400 mb-2">📼 VOD (Video on Demand)</h3>
+          <p class="text-gray-300 text-sm">
+            If VOD is enabled for this event, the recording will automatically be available after the stream ends. 
+            Viewers who purchased can re-watch using the same link.
+          </p>
+        </div>
+      </div>
+    </details>
+
+    <!-- Section 7: Troubleshooting -->
+    <details class="bg-gray-800 rounded-xl mb-4 overflow-hidden">
+      <summary class="p-4 font-bold text-xl flex items-center gap-2 hover:bg-gray-700">
+        <span class="text-2xl">7️⃣</span> Troubleshooting
+      </summary>
+      <div class="px-4 pb-4 space-y-4">
+        
+        <div class="bg-red-500/20 border border-red-500/50 rounded-lg p-4">
+          <h3 class="font-semibold text-red-400 mb-2">❌ "Stream not connecting"</h3>
+          <ul class="list-disc list-inside space-y-1 text-gray-300 text-sm">
+            <li>Check stream key is copied correctly (no extra spaces)</li>
+            <li>Verify server URL is exactly: <code class="bg-gray-800 px-1 rounded">rtmps://global-live.mux.com:443/app</code></li>
+            <li>Check firewall isn't blocking OBS</li>
+            <li>Try restarting OBS</li>
+          </ul>
+        </div>
+
+        <div class="bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-4">
+          <h3 class="font-semibold text-yellow-400 mb-2">⚠️ "Dropped frames" in OBS</h3>
+          <ul class="list-disc list-inside space-y-1 text-gray-300 text-sm">
+            <li>Reduce bitrate (try 4000 Kbps)</li>
+            <li>Check internet upload speed</li>
+            <li>Close other apps using bandwidth</li>
+            <li>Switch to backup internet if available</li>
+          </ul>
+        </div>
+
+        <div class="bg-blue-500/20 border border-blue-500/50 rounded-lg p-4">
+          <h3 class="font-semibold text-blue-400 mb-2">🔇 "No audio"</h3>
+          <ul class="list-disc list-inside space-y-1 text-gray-300 text-sm">
+            <li>Check audio mixer levels in OBS (not muted)</li>
+            <li>Verify correct audio input is selected in OBS</li>
+            <li>Test with headphones to confirm audio is reaching OBS</li>
+          </ul>
+        </div>
+
+        <div class="bg-purple-500/20 border border-purple-500/50 rounded-lg p-4">
+          <h3 class="font-semibold text-purple-400 mb-2">👤 "Viewer can't access stream"</h3>
+          <ul class="list-disc list-inside space-y-1 text-gray-300 text-sm">
+            <li>Confirm they purchased (check Orders tab in portal)</li>
+            <li>Make sure "Doors" are open (door icon should be green)</li>
+            <li>Have them try the email they used to purchase</li>
+            <li>Check if geo-blocking is enabled and they're within range</li>
+          </ul>
+        </div>
+
+        <div class="bg-green-500/20 border border-green-500/50 rounded-lg p-4">
+          <h3 class="font-semibold text-green-400 mb-2">🎥 "Black screen for viewers"</h3>
+          <ul class="list-disc list-inside space-y-1 text-gray-300 text-sm">
+            <li>Verify OBS is actively streaming (green indicator)</li>
+            <li>Check "Go Live" is toggled on (radio icon red)</li>
+            <li>Wait 10-15 seconds for stream to propagate</li>
+            <li>Have viewer refresh their browser</li>
+          </ul>
+        </div>
+      </div>
+    </details>
+
+    <!-- Quick Reference Card -->
+    <div class="bg-gradient-to-r from-red-500/20 to-orange-500/20 rounded-xl p-6 mt-8 border border-red-500/30">
+      <h2 class="font-bold text-xl text-white mb-4">📌 Quick Reference</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+        <div>
+          <div class="text-gray-400 mb-1">RTMP Server</div>
+          <code class="text-green-400 text-xs break-all">rtmps://global-live.mux.com:443/app</code>
+        </div>
+        <div>
+          <div class="text-gray-400 mb-1">Portal URL</div>
+          <code class="text-blue-400 text-xs">fitfocusmedia.com.au/#/portal/livestream</code>
+        </div>
+        <div>
+          <div class="text-gray-400 mb-1">Go Live Order</div>
+          <span class="text-white">OBS Start → Open Doors → Toggle Live</span>
+        </div>
+        <div>
+          <div class="text-gray-400 mb-1">End Order</div>
+          <span class="text-white">OBS Stop → End Stream (⏹️)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="text-center text-gray-500 text-sm mt-8 pb-8">
+      <p>FitFocus Media Livestream SOP v1.0</p>
+      <p>Last updated: March 20, 2026</p>
+      <p class="mt-2">Questions? Contact Brandon: <a href="tel:0411934935" class="text-red-400">0411 934 935</a></p>
+    </footer>
+
+  </div>
+  </div><!-- end main-content -->
+
+  <script>
+    // Copy to clipboard function
+    function copyToClipboard(text, btn) {
+      navigator.clipboard.writeText(text).then(() => {
+        const originalText = btn.textContent;
+        btn.textContent = 'Copied!';
+        btn.classList.add('bg-green-600');
+        setTimeout(() => {
+          btn.textContent = originalText;
+          btn.classList.remove('bg-green-600');
+        }, 2000);
+      });
+    }
+
+    // Save checkbox state to localStorage
+    document.querySelectorAll('input[type="checkbox"]').forEach((checkbox, index) => {
+      const key = `sop-checkbox-${index}`;
+      // Restore state
+      checkbox.checked = localStorage.getItem(key) === 'true';
+      // Save state on change
+      checkbox.addEventListener('change', () => {
+        localStorage.setItem(key, checkbox.checked);
+      });
+    });
+
+    // Reset all checkboxes button (hidden but available)
+    window.resetChecklist = function() {
+      document.querySelectorAll('input[type="checkbox"]').forEach((checkbox, index) => {
+        checkbox.checked = false;
+        localStorage.setItem(`sop-checkbox-${index}`, 'false');
+      });
+    };
+
+    // Password authentication
+    const PASS_HASH = '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a963'; // SHA-256 of 'ffmcrew'
+    
+    async function hashPassword(password) {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(password.toLowerCase().trim());
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    // Check if already authenticated
+    if (localStorage.getItem('sop_auth') === PASS_HASH) {
+      document.body.classList.add('authenticated');
+    }
+
+    // Handle form submission
+    document.getElementById('auth-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const password = document.getElementById('password-input').value;
+      const hash = await hashPassword(password);
+      
+      if (hash === PASS_HASH) {
+        localStorage.setItem('sop_auth', PASS_HASH);
+        document.body.classList.add('authenticated');
+        document.getElementById('auth-error').classList.add('hidden');
+      } else {
+        document.getElementById('auth-error').classList.remove('hidden');
+        document.getElementById('password-input').value = '';
+      }
+    });
+  </script>
+</body>
+</html>
