@@ -79,6 +79,7 @@ serve(async (req) => {
               athlete_first_name: row.first_name || null,
               athlete_last_name: row.last_name || null,
               athlete_number: row.athlete_number || null,
+              notes: row.videography_service ? `Service: ${row.videography_service}${row.event ? ` | Event: ${row.event}` : ''}` : (row.event || null),
               download_token: downloadToken,
               completed_at: new Date().toISOString(),
               delivery_email_sent: false
