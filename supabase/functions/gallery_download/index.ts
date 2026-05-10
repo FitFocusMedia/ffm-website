@@ -19,9 +19,10 @@ serve(async (req) => {
     const url = new URL(req.url)
     const token = url.searchParams.get('token')
     const photoId = url.searchParams.get('photo_id')
+    const clipId = url.searchParams.get('clip_id')
     const directDownload = url.searchParams.get('download') === 'true'
 
-    console.log('[Gallery Download] Request:', { token: token?.substring(0, 8) + '...', photoId, directDownload })
+    console.log('[Gallery Download] Request:', { token: token?.substring(0, 8) + '...', photoId, clipId, directDownload })
 
     if (!token) {
       return new Response(JSON.stringify({ error: 'Missing download token' }), {
@@ -42,7 +43,7 @@ serve(async (req) => {
           price,
           downloaded,
           download_count,
-          gallery_photos(id, filename, original_path, watermarked_path)
+          gallery_photos(id, filename, original_path, watermarked_path, thumbnail_path)
         )
       `)
       .eq('download_token', token)
@@ -57,12 +58,34 @@ serve(async (req) => {
       })
     }
 
+    // Fetch video items SEPARATELY (works around PostgREST relationship issue)
+    const { data: videoOrderItems, error: videoError } = await supabase
+      .from('gallery_order_video_items')
+      .select(`
+        id,
+        clip_id,
+        price,
+        downloaded,
+        download_count,
+        gallery_clips(id, filename, title, original_path, mux_playback_id, duration_seconds)
+      `)
+      .eq('order_id', order.id)
+
+    if (videoError) {
+      console.error('[Gallery Download] Error fetching video items:', videoError)
+    }
+
+    const orderWithVideos = {
+      ...order,
+      gallery_order_video_items: videoOrderItems || []
+    }
+
     // For free_access orders, fetch the gallery's video clips
     let galleryClips = []
     if (order.delivery_type === 'free_access' && order.galleries?.id) {
       const { data: clips } = await supabase
         .from('gallery_clips')
-        .select('id, filename, original_path, thumbnail_url, mux_playback_id, duration, category_id')
+        .select('id, filename, original_path, thumbnail_url, mux_playback_id, duration_seconds, category_id')
         .eq('gallery_id', order.galleries.id)
         .neq('processing_status', 'failed')
         .order('created_at', { ascending: true })
@@ -71,7 +94,7 @@ serve(async (req) => {
     }
 
     // Check token expiry
-    if (new Date(order.token_expires_at) < new Date()) {
+    if (order.token_expires_at && new Date(order.token_expires_at) < new Date()) {
       console.log('[Gallery Download] Token expired:', order.id)
       return new Response(JSON.stringify({ error: 'Download link has expired' }), {
         status: 410,
@@ -79,23 +102,20 @@ serve(async (req) => {
       })
     }
 
-    // If no photo_id, return order details with thumbnails (for download page)
-    if (!photoId) {
+    // If no photo_id or clip_id, return order details with thumbnails (for download page)
+    if (!photoId && !clipId) {
       console.log('[Gallery Download] Returning order details:', order.id)
       
       // Generate thumbnail URLs for each photo (1 hour expiry for previews)
-      const itemsWithThumbnails = await Promise.all(
+      const photoItems = await Promise.all(
         (order.gallery_order_items || []).map(async (item: any) => {
           let thumbnail_url = null
-          
-          // Use thumbnail_path for fast loading, fall back to original if no thumbnail
           const imagePath = item.gallery_photos?.thumbnail_path || item.gallery_photos?.original_path
           
           if (imagePath) {
             const { data: thumbData } = await supabase.storage
               .from('galleries')
-              .createSignedUrl(imagePath, 3600) // 1 hour for thumbnails
-            
+              .createSignedUrl(imagePath, 3600)
             thumbnail_url = thumbData?.signedUrl || null
           }
           
@@ -105,11 +125,32 @@ serve(async (req) => {
             filename: item.gallery_photos?.filename,
             thumbnail_url,
             downloaded: item.downloaded,
-            download_count: item.download_count
+            download_count: item.download_count,
+            gallery_photos: item.gallery_photos
           }
         })
       )
-      
+
+      // Video items - use MUX thumbnails
+      const videoItems = (orderWithVideos.gallery_order_video_items || []).map((item: any) => {
+        const clip = item.gallery_clips
+        return {
+          id: item.id,
+          clip_id: item.clip_id,
+          filename: clip?.filename,
+          title: clip?.title,
+          thumbnail_url: clip?.mux_playback_id
+            ? `https://image.mux.com/${clip.mux_playback_id}/thumbnail.jpg?width=320`
+            : null,
+          duration_seconds: clip?.duration_seconds,
+          downloaded: item.downloaded,
+          download_count: item.download_count,
+          gallery_clips: clip
+        }
+      })
+
+      console.log('[Gallery Download] Returning', photoItems.length, 'photos and', videoItems.length, 'videos', galleryClips.length, 'gallery clips (free_access)')
+
       return new Response(JSON.stringify({
         order: {
           id: order.id,
@@ -123,17 +164,18 @@ serve(async (req) => {
           athlete_last_name: order.athlete_last_name,
           completed_at: order.completed_at,
           token_expires_at: order.token_expires_at,
-          gallery: order.galleries,
-          items: itemsWithThumbnails,
+          galleries: order.galleries,
+          gallery_order_items: photoItems,
+          gallery_order_video_items: videoItems,
           // For free_access orders, include the gallery's video clips
           ...(galleryClips.length > 0 ? { gallery_clips: galleryClips.map((clip: any) => ({
             id: clip.id,
             filename: clip.filename,
-            thumbnail_url: clip.mux_playback_id 
+            thumbnail_url: clip.mux_playback_id
               ? `https://image.mux.com/${clip.mux_playback_id}/thumbnail.jpg?width=400`
               : clip.thumbnail_url,
             mux_playback_id: clip.mux_playback_id,
-            duration: clip.duration,
+            duration_seconds: clip.duration_seconds,
             original_path: clip.original_path
           })) } : {})
         }
@@ -142,82 +184,132 @@ serve(async (req) => {
       })
     }
 
-    // Find the specific photo in the order
-    const orderItem = order.gallery_order_items?.find((item: any) => item.photo_id === photoId)
-
-    if (!orderItem) {
-      console.error('[Gallery Download] Photo not in order:', photoId)
-      return new Response(JSON.stringify({ error: 'Photo not included in this order' }), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
-
-    // Update download tracking
-    await supabase
-      .from('gallery_order_items')
-      .update({
-        downloaded: true,
-        download_count: (orderItem.download_count || 0) + 1
-      })
-      .eq('id', orderItem.id)
-
-    // DIRECT DOWNLOAD: Stream the actual file (no exposed URL)
-    if (directDownload) {
-      console.log('[Gallery Download] Direct download for:', orderItem.gallery_photos.filename)
+    // === VIDEO DOWNLOAD ===
+    if (clipId) {
+      // Check if it's a free_access clip or a purchased clip
+      let videoItem = orderWithVideos.gallery_order_video_items?.find((item: any) => item.clip_id === clipId)
       
-      // Download the file from storage
-      const { data: fileData, error: fileError } = await supabase.storage
-        .from('galleries')
-        .download(orderItem.gallery_photos.original_path)
+      // For free_access orders, also check gallery clips
+      if (!videoItem && order.delivery_type === 'free_access') {
+        const galleryClip = galleryClips.find((clip: any) => clip.id === clipId)
+        if (galleryClip) {
+          videoItem = {
+            id: `free-${galleryClip.id}`,
+            clip_id: galleryClip.id,
+            gallery_clips: galleryClip
+          }
+        }
+      }
 
-      if (fileError || !fileData) {
-        console.error('[Gallery Download] Failed to download file:', fileError)
-        return new Response(JSON.stringify({ error: 'Failed to download file' }), {
+      if (!videoItem) {
+        console.error('[Gallery Download] Video not in order:', clipId)
+        return new Response(JSON.stringify({ error: 'Video not included in this order' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+
+      const originalPath = videoItem.gallery_clips?.original_path
+      if (!originalPath) {
+        console.error('[Gallery Download] No original path for video:', clipId)
+        return new Response(JSON.stringify({ error: 'Video file not available' }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+
+      // Update download tracking (only for purchased clips, not free_access)
+      if (videoItem.id && !videoItem.id.startsWith('free-')) {
+        await supabase
+          .from('gallery_order_video_items')
+          .update({
+            downloaded: true,
+            download_count: (videoItem.download_count || 0) + 1
+          })
+          .eq('id', videoItem.id)
+      }
+
+      // Generate signed URL with download filename and REDIRECT
+      const filename = videoItem.gallery_clips?.filename || `video-${clipId}.mp4`
+      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+        .from('galleries')
+        .createSignedUrl(originalPath, 300, {
+          download: filename
+        })
+
+      if (signedUrlError || !signedUrlData?.signedUrl) {
+        console.error('[Gallery Download] Failed to create signed URL for video:', signedUrlError)
+        return new Response(JSON.stringify({ error: 'Failed to generate download link' }), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })
       }
 
-      // Get the filename, sanitize it for Content-Disposition header
-      const filename = orderItem.gallery_photos.filename || 'photo.jpg'
-      const safeFilename = filename.replace(/[^a-zA-Z0-9._-]/g, '_')
+      console.log('[Gallery Download] Redirecting to signed URL for video:', filename)
 
-      // Return the file directly with download headers
-      return new Response(fileData, {
+      return new Response(null, {
+        status: 302,
         headers: {
           ...corsHeaders,
-          'Content-Type': 'image/jpeg',
-          'Content-Disposition': `attachment; filename="${safeFilename}"`,
-          'Cache-Control': 'no-cache'
+          'Location': signedUrlData.signedUrl
         }
       })
     }
 
-    // JSON response with signed URL (legacy/fallback)
-    const { data: signedUrlData, error: signedUrlError } = await supabase
-      .storage
-      .from('galleries')
-      .createSignedUrl(orderItem.gallery_photos.original_path, 300) // 5 min expiry
+    // === PHOTO DOWNLOAD ===
+    if (photoId) {
+      const orderItem = order.gallery_order_items?.find((item: any) => item.photo_id === photoId)
 
-    if (signedUrlError || !signedUrlData) {
-      console.error('[Gallery Download] Failed to create signed URL:', signedUrlError)
-      return new Response(JSON.stringify({ error: 'Failed to generate download link' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      if (!orderItem) {
+        console.error('[Gallery Download] Photo not in order:', photoId)
+        return new Response(JSON.stringify({ error: 'Photo not included in this order' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+
+      // Update download tracking
+      await supabase
+        .from('gallery_order_items')
+        .update({
+          downloaded: true,
+          download_count: (orderItem.download_count || 0) + 1
+        })
+        .eq('id', orderItem.id)
+
+      // Generate signed URL with download filename and REDIRECT
+      const filename = orderItem.gallery_photos?.filename || 'photo.jpg'
+      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+        .from('galleries')
+        .createSignedUrl(orderItem.gallery_photos.original_path, 300, {
+          download: filename
+        })
+
+      if (signedUrlError || !signedUrlData?.signedUrl) {
+        console.error('[Gallery Download] Failed to create signed URL:', signedUrlError)
+        return new Response(JSON.stringify({ error: 'Failed to generate download link' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+
+      console.log('[Gallery Download] Redirecting to signed URL for photo:', filename)
+
+      return new Response(null, {
+        status: 302,
+        headers: {
+          ...corsHeaders,
+          'Location': signedUrlData.signedUrl
+        }
       })
     }
 
-    console.log('[Gallery Download] Signed URL generated for:', orderItem.gallery_photos.filename)
-
-    return new Response(JSON.stringify({
-      download_url: signedUrlData.signedUrl,
-      filename: orderItem.gallery_photos.filename
-    }), {
+    return new Response(JSON.stringify({ error: 'Invalid request' }), {
+      status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('[Gallery Download] Error:', error)
     return new Response(JSON.stringify({ error: error.message || 'Internal server error' }), {
       status: 500,
