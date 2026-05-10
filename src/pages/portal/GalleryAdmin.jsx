@@ -2482,33 +2482,22 @@ function ContentDelivery({ gallery, organization }) {
   const [showCsvImport, setShowCsvImport] = useState(false)
   const [csvText, setCsvText] = useState('')
   const [csvResult, setCsvResult] = useState(null)
+  const [csvEvents, setCsvEvents] = useState([])
+  const [selectedCsvEvent, setSelectedCsvEvent] = useState('')
+  const [parsedRows, setParsedRows] = useState([])
 
+  // Parse CSV when text changes and extract events
   useEffect(() => {
-    loadEvents()
-  }, [organization?.id])
-
-  useEffect(() => {
-    if (selectedEventId) {
-      const ev = events.find(e => e.id === selectedEventId)
-      setEventName(ev?.name || '')
+    if (!csvText.trim()) {
+      setCsvEvents([])
+      setParsedRows([])
+      setSelectedCsvEvent('')
+      return
     }
-  }, [selectedEventId, events])
-
-  const importFromCsv = async () => {
-    if (!csvText.trim() || !gallery?.id) return
-    setLoading(true)
-    setCsvResult(null)
-
     try {
-      // Parse CSV with header detection and quoted field support
       const lines = csvText.trim().split('\n').map(l => l.trim()).filter(l => l)
-      if (lines.length < 2) {
-        setCsvResult({ error: 'Need at least a header row and one data row' })
-        setLoading(false)
-        return
-      }
+      if (lines.length < 2) { setCsvEvents([]); setParsedRows([]); return }
 
-      // Parse CSV line handling quoted fields (e.g. "6 – Oceania Pro/Am Nationals, Gold Coast")
       const parseCsvLine = (line) => {
         const parts = []
         let current = ''
@@ -2522,9 +2511,7 @@ function ContentDelivery({ gallery, organization }) {
         return parts
       }
 
-      // Detect headers from first row
       const headers = parseCsvLine(lines[0]).map(h => h.toLowerCase().trim())
-      
       const emailIdx = headers.findIndex(h => h === 'email' || h === 'e-mail')
       const firstNameIdx = headers.findIndex(h => h === 'first name' || h === 'first_name' || h === 'firstname')
       const lastNameIdx = headers.findIndex(h => h === 'last name' || h === 'last_name' || h === 'lastname')
@@ -2532,30 +2519,62 @@ function ContentDelivery({ gallery, organization }) {
       const videographyIdx = headers.findIndex(h => h.includes('videography') || h.includes('service'))
       const eventIdx = headers.findIndex(h => h === 'event')
 
-      if (emailIdx === -1) {
-        setCsvResult({ error: 'No "Email" column found. Please include an Email column in your CSV.' })
-        setLoading(false)
-        return
-      }
+      if (emailIdx === -1) { setCsvEvents([]); setParsedRows([]); return }
 
       const rows = []
+      const eventSet = new Set()
       for (let i = 1; i < lines.length; i++) {
         const parts = parseCsvLine(lines[i])
         const email = (parts[emailIdx] || '').toLowerCase().trim()
         if (!email || !email.includes('@')) continue
+
+        const evt = eventIdx >= 0 ? (parts[eventIdx] || '').trim() : ''
+        const service = videographyIdx >= 0 ? (parts[videographyIdx] || '').trim() : ''
 
         rows.push({
           email,
           first_name: firstNameIdx >= 0 ? (parts[firstNameIdx] || '').trim() : '',
           last_name: lastNameIdx >= 0 ? (parts[lastNameIdx] || '').trim() : '',
           athlete_number: athleteNumberIdx >= 0 ? (parts[athleteNumberIdx] || '').trim() : '',
-          videography_service: videographyIdx >= 0 ? (parts[videographyIdx] || '').trim() : '',
-          event: eventIdx >= 0 ? (parts[eventIdx] || '').trim() : ''
+          videography_service: service,
+          event: evt
         })
+
+        if (evt) eventSet.add(evt)
       }
 
-      if (rows.length === 0) {
-        setCsvResult({ error: 'No valid rows found with email addresses.' })
+      setCsvEvents([...eventSet].sort())
+      setParsedRows(rows)
+    } catch (err) {
+      setCsvEvents([])
+      setParsedRows([])
+    }
+  }, [csvText])
+
+  useEffect(() => {
+    loadEvents()
+  }, [organization?.id])
+
+  useEffect(() => {
+    if (selectedEventId) {
+      const ev = events.find(e => e.id === selectedEventId)
+      setEventName(ev?.name || '')
+    }
+  }, [selectedEventId, events])
+
+  const importFromCsv = async () => {
+    if (!parsedRows.length || !gallery?.id) return
+    setLoading(true)
+    setCsvResult(null)
+
+    try {
+      // Filter rows by selected event (or use all if no event selected)
+      const rowsToImport = selectedCsvEvent
+        ? parsedRows.filter(r => r.event === selectedCsvEvent)
+        : parsedRows
+
+      if (rowsToImport.length === 0) {
+        setCsvResult({ error: 'No athletes match the selected event.' })
         setLoading(false)
         return
       }
@@ -2571,7 +2590,7 @@ function ContentDelivery({ gallery, organization }) {
           gallery_id: gallery.id,
           event_id: selectedEventId || null,
           content_type: contentType,
-          csv_rows: rows
+          csv_rows: rowsToImport
         })
       })
 
@@ -2584,166 +2603,246 @@ function ContentDelivery({ gallery, organization }) {
       setLoading(false)
     }
   }
-  const loadEvents = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('events')
-        .select('id, name, date')
-        .eq('organization_id', organization.id)
-        .order('date', { ascending: false })
-      
-      if (error) throw error
-      setEvents(data || [])
-    } catch (err) {
-      console.error('Load events error:', err)
-    } finally {
-      setLoadingEvents(false)
-    }
-  }
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setCreating(true)
-
-    try {
-      const slug = formData.title
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)/g, '')
-
-      const { data, error } = await supabase
-        .from('galleries')
-        .insert({
-          organization_id: organization.id,
-          event_id: formData.event_id || null,
-          title: formData.title,
-          description: formData.description,
-          slug,
-          price_per_photo: Math.round(formData.price_per_photo * 100),
-          package_price: formData.package_price ? Math.round(parseFloat(formData.package_price) * 100) : null,
-          package_enabled: formData.package_enabled,
-          status: 'draft'
-        })
-        .select()
-        .single()
-
-      if (error) throw error
-      onCreate(data)
-    } catch (err) {
-      console.error('Create gallery error:', err)
-      alert('Failed to create gallery: ' + err.message)
-    } finally {
-      setCreating(false)
-    }
-  }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-dark-800 rounded-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <h2 className="text-xl font-bold text-white mb-4">
-          Create Gallery for {organization.display_name || organization.name}
-        </h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="border-t border-dark-600 pt-6 mt-6">
+      <h3 className="text-md font-semibold text-white flex items-center gap-2 mb-4">
+        🎬 Content Delivery
+        <span className="text-xs text-gray-500 font-normal">(I-Walk / Posing Routine)</span>
+      </h3>
+      
+      <div className="bg-dark-700 rounded-lg p-4 mb-4">
+        <p className="text-gray-400 text-sm mb-4">
+          Import athletes and grant them free gallery access, then send delivery or promo emails.
+        </p>
+
+        {/* Event Selection */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <div>
-            <label className="block text-gray-400 mb-1">Title *</label>
+            <label className="block text-gray-400 text-sm mb-1">Linked Event</label>
+            <select
+              value={selectedEventId}
+              onChange={(e) => setSelectedEventId(e.target.value)}
+              className="w-full bg-dark-900 text-white rounded-lg px-3 py-2 border border-dark-600 focus:border-red-500 focus:outline-none"
+            >
+              <option value="">Select event...</option>
+              {events.map(ev => (
+                <option key={ev.id} value={ev.id}>
+                  {ev.name} ({new Date(ev.date).toLocaleDateString()})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-gray-400 text-sm mb-1">Content Type</label>
             <input
               type="text"
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              className="w-full bg-dark-700 text-white rounded-lg px-4 py-3 border border-dark-600 focus:border-red-500 focus:outline-none"
-              placeholder="e.g. South East Qld Championship Photos"
-              required
+              value={contentType}
+              onChange={(e) => setContentType(e.target.value)}
+              className="w-full bg-dark-900 text-white rounded-lg px-3 py-2 border border-dark-600 focus:border-red-500 focus:outline-none"
             />
           </div>
+        </div>
 
-          <div>
-            <label className="block text-gray-400 mb-1">Link to Event (Optional)</label>
-            {loadingEvents ? (
-              <div className="text-gray-500 py-2">Loading events...</div>
-            ) : (
-              <select
-                value={formData.event_id}
-                onChange={(e) => setFormData({ ...formData, event_id: e.target.value })}
-                className="w-full bg-dark-700 text-white rounded-lg px-4 py-3 border border-dark-600 focus:border-red-500 focus:outline-none"
+        {/* Import Buttons */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+          <button
+            onClick={importAthletes}
+            disabled={loading || !selectedEventId}
+            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-4 py-3 rounded-lg flex items-center justify-center gap-2 font-medium"
+          >
+            {loading && !emailResult ? <Loader2 className="w-4 h-4 animate-spin" /> : '📋'}
+            Import from Content Orders
+            <span className="text-xs opacity-70">(paid athletes)</span>
+          </button>
+          <button
+            onClick={() => setShowCsvImport(!showCsvImport)}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-lg flex items-center justify-center gap-2 font-medium"
+          >
+            📄 Import from CSV
+            <span className="text-xs opacity-70">(paste spreadsheet)</span>
+          </button>
+        </div>
+
+        {/* CSV Import Area */}
+        {showCsvImport && (
+          <div className="mb-4 p-4 bg-dark-800 rounded-lg border border-emerald-700/30">
+            <p className="text-gray-400 text-xs mb-2">
+              Paste your full order sheet. Auto-detects events and lets you filter by show.
+            </p>
+            <textarea
+              value={csvText}
+              onChange={(e) => setCsvText(e.target.value)}
+              placeholder="Paste your full CSV here... (all events)"
+              className="w-full h-32 bg-dark-900 text-white rounded-lg px-3 py-2 border border-dark-600 focus:border-emerald-500 focus:outline-none font-mono text-sm resize-y"
+            />
+
+            {/* Event Filter */}
+            {csvEvents.length > 0 && (
+              <div className="mt-3">
+                <label className="block text-gray-400 text-sm mb-1">
+                  Filter by event ({parsedRows.length} total athletes, {csvEvents.length} events found)
+                </label>
+                <select
+                  value={selectedCsvEvent}
+                  onChange={(e) => setSelectedCsvEvent(e.target.value)}
+                  className="w-full bg-dark-900 text-white rounded-lg px-3 py-2 border border-dark-600 focus:border-emerald-500 focus:outline-none"
+                >
+                  <option value="">All events ({parsedRows.length} athletes)</option>
+                  {csvEvents.map(evt => {
+                    const count = parsedRows.filter(r => r.event === evt).length
+                    return <option key={evt} value={evt}>{evt} ({count} athletes)</option>
+                  })}
+                </select>
+                {selectedCsvEvent && (
+                  <p className="text-emerald-400 text-sm mt-1">
+                    ✅ {parsedRows.filter(r => r.event === selectedCsvEvent).length} athletes will be imported for "{selectedCsvEvent}"
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="flex items-center gap-3 mt-3">
+              <button
+                onClick={importFromCsv}
+                disabled={loading || !parsedRows.length}
+                className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg flex items-center gap-2 font-medium text-sm"
               >
-                <option value="">No specific event (org-wide gallery)</option>
-                {events.map(event => (
-                  <option key={event.id} value={event.id}>
-                    {event.name} ({new Date(event.date).toLocaleDateString()})
-                  </option>
-                ))}
-              </select>
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : '➕'}
+                Create Gallery Orders
+                {selectedCsvEvent
+                  ? ` (${parsedRows.filter(r => r.event === selectedCsvEvent).length} athletes)`
+                  : parsedRows.length > 0 ? ` (${parsedRows.length} athletes)` : ''
+                }
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* CSV Import Result */}
+        {csvResult && (
+          <div className={`rounded-lg p-4 mb-4 ${csvResult.error ? 'bg-red-900/30 border border-red-700' : 'bg-green-900/30 border border-green-700'}`}>
+            {csvResult.error ? (
+              <p className="text-red-400 text-sm">Error: {csvResult.error}</p>
+            ) : (
+              <div className="text-sm">
+                <p className="text-green-400 font-medium mb-2">✅ CSV Import complete</p>
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div><div className="text-2xl font-bold text-green-400">{csvResult.results?.created || 0}</div><div className="text-gray-400">Created</div></div>
+                  <div><div className="text-2xl font-bold text-yellow-400">{csvResult.results?.skipped || 0}</div><div className="text-gray-400">Skipped</div></div>
+                  <div><div className="text-2xl font-bold text-red-400">{csvResult.results?.errors || 0}</div><div className="text-gray-400">Errors</div></div>
+                </div>
+                {csvResult.results?.details?.length > 0 && (
+                  <details className="mt-3">
+                    <summary className="text-gray-400 cursor-pointer hover:text-white">View details</summary>
+                    <div className="mt-2 max-h-40 overflow-y-auto">
+                      {csvResult.results.details.map((d, i) => (
+                        <div key={i} className={`py-1 ${d.status === 'error' ? 'text-red-400' : d.status === 'already_exists' ? 'text-yellow-400' : 'text-green-400'}`}>
+                          {d.name || d.email} — {d.status}
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+              </div>
             )}
           </div>
+        )}
 
+        {/* Import Result */}
+        {importResult && (
+          <div className={`rounded-lg p-4 mb-4 ${importResult.error ? 'bg-red-900/30 border border-red-700' : 'bg-green-900/30 border border-green-700'}`}>
+            {importResult.error ? (
+              <p className="text-red-400 text-sm">Error: {importResult.error}</p>
+            ) : (
+              <div className="text-sm">
+                <p className="text-green-400 font-medium mb-2">✅ Import complete</p>
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div><div className="text-2xl font-bold text-green-400">{importResult.results?.created || 0}</div><div className="text-gray-400">Created</div></div>
+                  <div><div className="text-2xl font-bold text-yellow-400">{importResult.results?.skipped || 0}</div><div className="text-gray-400">Skipped</div></div>
+                  <div><div className="text-2xl font-bold text-red-400">{importResult.results?.errors || 0}</div><div className="text-gray-400">Errors</div></div>
+                </div>
+                {importResult.results?.details?.length > 0 && (
+                  <details className="mt-3">
+                    <summary className="text-gray-400 cursor-pointer hover:text-white">View details</summary>
+                    <div className="mt-2 max-h-40 overflow-y-auto">
+                      {importResult.results.details.map((d, i) => (
+                        <div key={i} className={`py-1 ${d.status === 'error' ? 'text-red-400' : d.status === 'already_exists' ? 'text-yellow-400' : 'text-green-400'}`}>
+                          {d.name || d.email} — {d.status}
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Dry Run Toggle */}
+        <div className="flex items-center gap-3 mb-4 p-3 bg-yellow-900/20 border border-yellow-700/30 rounded-lg">
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" checked={dryRun} onChange={(e) => setDryRun(e.target.checked)} className="sr-only peer" />
+            <div className="w-9 h-5 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-yellow-500"></div>
+          </label>
           <div>
-            <label className="block text-gray-400 mb-1">Description</label>
-            <textarea
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="w-full bg-dark-700 text-white rounded-lg px-4 py-3 border border-dark-600 focus:border-red-500 focus:outline-none"
-              rows={3}
-              placeholder="Optional description for the gallery"
-            />
+            <span className="text-yellow-400 text-sm font-medium">{dryRun ? '🧪 Dry Run Mode' : '📧 Live Mode'}</span>
+            <p className="text-gray-500 text-xs">{dryRun ? 'Preview who would receive emails without actually sending' : 'Emails will be sent for real!'}</p>
           </div>
+        </div>
 
-          <div>
-            <label className="block text-gray-400 mb-1">Price per Photo ($)</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={formData.price_per_photo}
-              onChange={(e) => setFormData({ ...formData, price_per_photo: parseFloat(e.target.value) || 0 })}
-              className="w-full bg-dark-700 text-white rounded-lg px-4 py-3 border border-dark-600 focus:border-red-500 focus:outline-none"
-            />
+        {/* Email Buttons */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <button
+            onClick={() => sendDeliveryEmails('delivery')}
+            disabled={loading || !selectedEventId}
+            className="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-4 py-3 rounded-lg flex items-center justify-center gap-2 font-medium"
+          >
+            {loading && !importResult ? <Loader2 className="w-4 h-4 animate-spin" /> : '📧'}
+            Send Delivery Emails
+            <span className="text-xs opacity-70">(paid athletes)</span>
+          </button>
+          <button
+            onClick={() => sendDeliveryEmails('promo')}
+            disabled={loading || !selectedEventId}
+            className="bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-4 py-3 rounded-lg flex items-center justify-center gap-2 font-medium"
+          >
+            {loading && !importResult ? <Loader2 className="w-4 h-4 animate-spin" /> : '📣'}
+            Send Promo Emails
+            <span className="text-xs opacity-70">(non-buyers)</span>
+          </button>
+        </div>
+
+        {/* Email Result */}
+        {emailResult && (
+          <div className={`rounded-lg p-4 mt-4 ${emailResult.error ? 'bg-red-900/30 border border-red-700' : 'bg-green-900/30 border border-green-700'}`}>
+            {emailResult.error ? (
+              <p className="text-red-400 text-sm">Error: {emailResult.error}</p>
+            ) : (
+              <div className="text-sm">
+                <p className={`font-medium mb-2 ${emailResult.dry_run ? 'text-yellow-400' : 'text-green-400'}`}>
+                  {emailResult.dry_run ? '🧪 Dry Run — no emails sent' : '✅'} {emailResult.email_type === 'delivery' ? 'Delivery' : 'Promo'} emails {emailResult.dry_run ? 'would be sent' : 'processed'}
+                </p>
+                <div className="grid grid-cols-2 gap-3 text-center">
+                  <div><div className="text-2xl font-bold text-green-400">{emailResult.results?.sent || 0}</div><div className="text-gray-400">Sent</div></div>
+                  <div><div className="text-2xl font-bold text-red-400">{emailResult.results?.failed || 0}</div><div className="text-gray-400">Failed</div></div>
+                </div>
+                {emailResult.results?.details?.length > 0 && (
+                  <details className="mt-3">
+                    <summary className="text-gray-400 cursor-pointer hover:text-white">View details</summary>
+                    <div className="mt-2 max-h-40 overflow-y-auto">
+                      {emailResult.results.details.map((d, i) => (
+                        <div key={i} className={`py-1 ${d.status === 'failed' || d.status === 'error' ? 'text-red-400' : d.status === 'dry_run' ? 'text-yellow-400' : 'text-green-400'}`}>
+                          {d.name || d.email} — {d.status}
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+              </div>
+            )}
           </div>
-
-          <div>
-            <label className="flex items-center gap-2 text-gray-400 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={formData.package_enabled}
-                onChange={(e) => setFormData({ ...formData, package_enabled: e.target.checked })}
-                className="w-4 h-4 rounded"
-              />
-              Enable "Buy All" Package Deal
-            </label>
-          </div>
-
-          {formData.package_enabled && (
-            <div>
-              <label className="block text-gray-400 mb-1">Package Price ($)</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={formData.package_price}
-                onChange={(e) => setFormData({ ...formData, package_price: e.target.value })}
-                className="w-full bg-dark-700 text-white rounded-lg px-4 py-3 border border-dark-600 focus:border-red-500 focus:outline-none"
-                placeholder="e.g. 49.99 for all photos"
-              />
-            </div>
-          )}
-
-          <div className="flex gap-3 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 bg-dark-600 hover:bg-dark-500 text-white py-3 rounded-lg"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={creating || !formData.title}
-              className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white py-3 rounded-lg flex items-center justify-center gap-2"
-            >
-              {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              Create Gallery
-            </button>
-          </div>
-        </form>
+        )}
       </div>
     </div>
   )
