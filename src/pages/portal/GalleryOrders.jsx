@@ -14,7 +14,6 @@ export default function GalleryOrders() {
   const [filterDateTo, setFilterDateTo] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [showFilters, setShowFilters] = useState(false) // Collapsed by default on mobile
-  const [filterType, setFilterType] = useState('all') // purchase, free_access, or all
   
   // Selected order for detail view
   const [selectedOrder, setSelectedOrder] = useState(null)
@@ -123,12 +122,6 @@ export default function GalleryOrders() {
     // Status filter
     if (filterStatus !== 'all' && order.status !== filterStatus) return false
     
-    // Type filter
-    if (filterType !== 'all') {
-      if (filterType === 'purchase' && order.delivery_type === 'free_access') return false
-      if (filterType === 'free_access' && order.delivery_type !== 'free_access') return false
-    }
-    
     // Date range filter
     if (filterDateFrom && new Date(order.created_at) < new Date(filterDateFrom)) return false
     if (filterDateTo && new Date(order.created_at) > new Date(filterDateTo + 'T23:59:59')) return false
@@ -151,7 +144,6 @@ export default function GalleryOrders() {
   const activeFilterCount = [
     filterGallery !== 'all',
     filterStatus !== 'all',
-    filterType !== 'all',
     filterDateFrom,
     filterDateTo,
     searchQuery
@@ -297,20 +289,6 @@ export default function GalleryOrders() {
                 </select>
               </div>
 
-              {/* Delivery Type Filter */}
-              <div>
-                <label className="block text-xs md:text-sm text-gray-400 mb-1">Type</label>
-                <select
-                  value={filterType}
-                  onChange={(e) => setFilterType(e.target.value)}
-                  className="w-full bg-dark-800 border border-dark-700 rounded-lg px-3 py-2 text-white text-sm"
-                >
-                  <option value="all">All Types</option>
-                  <option value="purchase">Purchases</option>
-                  <option value="free_access">Free Access (Imported)</option>
-                </select>
-              </div>
-
               {/* Date From */}
               <div>
                 <label className="block text-xs md:text-sm text-gray-400 mb-1">From</label>
@@ -362,7 +340,7 @@ export default function GalleryOrders() {
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Customer</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Gallery</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Items</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Type</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Access</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Amount</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Status</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Actions</th>
@@ -392,12 +370,12 @@ export default function GalleryOrders() {
                       <td className="px-4 py-4">
                         <div className="text-sm">
                           {order.delivery_type === 'free_access' ? (
-                            <span className="bg-blue-500/20 text-blue-400 px-2 py-1 rounded text-xs">
-                              🎬 Free Access
+                            <span className="bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded text-xs">
+                              Pre-paid
                             </span>
                           ) : order.is_package ? (
                             <span className="bg-purple-500/20 text-purple-400 px-2 py-1 rounded text-xs">
-                              Full Package
+                              Package
                             </span>
                           ) : (
                             `${order.gallery_order_items?.length || 0} photos`
@@ -457,7 +435,7 @@ export default function GalleryOrders() {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-gray-500">
-                        {order.delivery_type === 'free_access' ? '🎬 Free' : order.is_package ? 'Package' : `${order.gallery_order_items?.length || 0} photos`}
+                        {order.delivery_type === 'free_access' ? '✓ Pre-paid' : order.is_package ? 'Package' : `${order.gallery_order_items?.length || 0} photos`}
                       </span>
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[order.status]}`}>
                         <StatusIcon status={order.status} />
@@ -527,9 +505,9 @@ export default function GalleryOrders() {
                         <StatusIcon status={selectedOrder.status} />
                         {selectedOrder.status}
                       </span>
-                      {selectedOrder.delivery_type && (
-                        <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-500/20 text-blue-400">
-                          {selectedOrder.delivery_type === 'free_access' ? '🎬 Free Access' : '💰 Purchase'}
+                      {selectedOrder.delivery_type === 'free_access' && (
+                        <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-500/20 text-emerald-400">
+                          ✓ Pre-paid
                         </span>
                       )}
                     </div>
