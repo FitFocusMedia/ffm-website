@@ -2551,6 +2551,21 @@ function ContentDelivery({ gallery, organization }) {
     }
   }, [csvText])
 
+  const loadEvents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('events')
+        .select('id, name, date')
+        .eq('organization_id', organization.id)
+        .order('date', { ascending: false })
+      
+      if (error) throw error
+      setEvents(data || [])
+    } catch (err) {
+      console.error('Load events error:', err)
+    }
+  }
+
   useEffect(() => {
     loadEvents()
   }, [organization?.id])
