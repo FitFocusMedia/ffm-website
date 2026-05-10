@@ -276,14 +276,30 @@ serve(async (req) => {
 
       if (email_type === 'delivery') {
         // Send to athletes who already paid (free access)
-        const { data: freeOrders } = await supabase
+        // Filter by content type if specified (e.g., only I-Walk orders)
+        let query = supabase
           .from('gallery_orders')
-          .select('id, email, customer_name, download_token, athlete_first_name, athlete_last_name, delivery_email_sent, galleries(title, organizations(name))')
+          .select('id, email, customer_name, download_token, athlete_first_name, athlete_last_name, notes, delivery_email_sent, galleries(title, organizations(name))')
           .eq('gallery_id', gallery_id)
           .eq('delivery_type', 'free_access')
           .eq('delivery_email_sent', false)
+        
+        // If content_type is specified, filter orders by their service type in notes
+        // Notes format: "Service: I-Walk | Event: Show Name" or "I-Walk Routine"
+        const { data: freeOrders } = await query
 
-        for (const order of (freeOrders || [])) {
+        // Filter orders by content type if specified
+        const filteredOrders = (freeOrders || []).filter((order: any) => {
+          if (!content_type || content_type === 'I-Walk / Posing Routine') return true
+          const notesLower = (order.notes || '').toLowerCase()
+          if (content_type.toLowerCase().includes('i-walk') && notesLower.includes('i-walk')) return true
+          if (content_type.toLowerCase().includes('posing') && notesLower.includes('posing')) return true
+          // If no notes, include them (might be from content orders import)
+          if (!order.notes) return true
+          return false
+        })
+
+        for (const order of filteredOrders) {
           const downloadUrl = `https://fitfocusmedia.com.au/#/gallery/download/${order.download_token}`
           const firstName = order.athlete_first_name || order.customer_name?.split(' ')[0] || 'Athlete'
           const orgName = gallery?.organizations?.name || 'Fit Focus Media'
