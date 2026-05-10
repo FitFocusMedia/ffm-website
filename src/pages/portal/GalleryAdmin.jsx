@@ -2939,10 +2939,25 @@ function ContentDelivery({ gallery, organization }) {
                 {emailResult.results?.details?.length > 0 && (
                   <details className="mt-3">
                     <summary className="text-gray-400 cursor-pointer hover:text-white">View details</summary>
-                    <div className="mt-2 max-h-40 overflow-y-auto">
+                    <div className="mt-2 max-h-60 overflow-y-auto space-y-2">
                       {emailResult.results.details.map((d, i) => (
-                        <div key={i} className={`py-1 ${d.status === 'failed' || d.status === 'error' ? 'text-red-400' : d.status === 'dry_run' ? 'text-yellow-400' : 'text-green-400'}`}>
-                          {d.name || d.email} — {d.status}
+                        <div key={i} className={`p-2 rounded ${d.status === 'failed' || d.status === 'error' ? 'bg-red-900/20' : d.status === 'dry_run' ? 'bg-yellow-900/20' : 'bg-green-900/20'}`}>
+                          <div className={`font-medium ${d.status === 'failed' || d.status === 'error' ? 'text-red-400' : d.status === 'dry_run' ? 'text-yellow-400' : 'text-green-400'}`}>
+                            {d.name || d.email} — {d.status}
+                          </div>
+                          {d.subject && (
+                            <div className="text-gray-400 text-xs mt-1">Subject: {d.subject}</div>
+                          )}
+                          {d.download_url && (
+                            <div className="text-gray-500 text-xs mt-1 break-all">
+                              Download link: <a href={d.download_url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">{d.download_url}</a>
+                            </div>
+                          )}
+                          {d.preview_url && (
+                            <div className="text-gray-500 text-xs mt-1 break-all">
+                              Preview link: <a href={d.preview_url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">{d.preview_url}</a>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>

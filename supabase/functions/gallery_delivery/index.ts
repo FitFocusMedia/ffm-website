@@ -291,7 +291,15 @@ serve(async (req) => {
           // Dry run: skip sending, just record what would be sent
           if (isDryRun) {
             results.sent++
-            results.details.push({ email: order.email, name: order.customer_name, status: 'dry_run', type: 'delivery' })
+            results.details.push({
+              email: order.email,
+              name: order.customer_name,
+              status: 'dry_run',
+              type: 'delivery',
+              subject: `Your ${contentType} Is Ready! - ${gallery.title} 🎬`,
+              download_url: downloadUrl,
+              first_name: firstName
+            })
             continue
           }
 
@@ -396,7 +404,15 @@ serve(async (req) => {
           // Dry run: skip sending, just record what would be sent
           if (isDryRun) {
             results.sent++
-            results.details.push({ email: order.email, name: `${order.first_name} ${order.last_name}`, status: 'dry_run', type: 'promo' })
+            results.details.push({
+              email: order.email,
+              name: `${order.first_name} ${order.last_name}`,
+              status: 'dry_run',
+              type: 'promo',
+              subject: `${contentType}s from ${event_name || gallery.title} Are Now Available! 🎬`,
+              preview_url: galleryViewUrl,
+              first_name: firstName
+            })
             continue
           }
 
