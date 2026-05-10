@@ -2600,13 +2600,17 @@ function ContentDelivery({ gallery, organization }) {
 
       // Only import athletes who ordered I-Walk or Posing Routine content
       // (Skip athletes who ordered other services like Highlight Reel only, or nothing)
-      const serviceKeywords = ['i-walk', 'i walk', 'posing', 'routine']
+      const iwalkKeywords = ['i-walk', 'i walk', 'iwalk']
+      const posingKeywords = ['posing', 'routine']
       rowsToImport = rowsToImport.filter(r => {
         const service = (r.videography_service || '').toLowerCase()
         // Include if their service mentions I-Walk, Posing, or Routine
+        // This catches "Fully Edited Individual Highlight + I-Walk Reel (Package)" too
         // Exclude if they only ordered Highlight Reel or nothing
         if (!service) return false // No service ordered
-        return serviceKeywords.some(kw => service.includes(kw))
+        const hasIWalk = iwalkKeywords.some(kw => service.includes(kw))
+        const hasPosing = posingKeywords.some(kw => service.includes(kw))
+        return hasIWalk || hasPosing
       })
 
       if (rowsToImport.length === 0) {
@@ -2834,11 +2838,11 @@ function ContentDelivery({ gallery, organization }) {
                 {selectedCsvEvent
                   ? ` (${parsedRows.filter(r => {
                       const s = (r.videography_service || '').toLowerCase()
-                      return r.event === selectedCsvEvent && s && ['i-walk','i walk','posing','routine'].some(kw => s.includes(kw))
+                      return r.event === selectedCsvEvent && s && (['i-walk','i walk','posing','routine'].some(kw => s.includes(kw)))
                     }).length} eligible)`
                   : parsedRows.length > 0 ? ` (${parsedRows.filter(r => {
                       const s = (r.videography_service || '').toLowerCase()
-                      return s && ['i-walk','i walk','posing','routine'].some(kw => s.includes(kw))
+                      return s && (['i-walk','i walk','posing','routine'].some(kw => s.includes(kw)))
                     }).length} eligible of ${parsedRows.length} total)` : ''
                 }
               </button>
