@@ -1,0 +1,9 @@
+## 10:11 AM — Dry Run Mode Added to Content Delivery
+
+Brandon asked how to safely test before sending real emails. Added dry run mode:
+- Toggle ON by default (yellow banner: 🧪 Dry Run Mode)
+- Dry run: lists who would receive emails without actually sending
+- Live mode: actually sends via Postmark
+- Edge function updated to accept `dry_run: true` parameter
+- Frontend deployed to gh-pages
+- Edge function needs manual deploy: `npx supabase functions deploy gallery_delivery`

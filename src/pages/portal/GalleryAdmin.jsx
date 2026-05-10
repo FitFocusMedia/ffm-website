@@ -2514,7 +2514,7 @@ function ContentDelivery({ gallery, organization }) {
     
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      const response = await fetch(`https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/gallery-delivery/import`, {
+      const response = await fetch(`https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/gallery_delivery/import`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2543,7 +2543,7 @@ function ContentDelivery({ gallery, organization }) {
     
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      const response = await fetch(`https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/gallery-delivery/send-emails`, {
+      const response = await fetch(`https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/gallery_delivery/send-emails`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
