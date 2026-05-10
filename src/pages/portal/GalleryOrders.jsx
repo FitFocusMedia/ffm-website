@@ -14,6 +14,7 @@ export default function GalleryOrders() {
   const [filterDateTo, setFilterDateTo] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [showFilters, setShowFilters] = useState(false) // Collapsed by default on mobile
+  const [filterType, setFilterType] = useState('all') // purchase, free_access, or all
   
   // Selected order for detail view
   const [selectedOrder, setSelectedOrder] = useState(null)
@@ -48,7 +49,42 @@ export default function GalleryOrders() {
       `)
       .order('created_at', { ascending: false })
     
-    setOrders(ordersData || [])
+    // Also load free_access orders (from CSV imports) which won't have gallery_order_items
+    const { data: freeOrders } = await supabase
+      .from('gallery_orders')
+      .select(`
+        id,
+        gallery_id,
+        email,
+        customer_name,
+        total_amount,
+        status,
+        delivery_type,
+        athlete_first_name,
+        athlete_last_name,
+        athlete_number,
+        notes,
+        created_at,
+        completed_at,
+        download_token,
+        delivery_email_sent,
+        galleries (id, title, slug)
+      `)
+      .eq('delivery_type', 'free_access')
+      .order('created_at', { ascending: false })
+    
+    // Merge free_access orders that aren't already in the main query
+    const existingIds = new Set((ordersData || []).map(o => o.id))
+    const mergedOrders = [...(ordersData || [])]
+    for (const order of (freeOrders || [])) {
+      if (!existingIds.has(order.id)) {
+        mergedOrders.push(order)
+      }
+    }
+    // Sort by created_at descending
+    mergedOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    
+    setOrders(mergedOrders)
     setLoading(false)
   }
 
@@ -87,6 +123,12 @@ export default function GalleryOrders() {
     // Status filter
     if (filterStatus !== 'all' && order.status !== filterStatus) return false
     
+    // Type filter
+    if (filterType !== 'all') {
+      if (filterType === 'purchase' && order.delivery_type === 'free_access') return false
+      if (filterType === 'free_access' && order.delivery_type !== 'free_access') return false
+    }
+    
     // Date range filter
     if (filterDateFrom && new Date(order.created_at) < new Date(filterDateFrom)) return false
     if (filterDateTo && new Date(order.created_at) > new Date(filterDateTo + 'T23:59:59')) return false
@@ -109,6 +151,7 @@ export default function GalleryOrders() {
   const activeFilterCount = [
     filterGallery !== 'all',
     filterStatus !== 'all',
+    filterType !== 'all',
     filterDateFrom,
     filterDateTo,
     searchQuery
@@ -254,6 +297,20 @@ export default function GalleryOrders() {
                 </select>
               </div>
 
+              {/* Delivery Type Filter */}
+              <div>
+                <label className="block text-xs md:text-sm text-gray-400 mb-1">Type</label>
+                <select
+                  value={filterType}
+                  onChange={(e) => setFilterType(e.target.value)}
+                  className="w-full bg-dark-800 border border-dark-700 rounded-lg px-3 py-2 text-white text-sm"
+                >
+                  <option value="all">All Types</option>
+                  <option value="purchase">Purchases</option>
+                  <option value="free_access">Free Access (Imported)</option>
+                </select>
+              </div>
+
               {/* Date From */}
               <div>
                 <label className="block text-xs md:text-sm text-gray-400 mb-1">From</label>
@@ -305,6 +362,7 @@ export default function GalleryOrders() {
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Customer</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Gallery</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Items</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Type</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Amount</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Status</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Actions</th>
@@ -313,7 +371,7 @@ export default function GalleryOrders() {
               <tbody className="divide-y divide-dark-800">
                 {filteredOrders.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan="8" className="px-4 py-8 text-center text-gray-500">
                       No orders found
                     </td>
                   </tr>
@@ -333,7 +391,11 @@ export default function GalleryOrders() {
                       </td>
                       <td className="px-4 py-4">
                         <div className="text-sm">
-                          {order.is_package ? (
+                          {order.delivery_type === 'free_access' ? (
+                            <span className="bg-blue-500/20 text-blue-400 px-2 py-1 rounded text-xs">
+                              🎬 Free Access
+                            </span>
+                          ) : order.is_package ? (
                             <span className="bg-purple-500/20 text-purple-400 px-2 py-1 rounded text-xs">
                               Full Package
                             </span>
@@ -395,7 +457,7 @@ export default function GalleryOrders() {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-gray-500">
-                        {order.is_package ? 'Package' : `${order.gallery_order_items?.length || 0} photos`}
+                        {order.delivery_type === 'free_access' ? '🎬 Free' : order.is_package ? 'Package' : `${order.gallery_order_items?.length || 0} photos`}
                       </span>
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[order.status]}`}>
                         <StatusIcon status={order.status} />
@@ -431,6 +493,12 @@ export default function GalleryOrders() {
                   <div className="bg-dark-800 rounded-lg p-3 md:p-4">
                     <div className="font-medium">{selectedOrder.customer_name || 'No name provided'}</div>
                     <div className="text-gray-400 text-sm break-all">{selectedOrder.email}</div>
+                    {selectedOrder.athlete_first_name && (
+                      <div className="text-gray-500 text-xs mt-1">
+                        Athlete: {selectedOrder.athlete_first_name} {selectedOrder.athlete_last_name || ''}
+                        {selectedOrder.athlete_number ? ` #${selectedOrder.athlete_number}` : ''}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -459,15 +527,33 @@ export default function GalleryOrders() {
                         <StatusIcon status={selectedOrder.status} />
                         {selectedOrder.status}
                       </span>
+                      {selectedOrder.delivery_type && (
+                        <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-500/20 text-blue-400">
+                          {selectedOrder.delivery_type === 'free_access' ? '🎬 Free Access' : '💰 Purchase'}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div>
                     <h3 className="text-xs md:text-sm font-medium text-gray-400 mb-2">Date</h3>
                     <div className="bg-dark-800 rounded-lg p-3 md:p-4 text-sm">
                       {formatDateShort(selectedOrder.created_at)}
+                      {selectedOrder.completed_at && (
+                        <div className="text-xs text-gray-500 mt-1">Completed: {formatDateShort(selectedOrder.completed_at)}</div>
+                      )}
                     </div>
                   </div>
                 </div>
+
+                {/* Notes / Order Details */}
+                {selectedOrder.notes && (
+                  <div>
+                    <h3 className="text-xs md:text-sm font-medium text-gray-400 mb-2">Notes</h3>
+                    <div className="bg-dark-800 rounded-lg p-3 md:p-4 text-sm text-gray-300">
+                      {selectedOrder.notes}
+                    </div>
+                  </div>
+                )}
 
                 {/* Download Token */}
                 <div>
