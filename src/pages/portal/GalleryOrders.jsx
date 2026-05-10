@@ -340,7 +340,7 @@ export default function GalleryOrders() {
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Customer</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Gallery</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Items</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Access</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Order</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Amount</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Status</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Actions</th>
@@ -371,7 +371,7 @@ export default function GalleryOrders() {
                         <div className="text-sm">
                           {order.delivery_type === 'free_access' ? (
                             <span className="bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded text-xs">
-                              Pre-paid
+                              Ordered
                             </span>
                           ) : order.is_package ? (
                             <span className="bg-purple-500/20 text-purple-400 px-2 py-1 rounded text-xs">
@@ -381,6 +381,11 @@ export default function GalleryOrders() {
                             `${order.gallery_order_items?.length || 0} photos`
                           )}
                         </div>
+                        {order.notes && (
+                          <div className="text-xs text-gray-500 mt-0.5 truncate max-w-[120px]" title={order.notes}>
+                            {order.notes}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-4">
                         <div className="font-semibold text-green-400">{formatAmount(order.total_amount)}</div>
@@ -435,7 +440,7 @@ export default function GalleryOrders() {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-gray-500">
-                        {order.delivery_type === 'free_access' ? '✓ Pre-paid' : order.is_package ? 'Package' : `${order.gallery_order_items?.length || 0} photos`}
+                        {order.delivery_type === 'free_access' ? '✓ Ordered' : order.is_package ? 'Package' : `${order.gallery_order_items?.length || 0} photos`}
                       </span>
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[order.status]}`}>
                         <StatusIcon status={order.status} />
@@ -507,7 +512,7 @@ export default function GalleryOrders() {
                       </span>
                       {selectedOrder.delivery_type === 'free_access' && (
                         <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-500/20 text-emerald-400">
-                          ✓ Pre-paid
+                          ✓ Ordered
                         </span>
                       )}
                     </div>
