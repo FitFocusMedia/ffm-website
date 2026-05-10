@@ -156,8 +156,10 @@ export default function GalleryDownloadPage() {
 
   const photoItems = order.gallery_order_items || []
   const videoItems = order.gallery_order_video_items || []
+  const galleryClips = order.gallery_clips || []
   const hasPhotos = photoItems.length > 0
-  const hasVideos = videoItems.length > 0
+  const hasVideos = videoItems.length > 0 || galleryClips.length > 0
+  const isFreeAccess = order.delivery_type === 'free_access'
   
   const allPhotosDownloaded = photoItems.every(item => downloadedPhotos.has(item.photo_id))
   const allVideosDownloaded = videoItems.every(item => downloadedClips.has(item.clip_id))
@@ -167,7 +169,9 @@ export default function GalleryDownloadPage() {
 
   // Determine header text
   let headerText = 'Your Content Is Ready!'
-  if (hasPhotos && hasVideos) {
+  if (isFreeAccess) {
+    headerText = galleryClips.length > 0 ? 'Your Video Is Ready!' : 'Your Content Is Ready!'
+  } else if (hasPhotos && hasVideos) {
     headerText = 'Your Photos & Videos Are Ready!'
   } else if (hasVideos) {
     headerText = 'Your Videos Are Ready!'
@@ -185,7 +189,10 @@ export default function GalleryDownloadPage() {
           </div>
           <h1 className="text-3xl font-bold text-white mb-2">{headerText}</h1>
           <p className="text-gray-400">
-            Thank you for your purchase from {order.galleries?.title}
+            {isFreeAccess 
+              ? `Your content from ${order.galleries?.title || 'the gallery'} is ready to download`
+              : `Thank you for your purchase from ${order.galleries?.title}`
+            }
           </p>
         </div>
 
@@ -298,22 +305,67 @@ export default function GalleryDownloadPage() {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-white flex items-center gap-2">
                 <Video className="w-5 h-5 text-blue-400" />
-                Videos ({videoItems.length})
+                {isFreeAccess && galleryClips.length > 0 
+                  ? `Your Videos (${galleryClips.length})` 
+                  : `Videos (${videoItems.length})`
+                }
               </h2>
-              {videoItems.length > 1 && !allVideosDownloaded && (
-                <button
-                  onClick={downloadAllClips}
-                  disabled={downloadingClip}
-                  className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-600 text-white font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
-                >
-                  <Download className="w-4 h-4" />
-                  Download All ({videoItems.length})
-                </button>
-              )}
             </div>
 
             <div className="space-y-3">
-              {videoItems.map(item => {
+              {/* Gallery clips for free_access orders */}
+              {galleryClips.length > 0 && galleryClips.map(clip => {
+                const isDownloading = downloadingClip === clip.id
+
+                return (
+                  <div
+                    key={clip.id}
+                    className="bg-dark-800 rounded-lg p-4 flex items-center gap-4"
+                  >
+                    <div className="w-28 h-20 bg-dark-700 rounded-lg overflow-hidden flex-shrink-0 relative">
+                      {clip.thumbnail_url ? (
+                        <>
+                          <img 
+                            src={clip.thumbnail_url} 
+                            alt={clip.filename || 'Video'} 
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-10 h-10 bg-black/50 rounded-full flex items-center justify-center">
+                              <Play className="w-5 h-5 text-white ml-0.5" />
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <Video className="w-full h-full text-gray-600 p-4" />
+                      )}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-white font-medium truncate">
+                        {clip.filename || `Video`}
+                      </h3>
+                      {clip.duration && (
+                        <p className="text-gray-500 text-sm">
+                          Duration: {formatDuration(clip.duration)}
+                        </p>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={() => downloadClip(clip.id, clip.filename || `video-${clip.id}.mp4`)}
+                      disabled={isDownloading}
+                      className="flex-shrink-0 px-4 py-2 rounded-lg flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white transition-colors"
+                    >
+                      {isDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                      Download
+                    </button>
+                  </div>
+                )
+              })}
+
+              {/* Regular video items for purchased orders */}
+              {videoItems.length > 0 && videoItems.map(item => {
                 const isDownloaded = downloadedClips.has(item.clip_id)
                 const isDownloading = downloadingClip === item.clip_id
 

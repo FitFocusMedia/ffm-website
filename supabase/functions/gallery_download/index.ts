@@ -57,6 +57,19 @@ serve(async (req) => {
       })
     }
 
+    // For free_access orders, fetch the gallery's video clips
+    let galleryClips = []
+    if (order.delivery_type === 'free_access' && order.galleries?.id) {
+      const { data: clips } = await supabase
+        .from('gallery_clips')
+        .select('id, filename, original_path, thumbnail_url, mux_playback_id, duration, category_id')
+        .eq('gallery_id', order.galleries.id)
+        .neq('processing_status', 'failed')
+        .order('created_at', { ascending: true })
+      
+      galleryClips = clips || []
+    }
+
     // Check token expiry
     if (new Date(order.token_expires_at) < new Date()) {
       console.log('[Gallery Download] Token expired:', order.id)
@@ -104,10 +117,25 @@ serve(async (req) => {
           customer_name: order.customer_name,
           total_amount: order.total_amount,
           is_package: order.is_package,
+          delivery_type: order.delivery_type,
+          notes: order.notes,
+          athlete_first_name: order.athlete_first_name,
+          athlete_last_name: order.athlete_last_name,
           completed_at: order.completed_at,
           token_expires_at: order.token_expires_at,
           gallery: order.galleries,
-          items: itemsWithThumbnails
+          items: itemsWithThumbnails,
+          // For free_access orders, include the gallery's video clips
+          ...(galleryClips.length > 0 ? { gallery_clips: galleryClips.map((clip: any) => ({
+            id: clip.id,
+            filename: clip.filename,
+            thumbnail_url: clip.mux_playback_id 
+              ? `https://image.mux.com/${clip.mux_playback_id}/thumbnail.jpg?width=400`
+              : clip.thumbnail_url,
+            mux_playback_id: clip.mux_playback_id,
+            duration: clip.duration,
+            original_path: clip.original_path
+          })) } : {})
         }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }

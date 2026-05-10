@@ -323,36 +323,73 @@ serve(async (req) => {
           const emailBody = {
             From: 'info@fitfocusmedia.com.au',
             To: order.email,
-            Subject: `Your ${contentType} Is Ready! - ${gallery.title} 🎬`,
+            Subject: `Your ${contentType} from ${gallery.title} Is Ready! 🎬`,
             HtmlBody: `
               <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
                 <h1 style="color: #e53e3e; margin: 0 0 20px;">FIT FOCUS MEDIA</h1>
-                <h2 style="margin: 0 0 20px;">Hey ${firstName}! Your ${contentType} is ready 🎉</h2>
+                <h2 style="margin: 0 0 20px;">Hey ${firstName}! 👋</h2>
                 
-                <p>Thanks for ordering your ${contentType}! Your video is now available to view and download.</p>
+                <p>Hope you're having a fantastic day and feeling great post-show!</p>
+                
+                <p>First off, we'd like to say a massive <strong>thank you</strong> for choosing to support Fit Focus Media and allowing us to be a part of your special day. You absolutely <strong>crushed it</strong> out on stage — congratulations on an amazing effort! 🏆</p>
+                
+                <p>We'd also like to say a personal thank you for your patience in getting your content over to you. This season has been more than we could have ever expected, and we're truly grateful for your support as we continue to develop better systems and processes.</p>
                 
                 <div style="background: #f7f7f7; padding: 20px; border-radius: 8px; margin: 20px 0;">
                   <p style="margin: 0; font-size: 18px; font-weight: bold;">${gallery.title}</p>
                   <p style="margin: 5px 0 0; color: #666;">${orgName}</p>
-                  <p style="margin: 10px 0 0; font-size: 20px; font-weight: bold; color: #e53e3e;">FREE ACCESS</p>
+                  <p style="margin: 10px 0 0; font-size: 20px; font-weight: bold; color: #e53e3e;">Your ${contentType} Is Ready!</p>
                 </div>
                 
-                <h3 style="margin: 20px 0 10px;">Download Your Video</h3>
-                <p style="margin: 0 0 10px; color: #333;">Click the button below to view and download your content.</p>
+                <p>Your ${contentType} is now available to view and download. Below you'll find your access link, along with a video tutorial on how to correctly download and save your files in the highest possible quality.</p>
                 
                 ${buttonHtml}
                 
-                <p style="color: #666; font-size: 14px;">
-                  <strong>How to access:</strong> Your access is linked to this email address: <strong>${order.email}</strong>
-                </p>
+                <p style="margin: 20px 0;"><a href="https://vimeo.com/754948167/cca7492a10?share=copy" style="color: #e53e3e; font-weight: bold;">📹 Watch: How to Download & Save Your Videos</a></p>
+                
+                <p style="color: #666; font-size: 14px;"><strong>How to access:</strong> Your access is linked to this email address — <strong>${order.email}</strong></p>
+                
+                <div style="background: #fff8e1; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ffc107;">
+                  <p style="margin: 0; font-size: 14px;"><strong>📌 Please Note:</strong> If you have ordered other content from our team, such as a Show Day Highlight, or content that is separate from us such as show day photos, these will be delivered on their own when ready.</p>
+                </div>
+                
+                <p>If you have any issues with downloading or saving your files, please feel free to get in touch at any point and one of our team will be more than happy to assist.</p>
+                
+                <p>If you've enjoyed working with us, we'd love if you could leave a review on Google — it helps us so much! 👇</p>
+                <p><a href="https://g.page/r/CYhE4-27_SwIEB0/review" style="background: #e53e3e; color: #fff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: bold;">⭐ Leave a Google Review</a></p>
                 
                 <p style="color: #999; font-size: 12px; margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
-                  Order ID: ${order.id}<br>
-                  Questions? Reply to this email or contact us at info@fitfocusmedia.com.au
+                  Thank you once again, ${firstName}. Speak soon!<br><br>
+                  — The Fit Focus Media Team<br>
+                  info@fitfocusmedia.com.au
                 </p>
               </div>
             `,
-            TextBody: `Hey ${firstName}! Your ${contentType} is ready!\n\nThanks for ordering! Your video from ${gallery.title} is now available.\n\nDownload here:\n${downloadUrl}\n\nAccess linked to: ${order.email}\nOrder ID: ${order.id}\n\n— Fit Focus Media`,
+            TextBody: `Hey ${firstName}!
+
+Hope you're having a fantastic day and feeling great post-show!
+
+First off, we'd like to say a massive thank you for choosing to support Fit Focus Media and allowing us to be a part of your special day. You absolutely crushed it out on stage — congratulations on an amazing effort!
+
+Your ${contentType} from ${gallery.title} is now ready to view and download.
+
+Download here:
+${downloadUrl}
+
+How to download tutorial:
+https://vimeo.com/754948167/cca7492a10?share=copy
+
+Your access is linked to: ${order.email}
+
+If you have any issues, please get in touch and one of our team will be happy to assist.
+
+If you've enjoyed working with us, please consider leaving a review:
+https://g.page/r/CYhE4-27_SwIEB0/review
+
+Thank you once again, ${firstName}. Speak soon!
+
+— The Fit Focus Media Team
+info@fitfocusmedia.com.au`,
             MessageStream: 'outbound'
           }
 
@@ -440,25 +477,52 @@ serve(async (req) => {
             HtmlBody: `
               <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
                 <h1 style="color: #e53e3e; margin: 0 0 20px;">FIT FOCUS MEDIA</h1>
-                <h2 style="margin: 0 0 20px;">Hey ${firstName}! Your ${contentType} is now available 🎬</h2>
+                <h2 style="margin: 0 0 20px;">Hey ${firstName}! 👋</h2>
                 
-                <p>We captured your ${contentType} at ${event_name || gallery.title}! You can now preview and purchase your video.</p>
+                <p>Hope you're having a fantastic day and feeling great post-show!</p>
+                
+                <p>We captured your ${contentType} at <strong>${event_name || gallery.title}</strong> and it's now available to preview and purchase! You absolutely crushed it on stage — congratulations on an amazing effort! 🏆</p>
                 
                 <div style="background: #f7f7f7; padding: 20px; border-radius: 8px; margin: 20px 0;">
                   <p style="margin: 0; font-size: 18px; font-weight: bold;">${gallery.title}</p>
                   <p style="margin: 5px 0 0; color: #666;">${orgName}</p>
                 </div>
                 
+                <p>Click below to preview your footage and purchase your ${contentType}.</p>
+                
                 ${promoButtonHtml}
                 
-                <p style="color: #666; font-size: 14px;">Access is linked to your email: <strong>${order.email}</strong></p>
+                <p style="color: #666; font-size: 14px;"><strong>How to access:</strong> Your preview is linked to this email address — <strong>${order.email}</strong></p>
+                
+                <p>If you have any questions, please feel free to get in touch at any point and one of our team will be more than happy to assist.</p>
+                
+                <p>If you've enjoyed working with us, we'd love if you could leave a review on Google! 👇</p>
+                <p><a href="https://g.page/r/CYhE4-27_SwIEB0/review" style="background: #e53e3e; color: #fff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: bold;">⭐ Leave a Google Review</a></p>
                 
                 <p style="color: #999; font-size: 12px; margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
-                  Questions? Reply to this email or contact us at info@fitfocusmedia.com.au
+                  — The Fit Focus Media Team<br>
+                  info@fitfocusmedia.com.au
                 </p>
               </div>
             `,
-            TextBody: `Hey ${firstName}!\n\nYour ${contentType} from ${event_name || gallery.title} is now available for preview and purchase.\n\nView here: ${galleryViewUrl}\n\nAccess linked to: ${order.email}\n\n— Fit Focus Media`,
+            TextBody: `Hey ${firstName}!
+
+Hope you're having a fantastic day and feeling great post-show!
+
+We captured your ${contentType} at ${event_name || gallery.title} and it's now available to preview and purchase! You absolutely crushed it on stage — congratulations!
+
+Preview and purchase here:
+${galleryViewUrl}
+
+Your access is linked to: ${order.email}
+
+If you have any questions, please get in touch and one of our team will be happy to assist.
+
+If you've enjoyed working with us, please consider leaving a review:
+https://g.page/r/CYhE4-27_SwIEB0/review
+
+— The Fit Focus Media Team
+info@fitfocusmedia.com.au`,
             MessageStream: 'outbound'
           }
 
