@@ -24,6 +24,26 @@ serve(async (req) => {
 
     console.log('[Gallery Download] Request:', { token: token?.substring(0, 8) + '...', photoId, clipId, directDownload })
 
+    // Route: GET /gallery_download?lookup=email — Diagnostic: find orders by email
+    const lookupEmail = url.searchParams.get('lookup')
+    if (lookupEmail) {
+      const { data: lookupOrders, error: lookupError } = await supabase
+        .from('gallery_orders')
+        .select('id, email, customer_name, status, delivery_type, download_token, completed_at, token_expires_at, gallery_id, galleries(title, slug)')
+        .ilike('email', lookupEmail.toLowerCase())
+        .order('created_at', { ascending: false })
+
+      if (lookupError) {
+        return new Response(JSON.stringify({ error: lookupError.message }), {
+          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+
+      return new Response(JSON.stringify({ email: lookupEmail, orders: lookupOrders || [] }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
     if (!token) {
       return new Response(JSON.stringify({ error: 'Missing download token' }), {
         status: 400,
@@ -31,7 +51,14 @@ serve(async (req) => {
       })
     }
 
-    // Fetch order by download token
+    // First, try to find the order by token (any status) for better error messages
+    const { data: rawOrder, error: rawError } = await supabase
+      .from('gallery_orders')
+      .select('id, status, delivery_type, email, download_token, token_expires_at')
+      .eq('download_token', token)
+      .limit(1)
+
+    // Fetch order by download token (must be completed)
     const { data: order, error: orderError } = await supabase
       .from('gallery_orders')
       .select(`
@@ -52,9 +79,26 @@ serve(async (req) => {
 
     if (orderError || !order) {
       console.error('[Gallery Download] Order not found:', orderError)
+      // Provide better error messages based on what we found
+      if (rawOrder && rawOrder.length > 0) {
+        const found = rawOrder[0]
+        if (found.status === 'pending') {
+          return new Response(JSON.stringify({ error: 'Payment pending — order has not been completed yet' }), {
+            status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+        }
+        if (found.token_expires_at && new Date(found.token_expires_at) < new Date()) {
+          return new Response(JSON.stringify({ error: 'Download link has expired' }), {
+            status: 410, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+        }
+        // Order exists but status is something unexpected
+        return new Response(JSON.stringify({ error: `Order status is '${found.status}' — expected 'completed'. Contact support.` }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
       return new Response(JSON.stringify({ error: 'Order not found or not completed' }), {
-        status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 

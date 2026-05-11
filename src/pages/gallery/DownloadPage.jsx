@@ -141,12 +141,23 @@ export default function GalleryDownloadPage() {
         <div className="text-center max-w-md">
           <AlertTriangle className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-white mb-2">
-            {error === 'Download link has expired' ? 'Link Expired' : 'Access Denied'}
+            {error === 'Download link has expired' ? 'Link Expired' 
+              : error.includes('pending') ? 'Payment Pending'
+              : error.includes('status') ? 'Order Issue'
+              : 'Access Denied'}
           </h2>
           <p className="text-gray-400 mb-4">{error}</p>
-          {error === 'Download link has expired' && (
+          {error === 'Download link has expired' ? (
             <p className="text-gray-500 text-sm">
               Download links expire after 7 days. Please contact us if you need a new link.
+            </p>
+          ) : error.includes('pending') ? (
+            <p className="text-gray-500 text-sm">
+              Your order is being processed. If you've already paid, please try again in a few minutes or contact us.
+            </p>
+          ) : (
+            <p className="text-gray-500 text-sm">
+              If you believe this is an error, please contact us at info@fitfocusmedia.com.au and we'll sort it out.
             </p>
           )}
         </div>
