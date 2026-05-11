@@ -1010,6 +1010,237 @@ info@fitfocusmedia.com.au`
       )
     }
 
+    // Route: POST /gallery_delivery/fix-tokens — Find tokens from sent emails and update DB to match
+    if (req.method === 'POST' && path === 'fix-tokens') {
+      const { gallery_id, dry_run } = await req.json()
+
+      if (!gallery_id) {
+        return new Response(
+          JSON.stringify({ error: 'Missing gallery_id' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      const isDryRun = dry_run === true
+      const postmarkToken = Deno.env.get('POSTMARK_SERVER_TOKEN')
+
+      if (!postmarkToken) {
+        return new Response(
+          JSON.stringify({ error: 'Postmark not configured' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      // Get gallery info
+      const { data: gallery } = await supabase
+        .from('galleries')
+        .select('id, title, slug')
+        .eq('id', gallery_id)
+        .single()
+
+      if (!gallery) {
+        return new Response(
+          JSON.stringify({ error: 'Gallery not found' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      // Get all promo/free_access orders for this gallery
+      const { data: orders, error: ordersError } = await supabase
+        .from('gallery_orders')
+        .select('id, email, customer_name, download_token, delivery_type')
+        .eq('gallery_id', gallery_id)
+        .in('delivery_type', ['free_access', 'promo'])
+
+      if (ordersError) {
+        return new Response(
+          JSON.stringify({ error: ordersError.message }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      // Query Postmark Messages API for outbound messages containing the gallery slug/download path
+      // Extract download tokens from the email content
+      const results = { found: 0, updated: 0, skipped: 0, errors: 0, details: [] as any[] }
+      const tokenPattern = /gallery\/download\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/gi
+
+      // Search Postmark for messages related to this gallery
+      const searchSubject = encodeURIComponent(gallery.title)
+      let postmarkMessages: any[] = []
+      let offset = 0
+      let hasMore = true
+
+      while (hasMore && offset < 500) {
+        try {
+          const pmResponse = await fetch(
+            `https://api.postmarkapp.com/messages/outbound?subject=${searchSubject}&count=100&offset=${offset}`,
+            {
+              headers: {
+                'Accept': 'application/json',
+                'X-Postmark-Server-Token': postmarkToken
+              }
+            }
+          )
+
+          if (!pmResponse.ok) {
+            const errorData = await pmResponse.json()
+            console.error('[GalleryDelivery] Postmark API error:', errorData)
+            break
+          }
+
+          const pmData = await pmResponse.json()
+          const messages = pmData.Messages || []
+          postmarkMessages = postmarkMessages.concat(messages)
+
+          if (messages.length < 100) {
+            hasMore = false
+          } else {
+            offset += 100
+          }
+        } catch (err) {
+          console.error('[GalleryDelivery] Postmark fetch error:', err)
+          break
+        }
+      }
+
+      // Build a map of email -> old token from the Postmark messages
+      const emailTokenMap = new Map<string, string>()
+
+      for (const msg of postmarkMessages) {
+        // Extract token from the message body/text
+        const body = (msg.TextBody || '') + ' ' + (msg.HtmlBody || '') + ' ' + (msg.Subject || '')
+        const matches = body.matchAll(tokenPattern)
+        for (const match of matches) {
+          const token = match[1]
+          const email = (msg.To || '').toLowerCase().trim()
+          if (email && token) {
+            emailTokenMap.set(email, token)
+          }
+        }
+      }
+
+      // Also try to get tokens from the click-tracking URLs in the message
+      // The Postmark Messages API might not include full HTML body in the list endpoint
+      // So let's also try the message details endpoint for each message
+      for (const msg of postmarkMessages.slice(0, 50)) {
+        if (emailTokenMap.has((msg.To || '').toLowerCase().trim())) continue
+
+        try {
+          const detailResponse = await fetch(
+            `https://api.postmarkapp.com/messages/outbound/${msg.MessageID}/details`,
+            {
+              headers: {
+                'Accept': 'application/json',
+                'X-Postmark-Server-Token': postmarkToken
+              }
+            }
+          )
+
+          if (detailResponse.ok) {
+            const detail = await detailResponse.json()
+            const body = (detail.TextBody || '') + ' ' + (detail.HtmlBody || '') + ' ' + (detail.Subject || '')
+            const matches = body.matchAll(tokenPattern)
+            for (const match of matches) {
+              const token = match[1]
+              const email = (msg.To || '').toLowerCase().trim()
+              if (email && token) {
+                emailTokenMap.set(email, token)
+              }
+            }
+          }
+        } catch (err) {
+          // Skip individual message detail errors
+        }
+      }
+
+      // Now update each order's download_token to match the one from the email
+      for (const order of (orders || [])) {
+        const emailLower = order.email.toLowerCase().trim()
+        const oldToken = emailTokenMap.get(emailLower)
+
+        if (!oldToken) {
+          results.skipped++
+          results.details.push({
+            email: order.email,
+            name: order.customer_name,
+            status: 'no_email_found',
+            current_token: order.download_token
+          })
+          continue
+        }
+
+        if (oldToken === order.download_token) {
+          results.skipped++
+          results.details.push({
+            email: order.email,
+            name: order.customer_name,
+            status: 'token_already_matches',
+            token: oldToken
+          })
+          continue
+        }
+
+        results.found++
+
+        if (isDryRun) {
+          results.details.push({
+            email: order.email,
+            name: order.customer_name,
+            status: 'dry_run',
+            old_token: order.download_token,
+            new_token: oldToken
+          })
+          continue
+        }
+
+        // Update the download token in the DB to match what was in the email
+        const { error: updateError } = await supabase
+          .from('gallery_orders')
+          .update({ download_token: oldToken })
+          .eq('id', order.id)
+
+        if (updateError) {
+          console.error('[GalleryDelivery] Token update error:', updateError)
+          results.errors++
+          results.details.push({
+            email: order.email,
+            name: order.customer_name,
+            status: 'update_failed',
+            error: updateError.message
+          })
+        } else {
+          results.updated++
+          results.details.push({
+            email: order.email,
+            name: order.customer_name,
+            status: 'updated',
+            old_token: order.download_token,
+            new_token: oldToken
+          })
+        }
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          dry_run: isDryRun,
+          gallery_id,
+          gallery_title: gallery.title,
+          postmark_messages_found: postmarkMessages.length,
+          tokens_from_emails: emailTokenMap.size,
+          results,
+          summary: {
+            total_orders: orders?.length || 0,
+            found: results.found,
+            updated: results.updated,
+            skipped: results.skipped,
+            errors: results.errors
+          }
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     return new Response(
       JSON.stringify({ error: 'Not found' }),
       { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

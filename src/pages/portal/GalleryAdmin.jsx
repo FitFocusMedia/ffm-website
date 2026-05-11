@@ -2981,7 +2981,7 @@ function ContentDelivery({ gallery, organization }) {
 
         {/* Reset Tokens — fixes broken download links from first import */}
         <div className="border-t border-dark-700 pt-3 mt-3">
-          <p className="text-xs text-gray-500 mb-2">⚠️ If download links from sent emails are broken (showing "Access Denied"), use these to regenerate tokens and re-send:</p>
+          <p className="text-xs text-gray-500 mb-2">⚠️ If download links from sent emails are broken (showing "Access Denied"), use these:</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <button
               onClick={() => resetTokensAndResend('delivery')}
@@ -2997,6 +2997,38 @@ function ContentDelivery({ gallery, organization }) {
             >
               🔄 Reset Tokens & Re-send Promo
             </button>
+          </div>
+          <div className="mt-3">
+            <button
+              onClick={async () => {
+                if (!gallery?.id) return
+                if (!confirm('This will search Postmark for sent emails and update DB tokens to match. This makes existing email links work. Continue?')) return
+                setLoading(true)
+                setEmailResult(null)
+                try {
+                  const { data: { session } } = await supabase.auth.getSession()
+                  const response = await fetch(`https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/gallery_delivery/fix-tokens`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${session?.access_token || ''}`
+                    },
+                    body: JSON.stringify({ gallery_id: gallery.id, dry_run: true })
+                  })
+                  const result = await response.json()
+                  setEmailResult(result)
+                } catch (err) {
+                  setEmailResult({ error: err.message })
+                } finally {
+                  setLoading(false)
+                }
+              }}
+              disabled={loading || !gallery?.id}
+              className="bg-blue-700 hover:bg-blue-800 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-medium w-full"
+            >
+              🔍 Fix Tokens from Sent Emails (Dry Run)
+            </button>
+            <p className="text-xs text-gray-600 mt-1">Dry run first — checks Postmark for sent email tokens and shows what would change</p>
           </div>
         </div>
 
