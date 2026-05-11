@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { Download, Eye, CheckCircle, Clock, XCircle, RefreshCw, Search, Image, Filter, ChevronDown, ChevronUp } from 'lucide-react'
+import { Download, Eye, CheckCircle, Clock, XCircle, RefreshCw, Search, Image, Filter, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react'
 
 export default function GalleryOrders() {
   const [orders, setOrders] = useState([])
@@ -17,6 +17,12 @@ export default function GalleryOrders() {
   
   // Selected order for detail view
   const [selectedOrder, setSelectedOrder] = useState(null)
+  
+  // Diagnostic lookup
+  const [lookupEmail, setLookupEmail] = useState('')
+  const [lookupResult, setLookupResult] = useState(null)
+  const [lookupLoading, setLookupLoading] = useState(false)
+  const [showLookup, setShowLookup] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -69,10 +75,10 @@ export default function GalleryOrders() {
         delivery_email_sent,
         galleries (id, title, slug)
       `)
-      .eq('delivery_type', 'free_access')
+      .in('delivery_type', ['free_access', 'promo'])
       .order('created_at', { ascending: false })
     
-    // Merge free_access orders that aren't already in the main query
+    // Merge free_access/promo orders that aren't already in the main query
     const existingIds = new Set((ordersData || []).map(o => o.id))
     const mergedOrders = [...(ordersData || [])]
     for (const order of (freeOrders || [])) {
@@ -113,6 +119,21 @@ export default function GalleryOrders() {
       month: '2-digit',
       year: 'numeric'
     })
+  }
+
+  const lookupOrderByEmail = async () => {
+    if (!lookupEmail.trim()) return
+    setLookupLoading(true)
+    setLookupResult(null)
+    try {
+      const response = await fetch(`https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/gallery_download?lookup=${encodeURIComponent(lookupEmail.trim())}`)
+      const data = await response.json()
+      setLookupResult(data)
+    } catch (err) {
+      setLookupResult({ error: err.message })
+    } finally {
+      setLookupLoading(false)
+    }
   }
 
   const filteredOrders = orders.filter(order => {
@@ -325,6 +346,62 @@ export default function GalleryOrders() {
                   className="w-full bg-dark-800 border border-dark-700 rounded-lg pl-10 pr-4 py-2 text-white"
                 />
               </div>
+            </div>
+
+            {/* Diagnostic Lookup */}
+            <div className="mt-4 border-t border-dark-700 pt-4">
+              <button 
+                onClick={() => setShowLookup(!showLookup)}
+                className="text-sm text-gray-400 hover:text-white flex items-center gap-1 mb-2"
+              >
+                <AlertCircle className="w-4 h-4" />
+                {showLookup ? 'Hide' : 'Show'} Order Lookup (by email)
+              </button>
+              {showLookup && (
+                <div className="flex gap-2 items-start">
+                  <input
+                    type="email"
+                    placeholder="Enter email to diagnose..."
+                    value={lookupEmail}
+                    onChange={(e) => setLookupEmail(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && lookupOrderByEmail()}
+                    className="flex-1 bg-dark-800 border border-dark-700 rounded-lg px-3 py-2 text-white text-sm"
+                  />
+                  <button
+                    onClick={lookupOrderByEmail}
+                    disabled={lookupLoading}
+                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+                  >
+                    {lookupLoading ? '...' : 'Lookup'}
+                  </button>
+                </div>
+              )}
+              {lookupResult && (
+                <div className="mt-3 p-3 bg-dark-800 rounded-lg text-sm">
+                  {lookupResult.error ? (
+                    <p className="text-red-400">{lookupResult.error}</p>
+                  ) : lookupResult.orders?.length === 0 ? (
+                    <p className="text-yellow-400">⚠️ No orders found for {lookupResult.email}</p>
+                  ) : (
+                    <div>
+                      <p className="text-green-400 mb-2">✅ Found {lookupResult.orders.length} order(s) for {lookupResult.email}</p>
+                      {lookupResult.orders.map((o, i) => (
+                        <div key={i} className="border-l-2 pl-3 mb-2 last:mb-0"
+                          style={{ borderColor: o.status === 'completed' ? '#22c55e' : o.status === 'pending' ? '#eab308' : '#ef4444' }}>
+                          <div className="flex items-center gap-2">
+                            <span className="text-white font-medium">{o.status}</span>
+                            <span className="text-gray-500">•</span>
+                            <span className="text-gray-400">{o.delivery_type || 'purchase'}</span>
+                          </div>
+                          <div className="text-gray-500 text-xs mt-1">
+                            Gallery: {o.galleries?.title || 'Unknown'} • Token: {o.download_token ? '✅' : '❌ missing'}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
