@@ -2598,22 +2598,18 @@ function ContentDelivery({ gallery, organization }) {
         ? parsedRows.filter(r => r.event === selectedCsvEvent)
         : parsedRows
 
-      // Only import athletes who have an order in their videography_service
-      // Mark I-Walk/Posing athletes as 'free_access' (they get delivery email with download)
-      // Mark other athletes as 'promo' (they get promo email with preview link)
-      // Skip athletes with no service at all
-      const iwalkKeywords = ['i-walk', 'i walk', 'iwalk']
-      const posingKeywords = ['posing', 'routine']
-      rowsToImport = rowsToImport.filter(r => {
-        const service = (r.videography_service || '').toLowerCase()
-        // Skip if no service at all (they didn't order anything)
-        if (!service) return false
-        // Include everyone who has some service (we'll determine delivery_type in the edge function)
-        return true
-      })
+      // Import ALL athletes with valid emails
+      // Edge function determines delivery_type based on their service:
+      //   I-Walk/Posing → 'free_access' (delivery email with download)
+      //   Other service or no service → 'promo' (promo email with preview)
+      // No filtering by service type on the frontend — send everything to the edge function
+      rowsToImport = parsedRows.filter(r => r.email && r.email.includes('@'))
+      if (selectedCsvEvent) {
+        rowsToImport = rowsToImport.filter(r => r.event === selectedCsvEvent)
+      }
 
       if (rowsToImport.length === 0) {
-        setCsvResult({ error: 'No athletes with I-Walk or Posing Routine orders found in the selected data.' })
+        setCsvResult({ error: 'No athletes with valid emails found in the selected data.' })
         setLoading(false)
         return
       }
@@ -2840,14 +2836,14 @@ function ContentDelivery({ gallery, organization }) {
                       return r.event === selectedCsvEvent && s && (['i-walk','i walk','posing','routine'].some(kw => s.includes(kw)))
                     }).length} delivery + ${parsedRows.filter(r => {
                       const s = (r.videography_service || '').toLowerCase()
-                      return r.event === selectedCsvEvent && s && !(['i-walk','i walk','posing','routine'].some(kw => s.includes(kw)))
+                      return r.event === selectedCsvEvent && (!s || !(['i-walk','i walk','posing','routine'].some(kw => s.includes(kw))))
                     }).length} promo)`
                   : parsedRows.length > 0 ? ` (${parsedRows.filter(r => {
                       const s = (r.videography_service || '').toLowerCase()
                       return s && (['i-walk','i walk','posing','routine'].some(kw => s.includes(kw)))
                     }).length} delivery + ${parsedRows.filter(r => {
                       const s = (r.videography_service || '').toLowerCase()
-                      return s && !(['i-walk','i walk','posing','routine'].some(kw => s.includes(kw)))
+                      return !s || !(['i-walk','i walk','posing','routine'].some(kw => s.includes(kw)))
                     }).length} promo of ${parsedRows.length} total)` : ''
                 }
               </button>
