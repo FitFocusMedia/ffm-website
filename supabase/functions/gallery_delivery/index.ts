@@ -100,8 +100,7 @@ serve(async (req) => {
               notes: row.videography_service ? `Service: ${row.videography_service}${row.event ? ` | Event: ${row.event}` : ''}` : (row.event || null),
               download_token: downloadToken,
               completed_at: new Date().toISOString(),
-              delivery_email_sent: false,
-              promo_email_sent: false
+              delivery_email_sent: false
             })
             .select()
             .single()
@@ -217,8 +216,7 @@ serve(async (req) => {
             athlete_number: order.athlete_number,
             download_token: downloadToken,
             completed_at: new Date().toISOString(),
-            delivery_email_sent: false,
-            promo_email_sent: false
+            delivery_email_sent: false
           })
           .select()
           .single()
@@ -471,17 +469,19 @@ info@fitfocusmedia.com.au`
         // Source 1: gallery_orders with delivery_type = 'promo' (from CSV import)
         const { data: promoOrders } = await supabase
           .from('gallery_orders')
-          .select('id, email, customer_name, download_token, athlete_first_name, athlete_last_name, notes, promo_email_sent, galleries(title, organizations(name))')
+          .select('id, email, customer_name, download_token, athlete_first_name, athlete_last_name, notes, delivery_email_sent, galleries(title, organizations(name))')
           .eq('gallery_id', gallery_id)
           .eq('delivery_type', 'promo')
-          .eq('promo_email_sent', false)
+
+        // Filter out already-sent promos (handles both cases: column exists or not)
+        const unsentPromoOrders = (promoOrders || []).filter((o: any) => !o.promo_email_sent && !o.delivery_email_sent)
 
         // Source 2: content_orders with status != 'paid' (from website orders)
         // Source 2: content_orders with status != 'paid' (from website orders)
         // Only used if event_id is provided
 
         // Process promo gallery orders (from CSV import)
-        for (const order of (promoOrders || [])) {
+        for (const order of unsentPromoOrders) {
           const firstName = order.athlete_first_name || order.customer_name?.split(' ')[0] || 'Athlete'
           const galleryViewUrl = `${galleryUrl}?email=${encodeURIComponent(order.email)}`
 
@@ -591,7 +591,7 @@ info@fitfocusmedia.com.au`
             if (response.ok) {
               await supabase
                 .from('gallery_orders')
-                .update({ promo_email_sent: true, promo_email_sent_at: new Date().toISOString() })
+                .update({ delivery_email_sent: true, delivery_email_sent_at: new Date().toISOString() })
                 .eq('id', order.id)
               
               results.sent++
