@@ -2700,6 +2700,39 @@ function ContentDelivery({ gallery, organization }) {
     }
   }
 
+  const resetTokensAndResend = async (type) => {
+    if (!gallery?.id) return
+    if (!confirm(`This will regenerate download tokens for ALL ${type === 'delivery' ? 'free access' : 'promo'} orders and re-send emails. The old download links will stop working. Continue?`)) return
+    setLoading(true)
+    setEmailResult(null)
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const response = await fetch(`https://gonalgubgldgpkcekaxe.supabase.co/functions/v1/gallery_delivery/reset-tokens`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token || ''}`
+        },
+        body: JSON.stringify({
+          gallery_id: gallery.id,
+          email_type: type,
+          content_type: contentType,
+          dry_run: false
+        })
+      })
+
+      const result = await response.json()
+      setEmailResult(result)
+      // Refresh orders to show new tokens
+      if (result.success) loadDeliveryOrders()
+    } catch (err) {
+      setEmailResult({ error: err.message })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="border-t border-dark-600 pt-6 mt-6">
       <h3 className="text-md font-semibold text-white flex items-center gap-2 mb-4">
@@ -2944,6 +2977,27 @@ function ContentDelivery({ gallery, organization }) {
             Send Promo Emails
             <span className="text-xs opacity-70">(non-buyers)</span>
           </button>
+        </div>
+
+        {/* Reset Tokens — fixes broken download links from first import */}
+        <div className="border-t border-dark-700 pt-3 mt-3">
+          <p className="text-xs text-gray-500 mb-2">⚠️ If download links from sent emails are broken (showing "Access Denied"), use these to regenerate tokens and re-send:</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <button
+              onClick={() => resetTokensAndResend('delivery')}
+              disabled={loading}
+              className="bg-yellow-700 hover:bg-yellow-800 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-medium"
+            >
+              🔄 Reset Tokens & Re-send Delivery
+            </button>
+            <button
+              onClick={() => resetTokensAndResend('promo')}
+              disabled={loading}
+              className="bg-yellow-700 hover:bg-yellow-800 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-medium"
+            >
+              🔄 Reset Tokens & Re-send Promo
+            </button>
+          </div>
         </div>
 
         {/* Email Result */}

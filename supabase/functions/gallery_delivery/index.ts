@@ -743,6 +743,273 @@ info@fitfocusmedia.com.au`
       )
     }
 
+    // Route: POST /gallery_delivery/reset-tokens — Reset download tokens and re-send emails
+    if (req.method === 'POST' && path === 'reset-tokens') {
+      const { gallery_id, email_type, content_type, event_id, event_name, dry_run } = await req.json()
+
+      if (!gallery_id || !email_type) {
+        return new Response(
+          JSON.stringify({ error: 'Missing gallery_id or email_type' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      const contentType = content_type || 'I-Walk / Posing Routine'
+      const isDryRun = dry_run === true
+      const postmarkToken = Deno.env.get('POSTMARK_SERVER_TOKEN')
+
+      if (!isDryRun && !postmarkToken) {
+        return new Response(
+          JSON.stringify({ error: 'Postmark not configured' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      // Get gallery
+      const { data: gallery } = await supabase
+        .from('galleries')
+        .select('id, title, slug, organizations(id, name)')
+        .eq('id', gallery_id)
+        .single()
+
+      if (!gallery) {
+        return new Response(
+          JSON.stringify({ error: 'Gallery not found' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      const galleryUrl = `https://fitfocusmedia.com.au/#/gallery/${gallery.slug}`
+      const orgName = gallery?.organizations?.name || 'Fit Focus Media'
+
+      // Get orders that need token reset (delivery_email_sent = false means emails were sent with old tokens)
+      let query = supabase
+        .from('gallery_orders')
+        .select('id, email, customer_name, download_token, delivery_type, athlete_first_name, athlete_last_name, notes, delivery_email_sent, galleries(title, organizations(name))')
+        .eq('gallery_id', gallery_id)
+
+      if (email_type === 'delivery') {
+        query = query.eq('delivery_type', 'free_access')
+      } else if (email_type === 'promo') {
+        query = query.eq('delivery_type', 'promo')
+      }
+
+      const { data: orders, error: ordersError } = await query
+
+      if (ordersError) {
+        return new Response(
+          JSON.stringify({ error: ordersError.message }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      const results = { reset: 0, sent: 0, failed: 0, details: [] as any[] }
+
+      for (const order of (orders || [])) {
+        // Generate new download token
+        const newToken = crypto.randomUUID()
+
+        if (isDryRun) {
+          results.reset++
+          results.details.push({
+            email: order.email,
+            name: order.customer_name,
+            old_token: order.download_token,
+            new_token: newToken,
+            status: 'dry_run'
+          })
+          continue
+        }
+
+        // Update the download token in the database
+        const { error: updateError } = await supabase
+          .from('gallery_orders')
+          .update({ download_token: newToken })
+          .eq('id', order.id)
+
+        if (updateError) {
+          console.error('[GalleryDelivery] Token reset error:', updateError)
+          results.failed++
+          results.details.push({ email: order.email, name: order.customer_name, status: 'token_reset_failed', error: updateError.message })
+          continue
+        }
+
+        results.reset++
+
+        // Now send the email with the new token
+        const firstName = order.athlete_first_name || order.customer_name?.split(' ')[0] || 'Athlete'
+
+        if (email_type === 'delivery') {
+          const downloadUrl = `https://fitfocusmedia.com.au/#/gallery/download/${newToken}`
+
+          const buttonHtml = `
+            <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="margin: 20px 0;">
+              <tr>
+                <td align="center" bgcolor="#e53e3e" style="border-radius: 6px;">
+                  <a href="${downloadUrl}" target="_blank" style="display: inline-block; padding: 14px 30px; font-family: Arial, sans-serif; font-size: 16px; color: #ffffff; text-decoration: none; font-weight: bold; border-radius: 6px;">
+                    View & Download Your Video
+                  </a>
+                </td>
+              </tr>
+            </table>
+            <p style="color: #666; font-size: 13px; margin-top: 10px;">
+              Button not working? Copy and paste this link into your browser:<br>
+              <a href="${downloadUrl}" style="color: #e53e3e; word-break: break-all;">${downloadUrl}</a>
+            </p>
+          `
+
+          const fullHtmlBody = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <h1 style="color: #e53e3e; margin: 0 0 20px;">FIT FOCUS MEDIA</h1>
+              <h2 style="margin: 0 0 20px;">Hey ${firstName}! 👋</h2>
+              <p>Hope you're having a fantastic day and feeling great post-show!</p>
+              <p>First off, we'd like to say a massive <strong>thank you</strong> for choosing to support Fit Focus Media and allowing us to be a part of your special day. You absolutely <strong>crushed it</strong> out on stage — congratulations on an amazing effort! 🏆</p>
+              <p>We'd also like to say a personal thank you for your patience in getting your content over to you. This season has been more than we could have ever expected, and we're truly grateful for your support as we continue to develop better systems and processes.</p>
+              <div style="background: #f7f7f7; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <p style="margin: 0; font-size: 18px; font-weight: bold;">${gallery.title}</p>
+                <p style="margin: 5px 0 0; color: #666;">${orgName}</p>
+                <p style="margin: 10px 0 0; font-size: 20px; font-weight: bold; color: #e53e3e;">Your ${contentType} Is Ready!</p>
+              </div>
+              <p>Your ${contentType} is now available to view and download. Below you'll find your access link.</p>
+              ${buttonHtml}
+              <p style="color: #666; font-size: 14px;"><strong>How to access:</strong> Your access is linked to this email address — <strong>${order.email}</strong></p>
+              <div style="background: #fff8e1; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ffc107;">
+                <p style="margin: 0; font-size: 14px;"><strong>📌 Please Note:</strong> If you have ordered other content from our team, such as a Show Day Highlight, or content that is separate from us such as show day photos, these will be delivered on their own when ready.</p>
+              </div>
+              <p>If you have any issues with downloading or saving your files, please feel free to get in touch at any point and one of our team will be more than happy to assist.</p>
+              <p>If you've enjoyed working with us, we'd love if you could leave a review on Google — it helps us so much! 👇</p>
+              <p><a href="https://g.page/r/CYhE4-27_SwIEB0/review" style="background: #e53e3e; color: #fff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: bold;">⭐ Leave a Google Review</a></p>
+              <p style="color: #999; font-size: 12px; margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
+                Thank you once again, ${firstName}. Speak soon!<br><br>
+                — The Fit Focus Media Team<br>
+                info@fitfocusmedia.com.au
+              </p>
+            </div>
+          `
+
+          const textBody = `Hey ${firstName}!\n\nHope you're having a fantastic day and feeling great post-show!\n\nFirst off, we'd like to say a massive thank you for choosing to support Fit Focus Media and allowing us to be a part of your special day. You absolutely crushed it out on stage — congratulations on an amazing effort!\n\nYour ${contentType} from ${gallery.title} is now ready to view and download.\n\nDownload here:\n${downloadUrl}\n\nYour access is linked to: ${order.email}\n\nIf you have any issues, please get in touch and one of our team will be happy to assist.\n\nIf you've enjoyed working with us, please consider leaving a review:\nhttps://g.page/r/CYhE4-27_SwIEB0/review\n\nThank you once again, ${firstName}. Speak soon!\n\n— The Fit Focus Media Team\ninfo@fitfocusmedia.com.au`
+
+          try {
+            const response = await fetch('https://api.postmarkapp.com/email', {
+              method: 'POST',
+              headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-Postmark-Server-Token': postmarkToken
+              },
+              body: JSON.stringify({
+                From: 'info@fitfocusmedia.com.au',
+                To: order.email,
+                Subject: `Your ${contentType} from ${gallery.title} Is Ready! 🎬`,
+                HtmlBody: fullHtmlBody,
+                TextBody: textBody,
+                MessageStream: 'outbound'
+              })
+            })
+
+            if (response.ok) {
+              await supabase
+                .from('gallery_orders')
+                .update({ delivery_email_sent: true, delivery_email_sent_at: new Date().toISOString() })
+                .eq('id', order.id)
+              results.sent++
+              results.details.push({ email: order.email, name: order.customer_name, status: 'sent', new_token: newToken, download_url: downloadUrl })
+            } else {
+              const errorData = await response.json()
+              results.failed++
+              results.details.push({ email: order.email, name: order.customer_name, status: 'email_failed', error: errorData.Message || 'Unknown error' })
+            }
+          } catch (err) {
+            results.failed++
+            results.details.push({ email: order.email, name: order.customer_name, status: 'email_error', error: String(err) })
+          }
+        } else if (email_type === 'promo') {
+          const galleryViewUrl = `${galleryUrl}?email=${encodeURIComponent(order.email)}`
+
+          const promoButtonHtml = `
+            <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="margin: 20px 0;">
+              <tr>
+                <td align="center" bgcolor="#e53e3e" style="border-radius: 6px;">
+                  <a href="${galleryViewUrl}" target="_blank" style="display: inline-block; padding: 14px 30px; font-family: Arial, sans-serif; font-size: 16px; color: #ffffff; text-decoration: none; font-weight: bold; border-radius: 6px;">
+                    Preview & Purchase →
+                  </a>
+                </td>
+              </tr>
+            </table>
+            <p style="color: #666; font-size: 13px; margin-top: 10px;">
+              Button not working? Copy and paste this link into your browser:<br>
+              <a href="${galleryViewUrl}" style="color: #e53e3e; word-break: break-all;">${galleryViewUrl}</a>
+            </p>
+          `
+
+          const fullHtmlBody = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <h1 style="color: #e53e3e; margin: 0 0 20px;">FIT FOCUS MEDIA</h1>
+              <h2 style="margin: 0 0 20px;">Hey ${firstName}! 👋</h2>
+              <p>Hope you're having a fantastic day and feeling great post-show!</p>
+              <p>We captured your ${contentType} at <strong>${gallery.title}</strong> and it's now available to preview and purchase! You absolutely crushed it on stage — congratulations on an amazing effort! 🏆</p>
+              <div style="background: #f7f7f7; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <p style="margin: 0; font-size: 18px; font-weight: bold;">${gallery.title}</p>
+                <p style="margin: 5px 0 0; color: #666;">${orgName}</p>
+              </div>
+              <p>Click below to preview your footage and purchase your ${contentType}.</p>
+              ${promoButtonHtml}
+              <p style="color: #666; font-size: 14px;"><strong>How to access:</strong> Your preview is linked to this email address — <strong>${order.email}</strong></p>
+              <p>If you have any questions, please feel free to get in touch at any point and one of our team will be more than happy to assist.</p>
+              <p>If you've enjoyed working with us, we'd love if you could leave a review on Google! 👇</p>
+              <p><a href="https://g.page/r/CYhE4-27_SwIEB0/review" style="background: #e53e3e; color: #fff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: bold;">⭐ Leave a Google Review</a></p>
+              <p style="color: #999; font-size: 12px; margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
+                — The Fit Focus Media Team<br>
+                info@fitfocusmedia.com.au
+              </p>
+            </div>
+          `
+
+          const textBody = `Hey ${firstName}!\n\nHope you're having a fantastic day and feeling great post-show!\n\nWe captured your ${contentType} at ${gallery.title} and it's now available to preview and purchase!\n\nPreview and purchase here:\n${galleryViewUrl}\n\nYour access is linked to: ${order.email}\n\n— The Fit Focus Media Team\ninfo@fitfocusmedia.com.au`
+
+          try {
+            const response = await fetch('https://api.postmarkapp.com/email', {
+              method: 'POST',
+              headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-Postmark-Server-Token': postmarkToken
+              },
+              body: JSON.stringify({
+                From: 'info@fitfocusmedia.com.au',
+                To: order.email,
+                Subject: `${contentType}s from ${gallery.title} Are Now Available! 🎬`,
+                HtmlBody: fullHtmlBody,
+                TextBody: textBody,
+                MessageStream: 'outbound'
+              })
+            })
+
+            if (response.ok) {
+              await supabase
+                .from('gallery_orders')
+                .update({ delivery_email_sent: true, delivery_email_sent_at: new Date().toISOString() })
+                .eq('id', order.id)
+              results.sent++
+              results.details.push({ email: order.email, name: order.customer_name, status: 'sent', download_url: galleryViewUrl })
+            } else {
+              const errorData = await response.json()
+              results.failed++
+              results.details.push({ email: order.email, name: order.customer_name, status: 'email_failed', error: errorData.Message || 'Unknown error' })
+            }
+          } catch (err) {
+            results.failed++
+            results.details.push({ email: order.email, name: order.customer_name, status: 'email_error', error: String(err) })
+          }
+        }
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, email_type, dry_run: isDryRun, gallery_id, results, summary: { total: orders?.length || 0, reset: results.reset, sent: results.sent, failed: results.failed } }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     return new Response(
       JSON.stringify({ error: 'Not found' }),
       { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
