@@ -2598,19 +2598,18 @@ function ContentDelivery({ gallery, organization }) {
         ? parsedRows.filter(r => r.event === selectedCsvEvent)
         : parsedRows
 
-      // Only import athletes who ordered I-Walk or Posing Routine content
-      // (Skip athletes who ordered other services like Highlight Reel only, or nothing)
+      // Only import athletes who have an order in their videography_service
+      // Mark I-Walk/Posing athletes as 'free_access' (they get delivery email with download)
+      // Mark other athletes as 'promo' (they get promo email with preview link)
+      // Skip athletes with no service at all
       const iwalkKeywords = ['i-walk', 'i walk', 'iwalk']
       const posingKeywords = ['posing', 'routine']
       rowsToImport = rowsToImport.filter(r => {
         const service = (r.videography_service || '').toLowerCase()
-        // Include if their service mentions I-Walk, Posing, or Routine
-        // This catches "Fully Edited Individual Highlight + I-Walk Reel (Package)" too
-        // Exclude if they only ordered Highlight Reel or nothing
-        if (!service) return false // No service ordered
-        const hasIWalk = iwalkKeywords.some(kw => service.includes(kw))
-        const hasPosing = posingKeywords.some(kw => service.includes(kw))
-        return hasIWalk || hasPosing
+        // Skip if no service at all (they didn't order anything)
+        if (!service) return false
+        // Include everyone who has some service (we'll determine delivery_type in the edge function)
+        return true
       })
 
       if (rowsToImport.length === 0) {
@@ -2770,7 +2769,7 @@ function ContentDelivery({ gallery, organization }) {
           <div className="mb-4 p-4 bg-dark-800 rounded-lg border border-emerald-700/30">
             <p className="text-gray-400 text-xs mb-3">
               Upload a CSV/Excel file or paste spreadsheet data. Auto-detects columns and events.<br/>
-              <span className="text-emerald-400">Only athletes with I-Walk or Posing Routine orders will be imported.</span>
+              <span className="text-emerald-400">I-Walk/Posing athletes → Delivery email (with download link)</span> · <span className="text-orange-400">Other athletes → Promo email (with preview link)</span> · <span className="text-gray-500">No service = skipped</span>
             </p>
             <div className="flex gap-3 mb-3">
               <label className="flex-1 cursor-pointer">
@@ -2839,11 +2838,17 @@ function ContentDelivery({ gallery, organization }) {
                   ? ` (${parsedRows.filter(r => {
                       const s = (r.videography_service || '').toLowerCase()
                       return r.event === selectedCsvEvent && s && (['i-walk','i walk','posing','routine'].some(kw => s.includes(kw)))
-                    }).length} eligible)`
+                    }).length} delivery + ${parsedRows.filter(r => {
+                      const s = (r.videography_service || '').toLowerCase()
+                      return r.event === selectedCsvEvent && s && !(['i-walk','i walk','posing','routine'].some(kw => s.includes(kw)))
+                    }).length} promo)`
                   : parsedRows.length > 0 ? ` (${parsedRows.filter(r => {
                       const s = (r.videography_service || '').toLowerCase()
                       return s && (['i-walk','i walk','posing','routine'].some(kw => s.includes(kw)))
-                    }).length} eligible of ${parsedRows.length} total)` : ''
+                    }).length} delivery + ${parsedRows.filter(r => {
+                      const s = (r.videography_service || '').toLowerCase()
+                      return s && !(['i-walk','i walk','posing','routine'].some(kw => s.includes(kw)))
+                    }).length} promo of ${parsedRows.length} total)` : ''
                 }
               </button>
             </div>
@@ -2858,8 +2863,9 @@ function ContentDelivery({ gallery, organization }) {
             ) : (
               <div className="text-sm">
                 <p className="text-green-400 font-medium mb-2">✅ CSV Import complete</p>
-                <div className="grid grid-cols-3 gap-3 text-center">
-                  <div><div className="text-2xl font-bold text-green-400">{csvResult.results?.created || 0}</div><div className="text-gray-400">Created</div></div>
+                <div className="grid grid-cols-4 gap-3 text-center">
+                  <div><div className="text-2xl font-bold text-green-400">{(csvResult.results?.created_delivery || 0) + (csvResult.results?.created || 0)}</div><div className="text-gray-400">Delivery</div></div>
+                  <div><div className="text-2xl font-bold text-orange-400">{csvResult.results?.created_promo || 0}</div><div className="text-gray-400">Promo</div></div>
                   <div><div className="text-2xl font-bold text-yellow-400">{csvResult.results?.skipped || 0}</div><div className="text-gray-400">Skipped</div></div>
                   <div><div className="text-2xl font-bold text-red-400">{csvResult.results?.errors || 0}</div><div className="text-gray-400">Errors</div></div>
                 </div>
@@ -2969,6 +2975,12 @@ function ContentDelivery({ gallery, organization }) {
                           </div>
                           {d.subject && (
                             <div className="text-gray-400 text-xs mt-1">Subject: {d.subject}</div>
+                          )}
+                          {d.html_preview && (
+                            <details className="mt-1">
+                              <summary className="text-blue-400 text-xs cursor-pointer hover:text-blue-300">View email preview</summary>
+                              <div className="mt-1 p-2 bg-white rounded text-xs text-black overflow-x-auto max-h-40 overflow-y-auto" dangerouslySetInnerHTML={{ __html: d.html_preview }} />
+                            </details>
                           )}
                           {d.download_url && (
                             <div className="text-gray-500 text-xs mt-1 break-all">

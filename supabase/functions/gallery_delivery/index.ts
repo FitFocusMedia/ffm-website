@@ -1,5 +1,6 @@
 // Gallery Delivery: Bulk import & email delivery for I-Walk/Posing Routine videos
-// Creates free-access gallery orders for paid athletes and sends delivery emails
+// Creates free-access gallery orders for paid athletes and sends delivery/promo emails
+// v2: Added promo support for CSV-imported athletes + full email preview in dry run
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -23,7 +24,7 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Route: POST /gallery_delivery/import — Bulk create free-access orders from content orders OR CSV
+    // Route: POST /gallery_delivery/import — Bulk create gallery orders from content orders OR CSV
     if (req.method === 'POST' && path === 'import') {
       const { gallery_id, event_id, content_type, csv_rows } = await req.json()
 
@@ -44,7 +45,11 @@ serve(async (req) => {
           .eq('id', gallery_id)
           .single()
 
-        const results = { created: 0, skipped: 0, errors: 0, details: [] as any[] }
+        const results = { created_delivery: 0, created_promo: 0, skipped: 0, errors: 0, details: [] as any[] }
+
+        // Determine which athletes have I-Walk/Posing orders
+        const iwalkKeywords = ['i-walk', 'i walk', 'iwalk']
+        const posingKeywords = ['posing', 'routine']
 
         for (const row of csv_rows) {
           if (!row.email || !row.email.includes('@')) {
@@ -53,16 +58,29 @@ serve(async (req) => {
             continue
           }
 
+          // Determine delivery type based on what they ordered
+          const service = (row.videography_service || '').toLowerCase()
+          const hasIWalk = iwalkKeywords.some(kw => service.includes(kw))
+          const hasPosing = posingKeywords.some(kw => service.includes(kw))
+          const hasOrder = service && (hasIWalk || hasPosing)
+          const deliveryType = hasOrder ? 'free_access' : 'promo'
+
           const { data: existingOrder } = await supabase
             .from('gallery_orders')
-            .select('id, status')
+            .select('id, status, delivery_type')
             .eq('gallery_id', gallery_id)
             .ilike('email', row.email.toLowerCase())
             .limit(1)
 
           if (existingOrder && existingOrder.length > 0) {
             results.skipped++
-            results.details.push({ email: row.email, name: `${row.first_name || ''} ${row.last_name || ''}`.trim(), status: 'already_exists', existing_status: existingOrder[0].status })
+            results.details.push({ 
+              email: row.email, 
+              name: `${row.first_name || ''} ${row.last_name || ''}`.trim(), 
+              status: 'already_exists', 
+              existing_status: existingOrder[0].status,
+              existing_delivery_type: existingOrder[0].delivery_type
+            })
             continue
           }
 
@@ -75,14 +93,15 @@ serve(async (req) => {
               customer_name: `${row.first_name || ''} ${row.last_name || ''}`.trim(),
               total_amount: 0,
               status: 'completed',
-              delivery_type: 'free_access',
+              delivery_type: deliveryType,
               athlete_first_name: row.first_name || null,
               athlete_last_name: row.last_name || null,
               athlete_number: row.athlete_number || null,
               notes: row.videography_service ? `Service: ${row.videography_service}${row.event ? ` | Event: ${row.event}` : ''}` : (row.event || null),
               download_token: downloadToken,
               completed_at: new Date().toISOString(),
-              delivery_email_sent: false
+              delivery_email_sent: false,
+              promo_email_sent: false
             })
             .select()
             .single()
@@ -94,12 +113,36 @@ serve(async (req) => {
             continue
           }
 
-          results.created++
-          results.details.push({ email: row.email, name: `${row.first_name || ''} ${row.last_name || ''}`.trim(), status: 'created', order_id: galleryOrder?.id, download_token: downloadToken })
+          if (deliveryType === 'free_access') {
+            results.created_delivery++
+          } else {
+            results.created_promo++
+          }
+          results.details.push({ 
+            email: row.email, 
+            name: `${row.first_name || ''} ${row.last_name || ''}`.trim(), 
+            status: 'created', 
+            delivery_type: deliveryType,
+            order_id: galleryOrder?.id, 
+            download_token: downloadToken 
+          })
         }
 
         return new Response(
-          JSON.stringify({ success: true, gallery_id, import_type: 'csv', total_rows: csv_rows.length, results }),
+          JSON.stringify({ 
+            success: true, 
+            gallery_id, 
+            import_type: 'csv', 
+            total_rows: csv_rows.length, 
+            results,
+            summary: {
+              total: results.created_delivery + results.created_promo + results.skipped + results.errors,
+              delivery: results.created_delivery,
+              promo: results.created_promo,
+              skipped: results.skipped,
+              errors: results.errors
+            }
+          }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
@@ -127,13 +170,6 @@ serve(async (req) => {
         )
       }
 
-      // Get all gallery items (photos + videos) for this gallery
-      const { data: galleryItems, error: itemsError } = await supabase
-        .from('gallery_order_items')
-        .select('id')
-        .eq('order_id', gallery_id)
-        .limit(1)
-
       // Get gallery info with organization
       const { data: gallery } = await supabase
         .from('galleries')
@@ -141,20 +177,7 @@ serve(async (req) => {
         .eq('id', gallery_id)
         .single()
 
-      // Get all gallery photos for this gallery
-      const { data: photos } = await supabase
-        .from('gallery_photos')
-        .select('id, filename, category')
-        .eq('gallery_id', gallery_id)
-
-      // Get all video clips for this gallery (if video gallery system exists)
-      const { data: clips } = await supabase
-        .from('gallery_clips')
-        .select('id, filename, category')
-        .eq('gallery_id', gallery_id)
-        .limit(100)
-
-      const results = { created: 0, skipped: 0, errors: 0, details: [] as any[] }
+      const results = { created_delivery: 0, created_promo: 0, skipped: 0, errors: 0, details: [] as any[] }
 
       for (const order of contentOrders) {
         // Check if this athlete already has a gallery order
@@ -176,7 +199,7 @@ serve(async (req) => {
           continue
         }
 
-        // Create a free-access gallery order for this athlete
+        // Create a free-access gallery order for this paid athlete
         const downloadToken = crypto.randomUUID()
         
         const { data: galleryOrder, error: createError } = await supabase
@@ -185,7 +208,7 @@ serve(async (req) => {
             gallery_id: gallery_id,
             email: order.email.toLowerCase(),
             customer_name: `${order.first_name} ${order.last_name}`.trim(),
-            total_amount: 0, // Free — they already paid via content order
+            total_amount: 0,
             status: 'completed',
             delivery_type: 'free_access',
             content_order_id: order.id,
@@ -194,7 +217,8 @@ serve(async (req) => {
             athlete_number: order.athlete_number,
             download_token: downloadToken,
             completed_at: new Date().toISOString(),
-            delivery_email_sent: false
+            delivery_email_sent: false,
+            promo_email_sent: false
           })
           .select()
           .single()
@@ -211,11 +235,12 @@ serve(async (req) => {
           continue
         }
 
-        results.created++
+        results.created_delivery++
         results.details.push({
           email: order.email,
           name: `${order.first_name} ${order.last_name}`,
           status: 'created',
+          delivery_type: 'free_access',
           order_id: galleryOrder?.id,
           download_token: downloadToken
         })
@@ -228,15 +253,22 @@ serve(async (req) => {
           event_id,
           content_type: contentType,
           total_content_orders: contentOrders?.length || 0,
-          results
+          results,
+          summary: {
+            total: results.created_delivery + results.created_promo + results.skipped + results.errors,
+            delivery: results.created_delivery,
+            promo: results.created_promo,
+            skipped: results.skipped,
+            errors: results.errors
+          }
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Route: POST /gallery-delivery/send-emails — Send delivery emails to athletes
+    // Route: POST /gallery_delivery/send-emails — Send delivery or promo emails
     if (req.method === 'POST' && path === 'send-emails') {
-      const { gallery_id, email_type, content_type, event_name, event_date, dry_run } = await req.json()
+      const { gallery_id, email_type, content_type, event_id, event_name, event_date, dry_run } = await req.json()
 
       if (!gallery_id || !email_type) {
         return new Response(
@@ -259,7 +291,7 @@ serve(async (req) => {
       // Get gallery
       const { data: gallery } = await supabase
         .from('galleries')
-        .select('id, title, slug')
+        .select('id, title, slug, organizations(id, name)')
         .eq('id', gallery_id)
         .single()
 
@@ -275,8 +307,7 @@ serve(async (req) => {
       const results = { sent: 0, failed: 0, details: [] as any[] }
 
       if (email_type === 'delivery') {
-        // Send to athletes who already paid (free access)
-        // Filter by content type if specified (e.g., only I-Walk orders)
+        // Send to athletes who already paid (free_access orders)
         let query = supabase
           .from('gallery_orders')
           .select('id, email, customer_name, download_token, athlete_first_name, athlete_last_name, notes, delivery_email_sent, galleries(title, organizations(name))')
@@ -284,8 +315,6 @@ serve(async (req) => {
           .eq('delivery_type', 'free_access')
           .eq('delivery_email_sent', false)
         
-        // If content_type is specified, filter orders by their service type in notes
-        // Notes format: "Service: I-Walk | Event: Show Name" or "I-Walk Routine"
         const { data: freeOrders } = await query
 
         // Filter orders by content type if specified
@@ -294,7 +323,6 @@ serve(async (req) => {
           const notesLower = (order.notes || '').toLowerCase()
           if (content_type.toLowerCase().includes('i-walk') && notesLower.includes('i-walk')) return true
           if (content_type.toLowerCase().includes('posing') && notesLower.includes('posing')) return true
-          // If no notes, include them (might be from content orders import)
           if (!order.notes) return true
           return false
         })
@@ -302,24 +330,8 @@ serve(async (req) => {
         for (const order of filteredOrders) {
           const downloadUrl = `https://fitfocusmedia.com.au/#/gallery/download/${order.download_token}`
           const firstName = order.athlete_first_name || order.customer_name?.split(' ')[0] || 'Athlete'
-          const orgName = gallery?.organizations?.name || 'Fit Focus Media'
 
-          // Dry run: skip sending, just record what would be sent
-          if (isDryRun) {
-            results.sent++
-            results.details.push({
-              email: order.email,
-              name: order.customer_name,
-              status: 'dry_run',
-              type: 'delivery',
-              subject: `Your ${contentType} Is Ready! - ${gallery.title} 🎬`,
-              download_url: downloadUrl,
-              first_name: firstName
-            })
-            continue
-          }
-
-          // Build button using table for email client compatibility (matches gallery_webhook style)
+          // Build the full email HTML
           const buttonHtml = `
             <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="margin: 20px 0;">
               <tr>
@@ -336,50 +348,47 @@ serve(async (req) => {
             </p>
           `
 
-          const emailBody = {
-            From: 'info@fitfocusmedia.com.au',
-            To: order.email,
-            Subject: `Your ${contentType} from ${gallery.title} Is Ready! 🎬`,
-            HtmlBody: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-                <h1 style="color: #e53e3e; margin: 0 0 20px;">FIT FOCUS MEDIA</h1>
-                <h2 style="margin: 0 0 20px;">Hey ${firstName}! 👋</h2>
-                
-                <p>Hope you're having a fantastic day and feeling great post-show!</p>
-                
-                <p>First off, we'd like to say a massive <strong>thank you</strong> for choosing to support Fit Focus Media and allowing us to be a part of your special day. You absolutely <strong>crushed it</strong> out on stage — congratulations on an amazing effort! 🏆</p>
-                
-                <p>We'd also like to say a personal thank you for your patience in getting your content over to you. This season has been more than we could have ever expected, and we're truly grateful for your support as we continue to develop better systems and processes.</p>
-                
-                <div style="background: #f7f7f7; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                  <p style="margin: 0; font-size: 18px; font-weight: bold;">${gallery.title}</p>
-                  <p style="margin: 5px 0 0; color: #666;">${orgName}</p>
-                  <p style="margin: 10px 0 0; font-size: 20px; font-weight: bold; color: #e53e3e;">Your ${contentType} Is Ready!</p>
-                </div>
-                
-                <p>Your ${contentType} is now available to view and download. Below you'll find your access link.</p>
-                
-                ${buttonHtml}
-                
-                <p style="color: #666; font-size: 14px;"><strong>How to access:</strong> Your access is linked to this email address — <strong>${order.email}</strong></p>
-                
-                <div style="background: #fff8e1; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ffc107;">
-                  <p style="margin: 0; font-size: 14px;"><strong>📌 Please Note:</strong> If you have ordered other content from our team, such as a Show Day Highlight, or content that is separate from us such as show day photos, these will be delivered on their own when ready.</p>
-                </div>
-                
-                <p>If you have any issues with downloading or saving your files, please feel free to get in touch at any point and one of our team will be more than happy to assist.</p>
-                
-                <p>If you've enjoyed working with us, we'd love if you could leave a review on Google — it helps us so much! 👇</p>
-                <p><a href="https://g.page/r/CYhE4-27_SwIEB0/review" style="background: #e53e3e; color: #fff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: bold;">⭐ Leave a Google Review</a></p>
-                
-                <p style="color: #999; font-size: 12px; margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
-                  Thank you once again, ${firstName}. Speak soon!<br><br>
-                  — The Fit Focus Media Team<br>
-                  info@fitfocusmedia.com.au
-                </p>
+          const fullHtmlBody = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <h1 style="color: #e53e3e; margin: 0 0 20px;">FIT FOCUS MEDIA</h1>
+              <h2 style="margin: 0 0 20px;">Hey ${firstName}! 👋</h2>
+              
+              <p>Hope you're having a fantastic day and feeling great post-show!</p>
+              
+              <p>First off, we'd like to say a massive <strong>thank you</strong> for choosing to support Fit Focus Media and allowing us to be a part of your special day. You absolutely <strong>crushed it</strong> out on stage — congratulations on an amazing effort! 🏆</p>
+              
+              <p>We'd also like to say a personal thank you for your patience in getting your content over to you. This season has been more than we could have ever expected, and we're truly grateful for your support as we continue to develop better systems and processes.</p>
+              
+              <div style="background: #f7f7f7; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <p style="margin: 0; font-size: 18px; font-weight: bold;">${gallery.title}</p>
+                <p style="margin: 5px 0 0; color: #666;">${orgName}</p>
+                <p style="margin: 10px 0 0; font-size: 20px; font-weight: bold; color: #e53e3e;">Your ${contentType} Is Ready!</p>
               </div>
-            `,
-            TextBody: `Hey ${firstName}!
+              
+              <p>Your ${contentType} is now available to view and download. Below you'll find your access link.</p>
+              
+              ${buttonHtml}
+              
+              <p style="color: #666; font-size: 14px;"><strong>How to access:</strong> Your access is linked to this email address — <strong>${order.email}</strong></p>
+              
+              <div style="background: #fff8e1; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ffc107;">
+                <p style="margin: 0; font-size: 14px;"><strong>📌 Please Note:</strong> If you have ordered other content from our team, such as a Show Day Highlight, or content that is separate from us such as show day photos, these will be delivered on their own when ready.</p>
+              </div>
+              
+              <p>If you have any issues with downloading or saving your files, please feel free to get in touch at any point and one of our team will be more than happy to assist.</p>
+              
+              <p>If you've enjoyed working with us, we'd love if you could leave a review on Google — it helps us so much! 👇</p>
+              <p><a href="https://g.page/r/CYhE4-27_SwIEB0/review" style="background: #e53e3e; color: #fff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: bold;">⭐ Leave a Google Review</a></p>
+              
+              <p style="color: #999; font-size: 12px; margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
+                Thank you once again, ${firstName}. Speak soon!<br><br>
+                — The Fit Focus Media Team<br>
+                info@fitfocusmedia.com.au
+              </p>
+            </div>
+          `
+
+          const textBody = `Hey ${firstName}!
 
 Hope you're having a fantastic day and feeling great post-show!
 
@@ -400,7 +409,29 @@ https://g.page/r/CYhE4-27_SwIEB0/review
 Thank you once again, ${firstName}. Speak soon!
 
 — The Fit Focus Media Team
-info@fitfocusmedia.com.au`,
+info@fitfocusmedia.com.au`
+
+          if (isDryRun) {
+            results.sent++
+            results.details.push({
+              email: order.email,
+              name: order.customer_name,
+              status: 'dry_run',
+              type: 'delivery',
+              subject: `Your ${contentType} from ${gallery.title} Is Ready! 🎬`,
+              download_url: downloadUrl,
+              first_name: firstName,
+              html_preview: fullHtmlBody
+            })
+            continue
+          }
+
+          const emailPayload = {
+            From: 'info@fitfocusmedia.com.au',
+            To: order.email,
+            Subject: `Your ${contentType} from ${gallery.title} Is Ready! 🎬`,
+            HtmlBody: fullHtmlBody,
+            TextBody: textBody,
             MessageStream: 'outbound'
           }
 
@@ -412,11 +443,10 @@ info@fitfocusmedia.com.au`,
                 'Content-Type': 'application/json',
                 'X-Postmark-Server-Token': postmarkToken
               },
-              body: JSON.stringify(emailBody)
+              body: JSON.stringify(emailPayload)
             })
 
             if (response.ok) {
-              // Mark as sent
               await supabase
                 .from('gallery_orders')
                 .update({ delivery_email_sent: true, delivery_email_sent_at: new Date().toISOString() })
@@ -437,34 +467,24 @@ info@fitfocusmedia.com.au`,
           }
         }
       } else if (email_type === 'promo') {
-        // Send to athletes who competed but didn't order (purchase invitation)
-        // Get content orders for this event with status != 'paid'
-        const { data: unpaidOrders } = await supabase
-          .from('content_orders')
-          .select('id, email, first_name, last_name, athlete_number, status')
-          .eq('event_id', event_id)
-          .neq('status', 'paid')
+        // Send promo emails to athletes who didn't pre-order
+        // Source 1: gallery_orders with delivery_type = 'promo' (from CSV import)
+        const { data: promoOrders } = await supabase
+          .from('gallery_orders')
+          .select('id, email, customer_name, download_token, athlete_first_name, athlete_last_name, notes, promo_email_sent, galleries(title, organizations(name))')
+          .eq('gallery_id', gallery_id)
+          .eq('delivery_type', 'promo')
+          .eq('promo_email_sent', false)
 
-        for (const order of (unpaidOrders || [])) {
-          const firstName = order.first_name || 'Athlete'
+        // Source 2: content_orders with status != 'paid' (from website orders)
+        // Source 2: content_orders with status != 'paid' (from website orders)
+        // Only used if event_id is provided
+
+        // Process promo gallery orders (from CSV import)
+        for (const order of (promoOrders || [])) {
+          const firstName = order.athlete_first_name || order.customer_name?.split(' ')[0] || 'Athlete'
           const galleryViewUrl = `${galleryUrl}?email=${encodeURIComponent(order.email)}`
 
-          // Dry run: skip sending, just record what would be sent
-          if (isDryRun) {
-            results.sent++
-            results.details.push({
-              email: order.email,
-              name: `${order.first_name} ${order.last_name}`,
-              status: 'dry_run',
-              type: 'promo',
-              subject: `${contentType}s from ${event_name || gallery.title} Are Now Available! 🎬`,
-              preview_url: galleryViewUrl,
-              first_name: firstName
-            })
-            continue
-          }
-
-          // Build button using table for email client compatibility (matches gallery_webhook style)
           const promoButtonHtml = `
             <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="margin: 20px 0;">
               <tr>
@@ -481,46 +501,43 @@ info@fitfocusmedia.com.au`,
             </p>
           `
 
-          const emailBody = {
-            From: 'info@fitfocusmedia.com.au',
-            To: order.email,
-            Subject: `${contentType}s from ${event_name || gallery.title} Are Now Available! 🎬`,
-            HtmlBody: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-                <h1 style="color: #e53e3e; margin: 0 0 20px;">FIT FOCUS MEDIA</h1>
-                <h2 style="margin: 0 0 20px;">Hey ${firstName}! 👋</h2>
-                
-                <p>Hope you're having a fantastic day and feeling great post-show!</p>
-                
-                <p>We captured your ${contentType} at <strong>${event_name || gallery.title}</strong> and it's now available to preview and purchase! You absolutely crushed it on stage — congratulations on an amazing effort! 🏆</p>
-                
-                <div style="background: #f7f7f7; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                  <p style="margin: 0; font-size: 18px; font-weight: bold;">${gallery.title}</p>
-                  <p style="margin: 5px 0 0; color: #666;">${orgName}</p>
-                </div>
-                
-                <p>Click below to preview your footage and purchase your ${contentType}.</p>
-                
-                ${promoButtonHtml}
-                
-                <p style="color: #666; font-size: 14px;"><strong>How to access:</strong> Your preview is linked to this email address — <strong>${order.email}</strong></p>
-                
-                <p>If you have any questions, please feel free to get in touch at any point and one of our team will be more than happy to assist.</p>
-                
-                <p>If you've enjoyed working with us, we'd love if you could leave a review on Google! 👇</p>
-                <p><a href="https://g.page/r/CYhE4-27_SwIEB0/review" style="background: #e53e3e; color: #fff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: bold;">⭐ Leave a Google Review</a></p>
-                
-                <p style="color: #999; font-size: 12px; margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
-                  — The Fit Focus Media Team<br>
-                  info@fitfocusmedia.com.au
-                </p>
+          const fullHtmlBody = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <h1 style="color: #e53e3e; margin: 0 0 20px;">FIT FOCUS MEDIA</h1>
+              <h2 style="margin: 0 0 20px;">Hey ${firstName}! 👋</h2>
+              
+              <p>Hope you're having a fantastic day and feeling great post-show!</p>
+              
+              <p>We captured your ${contentType} at <strong>${gallery.title}</strong> and it's now available to preview and purchase! You absolutely crushed it on stage — congratulations on an amazing effort! 🏆</p>
+              
+              <div style="background: #f7f7f7; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <p style="margin: 0; font-size: 18px; font-weight: bold;">${gallery.title}</p>
+                <p style="margin: 5px 0 0; color: #666;">${orgName}</p>
               </div>
-            `,
-            TextBody: `Hey ${firstName}!
+              
+              <p>Click below to preview your footage and purchase your ${contentType}.</p>
+              
+              ${promoButtonHtml}
+              
+              <p style="color: #666; font-size: 14px;"><strong>How to access:</strong> Your preview is linked to this email address — <strong>${order.email}</strong></p>
+              
+              <p>If you have any questions, please feel free to get in touch at any point and one of our team will be more than happy to assist.</p>
+              
+              <p>If you've enjoyed working with us, we'd love if you could leave a review on Google! 👇</p>
+              <p><a href="https://g.page/r/CYhE4-27_SwIEB0/review" style="background: #e53e3e; color: #fff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: bold;">⭐ Leave a Google Review</a></p>
+              
+              <p style="color: #999; font-size: 12px; margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
+                — The Fit Focus Media Team<br>
+                info@fitfocusmedia.com.au
+              </p>
+            </div>
+          `
+
+          const textBody = `Hey ${firstName}!
 
 Hope you're having a fantastic day and feeling great post-show!
 
-We captured your ${contentType} at ${event_name || gallery.title} and it's now available to preview and purchase! You absolutely crushed it on stage — congratulations!
+We captured your ${contentType} at ${gallery.title} and it's now available to preview and purchase! You absolutely crushed it on stage — congratulations!
 
 Preview and purchase here:
 ${galleryViewUrl}
@@ -533,7 +550,30 @@ If you've enjoyed working with us, please consider leaving a review:
 https://g.page/r/CYhE4-27_SwIEB0/review
 
 — The Fit Focus Media Team
-info@fitfocusmedia.com.au`,
+info@fitfocusmedia.com.au`
+
+          if (isDryRun) {
+            results.sent++
+            results.details.push({
+              email: order.email,
+              name: order.customer_name,
+              status: 'dry_run',
+              type: 'promo',
+              source: 'gallery_orders',
+              subject: `${contentType}s from ${gallery.title} Are Now Available! 🎬`,
+              preview_url: galleryViewUrl,
+              first_name: firstName,
+              html_preview: fullHtmlBody
+            })
+            continue
+          }
+
+          const emailPayload = {
+            From: 'info@fitfocusmedia.com.au',
+            To: order.email,
+            Subject: `${contentType}s from ${gallery.title} Are Now Available! 🎬`,
+            HtmlBody: fullHtmlBody,
+            TextBody: textBody,
             MessageStream: 'outbound'
           }
 
@@ -545,25 +585,154 @@ info@fitfocusmedia.com.au`,
                 'Content-Type': 'application/json',
                 'X-Postmark-Server-Token': postmarkToken
               },
-              body: JSON.stringify(emailBody)
+              body: JSON.stringify(emailPayload)
             })
 
             if (response.ok) {
-              // Mark promo as sent
               await supabase
-                .from('content_orders')
+                .from('gallery_orders')
                 .update({ promo_email_sent: true, promo_email_sent_at: new Date().toISOString() })
                 .eq('id', order.id)
-
+              
               results.sent++
-              results.details.push({ email: order.email, name: `${order.first_name} ${order.last_name}`, status: 'sent' })
+              results.details.push({ email: order.email, name: order.customer_name, status: 'sent' })
             } else {
+              const errorData = await response.json()
               results.failed++
-              results.details.push({ email: order.email, name: `${order.first_name} ${order.last_name}`, status: 'failed' })
+              results.details.push({ email: order.email, name: order.customer_name, status: 'failed', error: errorData.Message || 'Unknown error' })
             }
           } catch (err) {
             results.failed++
-            results.details.push({ email: order.email, name: `${order.first_name} ${order.last_name}`, status: 'error' })
+            results.details.push({ email: order.email, name: order.customer_name, status: 'error' })
+          }
+        }
+
+        // Source 2: content_orders with status != 'paid' (from website orders)
+        // Only used if event_id is provided
+        if (event_id) {
+          const { data: unpaidOrders } = await supabase
+            .from('content_orders')
+            .select('id, email, first_name, last_name, athlete_number, status')
+            .eq('event_id', event_id)
+            .neq('status', 'paid')
+
+          for (const order of (unpaidOrders || [])) {
+            // Skip if this athlete already has a gallery order (avoid duplicates)
+            const { data: existingPromo } = await supabase
+              .from('gallery_orders')
+              .select('id')
+              .eq('gallery_id', gallery_id)
+              .ilike('email', order.email.toLowerCase())
+              .limit(1)
+
+            if (existingPromo && existingPromo.length > 0) continue
+
+            const firstName = order.first_name || 'Athlete'
+            const galleryViewUrl = `${galleryUrl}?email=${encodeURIComponent(order.email)}`
+
+            if (isDryRun) {
+              results.sent++
+              results.details.push({
+                email: order.email,
+                name: `${order.first_name} ${order.last_name}`,
+                status: 'dry_run',
+                type: 'promo',
+                source: 'content_orders',
+                subject: `${contentType}s from ${event_name || gallery.title} Are Now Available! 🎬`,
+                preview_url: galleryViewUrl,
+                first_name: firstName
+              })
+              continue
+            }
+
+            const promoButtonHtml = `
+              <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="margin: 20px 0;">
+                <tr>
+                  <td align="center" bgcolor="#e53e3e" style="border-radius: 6px;">
+                    <a href="${galleryViewUrl}" target="_blank" style="display: inline-block; padding: 14px 30px; font-family: Arial, sans-serif; font-size: 16px; color: #ffffff; text-decoration: none; font-weight: bold; border-radius: 6px;">
+                      Preview & Purchase →
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              <p style="color: #666; font-size: 13px; margin-top: 10px;">
+                Button not working? Copy and paste this link into your browser:<br>
+                <a href="${galleryViewUrl}" style="color: #e53e3e; word-break: break-all;">${galleryViewUrl}</a>
+              </p>
+            `
+
+            const fullHtmlBody = `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h1 style="color: #e53e3e; margin: 0 0 20px;">FIT FOCUS MEDIA</h1>
+                <h2 style="margin: 0 0 20px;">Hey ${firstName}! 👋</h2>
+                <p>Hope you're having a fantastic day and feeling great post-show!</p>
+                <p>We captured your ${contentType} at <strong>${event_name || gallery.title}</strong> and it's now available to preview and purchase! You absolutely crushed it on stage — congratulations on an amazing effort! 🏆</p>
+                <div style="background: #f7f7f7; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                  <p style="margin: 0; font-size: 18px; font-weight: bold;">${gallery.title}</p>
+                  <p style="margin: 5px 0 0; color: #666;">${orgName}</p>
+                </div>
+                <p>Click below to preview your footage and purchase your ${contentType}.</p>
+                ${promoButtonHtml}
+                <p style="color: #666; font-size: 14px;"><strong>How to access:</strong> Your preview is linked to this email address — <strong>${order.email}</strong></p>
+                <p>If you have any questions, please feel free to get in touch at any point and one of our team will be more than happy to assist.</p>
+                <p>If you've enjoyed working with us, we'd love if you could leave a review on Google! 👇</p>
+                <p><a href="https://g.page/r/CYhE4-27_SwIEB0/review" style="background: #e53e3e; color: #fff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: bold;">⭐ Leave a Google Review</a></p>
+                <p style="color: #999; font-size: 12px; margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
+                  — The Fit Focus Media Team<br>
+                  info@fitfocusmedia.com.au
+                </p>
+              </div>
+            `
+
+            const textBody = `Hey ${firstName}!
+
+Hope you're having a fantastic day and feeling great post-show!
+
+We captured your ${contentType} at ${event_name || gallery.title} and it's now available to preview and purchase!
+
+Preview and purchase here:
+${galleryViewUrl}
+
+Your access is linked to: ${order.email}
+
+— The Fit Focus Media Team
+info@fitfocusmedia.com.au`
+
+            const emailPayload = {
+              From: 'info@fitfocusmedia.com.au',
+              To: order.email,
+              Subject: `${contentType}s from ${event_name || gallery.title} Are Now Available! 🎬`,
+              HtmlBody: fullHtmlBody,
+              TextBody: textBody,
+              MessageStream: 'outbound'
+            }
+
+            try {
+              const response = await fetch('https://api.postmarkapp.com/email', {
+                method: 'POST',
+                headers: {
+                  'Accept': 'application/json',
+                  'Content-Type': 'application/json',
+                  'X-Postmark-Server-Token': postmarkToken
+                },
+                body: JSON.stringify(emailPayload)
+              })
+
+              if (response.ok) {
+                await supabase
+                  .from('content_orders')
+                  .update({ promo_email_sent: true, promo_email_sent_at: new Date().toISOString() })
+                  .eq('id', order.id)
+                results.sent++
+                results.details.push({ email: order.email, name: `${order.first_name} ${order.last_name}`, status: 'sent' })
+              } else {
+                results.failed++
+                results.details.push({ email: order.email, name: `${order.first_name} ${order.last_name}`, status: 'failed' })
+              }
+            } catch (err) {
+              results.failed++
+              results.details.push({ email: order.email, name: `${order.first_name} ${order.last_name}`, status: 'error' })
+            }
           }
         }
       }
