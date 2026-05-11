@@ -2871,7 +2871,7 @@ function ContentDelivery({ gallery, organization }) {
                     <div className="mt-2 max-h-40 overflow-y-auto">
                       {csvResult.results.details.map((d, i) => (
                         <div key={i} className={`py-1 ${d.status === 'error' ? 'text-red-400' : d.status === 'already_exists' ? 'text-yellow-400' : 'text-green-400'}`}>
-                          {d.name || d.email} — {d.status}
+                          {d.name || d.email} — {d.status}{d.delivery_type ? ` (${d.delivery_type})` : ''}{d.error ? `: ${d.error}` : ''}
                         </div>
                       ))}
                     </div>
