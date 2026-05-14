@@ -649,6 +649,7 @@ export default function EventPage() {
                   isPast={isPast}
                   isVod={isVodAvailable && !vodExpired}
                   vodExpired={vodExpired}
+                  vodEnabled={event.vod_enabled}
                 />
               </div>
             </div>
