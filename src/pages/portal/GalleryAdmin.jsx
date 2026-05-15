@@ -2469,7 +2469,7 @@ function VideoPricingTiersEditor({ gallery, onUpdate }) {
   )
 }
 
-// Content Delivery — I-Walk / Posing Routine bulk import & email delivery
+// Content Delivery — I-Walk / Posing / Showday Highlight Reel bulk import & email delivery
 function ContentDelivery({ gallery, organization }) {
   const [events, setEvents] = useState([])
   const [selectedEventId, setSelectedEventId] = useState(gallery.event_id || '')
