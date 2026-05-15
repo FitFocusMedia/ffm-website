@@ -126,8 +126,7 @@ export default function GalleryDownloadPage() {
   }
 
   const downloadAllVideos = async () => {
-    const items = order.gallery_order_video_items || []
-    for (const item of items) {
+    for (const item of videoItems) {
       if (!downloadedVideos.has(item.clip_id)) {
         await downloadVideo(item.clip_id, item.gallery_clips?.filename || `video-${item.clip_id}.mp4`)
         await new Promise(resolve => setTimeout(resolve, 500))
@@ -163,7 +162,26 @@ export default function GalleryDownloadPage() {
   }
 
   const photoItems = order.gallery_order_items || []
-  const videoItems = order.gallery_order_video_items || []
+  
+  // Merge purchased video items + free_access gallery clips
+  const purchasedVideos = order.gallery_order_video_items || []
+  const freeAccessClips = order.gallery_clips || []
+  
+  // Normalize free_access clips to same shape as purchased videos
+  const normalizedFreeClips = freeAccessClips.map(clip => ({
+    id: `free-${clip.id}`,
+    clip_id: clip.id,
+    gallery_clips: {
+      id: clip.id,
+      filename: clip.filename,
+      title: clip.title || clip.filename,
+      mux_playback_id: clip.mux_playback_id,
+      duration_seconds: clip.duration_seconds,
+      original_path: clip.original_path
+    }
+  }))
+  
+  const videoItems = [...purchasedVideos, ...normalizedFreeClips]
   const hasPhotos = photoItems.length > 0
   const hasVideos = videoItems.length > 0
   const allPhotosDownloaded = photoItems.every(item => downloadedPhotos.has(item.photo_id))
