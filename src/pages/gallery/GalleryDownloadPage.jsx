@@ -154,7 +154,7 @@ export default function GalleryDownloadPage() {
           <p className="text-gray-400 mb-4">{error}</p>
           {error === 'Download link has expired' && (
             <p className="text-gray-500 text-sm">
-              Download links expire after 7 days. Please contact us if you need a new link.
+              Your download link has expired. Please contact us if you need a new link.
             </p>
           )}
         </div>
@@ -168,8 +168,9 @@ export default function GalleryDownloadPage() {
   const hasVideos = videoItems.length > 0
   const allPhotosDownloaded = photoItems.every(item => downloadedPhotos.has(item.photo_id))
   const allVideosDownloaded = videoItems.every(item => downloadedVideos.has(item.clip_id))
-  const expiresAt = new Date(order.token_expires_at)
-  const daysLeft = Math.ceil((expiresAt - new Date()) / (1000 * 60 * 60 * 24))
+  const hasExpiry = !!order.token_expires_at
+  const expiresAt = hasExpiry ? new Date(order.token_expires_at) : null
+  const daysLeft = hasExpiry ? Math.ceil((expiresAt - new Date()) / (1000 * 60 * 60 * 24)) : null
 
   // Determine content type for title
   let contentType = 'Content'
@@ -192,16 +193,18 @@ export default function GalleryDownloadPage() {
         </div>
 
         {/* Expiry Warning */}
-        <div className="mb-6 p-4 bg-dark-800 rounded-lg flex items-center gap-3">
-          <Clock className="w-5 h-5 text-yellow-500" />
-          <div>
-            <span className="text-gray-300">Downloads available for </span>
-            <span className="text-white font-semibold">{daysLeft} more days</span>
-            <span className="text-gray-500 text-sm ml-2">
-              (expires {expiresAt.toLocaleDateString()})
-            </span>
+        {hasExpiry && (
+          <div className="mb-6 p-4 bg-dark-800 rounded-lg flex items-center gap-3">
+            <Clock className="w-5 h-5 text-yellow-500" />
+            <div>
+              <span className="text-gray-300">Downloads available for </span>
+              <span className="text-white font-semibold">{daysLeft} more days</span>
+              <span className="text-gray-500 text-sm ml-2">
+                (expires {expiresAt.toLocaleDateString()})
+              </span>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Photos Section */}
         {hasPhotos && (

@@ -87,11 +87,6 @@ serve(async (req) => {
             status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           })
         }
-        if (found.token_expires_at && new Date(found.token_expires_at) < new Date()) {
-          return new Response(JSON.stringify({ error: 'Download link has expired' }), {
-            status: 410, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          })
-        }
         // Order exists but status is something unexpected
         return new Response(JSON.stringify({ error: `Order status is '${found.status}' — expected 'completed'. Contact support.` }), {
           status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -166,15 +161,6 @@ serve(async (req) => {
           return nameMatches
         })
       }
-    }
-
-    // Check token expiry
-    if (order.token_expires_at && new Date(order.token_expires_at) < new Date()) {
-      console.log('[Gallery Download] Token expired:', order.id)
-      return new Response(JSON.stringify({ error: 'Download link has expired' }), {
-        status: 410,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
     }
 
     // If no photo_id or clip_id, return order details with thumbnails (for download page)
