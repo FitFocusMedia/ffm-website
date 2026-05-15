@@ -50,6 +50,7 @@ serve(async (req) => {
         // Determine which athletes have I-Walk/Posing orders
         const iwalkKeywords = ['i-walk', 'i walk', 'iwalk']
         const posingKeywords = ['posing', 'routine']
+        const showdayKeywords = ['showday', 'highlight', 'reel']
 
         for (const row of csv_rows) {
           if (!row.email || !row.email.includes('@')) {
@@ -62,7 +63,8 @@ serve(async (req) => {
           const service = (row.videography_service || '').toLowerCase()
           const hasIWalk = iwalkKeywords.some(kw => service.includes(kw))
           const hasPosing = posingKeywords.some(kw => service.includes(kw))
-          const hasOrder = service && (hasIWalk || hasPosing)
+          const hasShowday = showdayKeywords.some(kw => service.includes(kw))
+          const hasOrder = service && (hasIWalk || hasPosing || hasShowday)
           const deliveryType = hasOrder ? 'free_access' : 'promo'
 
           const { data: existingOrder } = await supabase
@@ -319,8 +321,12 @@ serve(async (req) => {
         const filteredOrders = (freeOrders || []).filter((order: any) => {
           if (!content_type || content_type === 'I-Walk / Posing Routine') return true
           const notesLower = (order.notes || '').toLowerCase()
-          if (content_type.toLowerCase().includes('i-walk') && notesLower.includes('i-walk')) return true
-          if (content_type.toLowerCase().includes('posing') && notesLower.includes('posing')) return true
+          const contentLower = content_type.toLowerCase()
+          if (contentLower.includes('i-walk') && notesLower.includes('i-walk')) return true
+          if (contentLower.includes('posing') && notesLower.includes('posing')) return true
+          if (contentLower.includes('showday') && notesLower.includes('showday')) return true
+          if (contentLower.includes('highlight') && notesLower.includes('highlight')) return true
+          if (contentLower.includes('reel') && notesLower.includes('reel')) return true
           if (!order.notes) return true
           return false
         })
@@ -370,7 +376,7 @@ serve(async (req) => {
               <p style="color: #666; font-size: 14px;"><strong>How to access:</strong> Your access is linked to this email address — <strong>${order.email}</strong></p>
               
               <div style="background: #fff8e1; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ffc107;">
-                <p style="margin: 0; font-size: 14px;"><strong>📌 Please Note:</strong> If you have ordered other content from our team, such as a Show Day Highlight, or content that is separate from us such as show day photos, these will be delivered on their own when ready.</p>
+                <p style="margin: 0; font-size: 14px;"><strong>📌 Please Note:</strong> If you have ordered other content from our team, these will be delivered on their own when ready.</p>
               </div>
               
               <p>If you have any issues with downloading or saving your files, please feel free to get in touch at any point and one of our team will be more than happy to assist.</p>
@@ -874,7 +880,7 @@ info@fitfocusmedia.com.au`
               ${buttonHtml}
               <p style="color: #666; font-size: 14px;"><strong>How to access:</strong> Your access is linked to this email address — <strong>${order.email}</strong></p>
               <div style="background: #fff8e1; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ffc107;">
-                <p style="margin: 0; font-size: 14px;"><strong>📌 Please Note:</strong> If you have ordered other content from our team, such as a Show Day Highlight, or content that is separate from us such as show day photos, these will be delivered on their own when ready.</p>
+                <p style="margin: 0; font-size: 14px;"><strong>📌 Please Note:</strong> If you have ordered other content from our team, these will be delivered on their own when ready.</p>
               </div>
               <p>If you have any issues with downloading or saving your files, please feel free to get in touch at any point and one of our team will be more than happy to assist.</p>
               <p>If you've enjoyed working with us, we'd love if you could leave a review on Google — it helps us so much! 👇</p>

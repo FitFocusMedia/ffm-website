@@ -2032,7 +2032,7 @@ function GalleryEditor({ gallery, organization, onBack }) {
           }} 
         />
 
-        {/* Content Delivery — I-Walk / Posing Routine */}
+        {/* Content Delivery — I-Walk / Posing / Showday Highlight Reel */}
         <ContentDelivery gallery={currentGallery} organization={organization} />
       </div>
     </div>
@@ -2737,7 +2737,7 @@ function ContentDelivery({ gallery, organization }) {
     <div className="border-t border-dark-600 pt-6 mt-6">
       <h3 className="text-md font-semibold text-white flex items-center gap-2 mb-4">
         🎬 Content Delivery
-        <span className="text-xs text-gray-500 font-normal">(I-Walk / Posing Routine)</span>
+        <span className="text-xs text-gray-500 font-normal">(I-Walk / Posing / Showday Highlight Reel)</span>
       </h3>
       
       <div className="bg-dark-700 rounded-lg p-4 mb-4">
@@ -2866,17 +2866,17 @@ function ContentDelivery({ gallery, organization }) {
                 {selectedCsvEvent
                   ? ` (${parsedRows.filter(r => {
                       const s = (r.videography_service || '').toLowerCase()
-                      return r.event === selectedCsvEvent && s && (['i-walk','i walk','posing','routine'].some(kw => s.includes(kw)))
+                      return r.event === selectedCsvEvent && s && (['i-walk','i walk','posing','routine','showday','highlight','reel'].some(kw => s.includes(kw)))
                     }).length} delivery + ${parsedRows.filter(r => {
                       const s = (r.videography_service || '').toLowerCase()
-                      return r.event === selectedCsvEvent && (!s || !(['i-walk','i walk','posing','routine'].some(kw => s.includes(kw))))
+                      return r.event === selectedCsvEvent && (!s || !(['i-walk','i walk','posing','routine','showday','highlight','reel'].some(kw => s.includes(kw))))
                     }).length} promo)`
                   : parsedRows.length > 0 ? ` (${parsedRows.filter(r => {
                       const s = (r.videography_service || '').toLowerCase()
-                      return s && (['i-walk','i walk','posing','routine'].some(kw => s.includes(kw)))
+                      return s && (['i-walk','i walk','posing','routine','showday','highlight','reel'].some(kw => s.includes(kw)))
                     }).length} delivery + ${parsedRows.filter(r => {
                       const s = (r.videography_service || '').toLowerCase()
-                      return !s || !(['i-walk','i walk','posing','routine'].some(kw => s.includes(kw)))
+                      return !s || !(['i-walk','i walk','posing','routine','showday','highlight','reel'].some(kw => s.includes(kw)))
                     }).length} promo of ${parsedRows.length} total)` : ''
                 }
               </button>

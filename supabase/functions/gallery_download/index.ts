@@ -147,6 +147,10 @@ serve(async (req) => {
         let serviceType = ''
         if (notesLower.includes('i-walk')) serviceType = 'i-walk'
         else if (notesLower.includes('posing')) serviceType = 'posing'
+        else if (notesLower.includes('showday') || notesLower.includes('highlight') || notesLower.includes('reel')) serviceType = 'showday highlight reel'
+        else if (notesLower.includes('showday')) serviceType = 'showday'
+        else if (notesLower.includes('highlight')) serviceType = 'highlight'
+        else if (notesLower.includes('reel')) serviceType = 'reel'
         
         // Filter clips to only include ones matching the athlete's name (and service type if available)
         galleryClips = galleryClips.filter((clip: any) => {
